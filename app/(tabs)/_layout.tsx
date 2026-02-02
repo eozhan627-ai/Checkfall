@@ -2,12 +2,20 @@ import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
   return (
-    <Tabs>
+    <Tabs
+      screenOptions={{
+
+        tabBarLabelStyle: {
+          fontSize: 17,
+
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           headerShown: false,
-          tabBarLabel: 'Home',
+          title: 'Home',
           tabBarIcon: () => null,
         }}
       />
@@ -15,15 +23,17 @@ export default function TabLayout() {
         name="learn"
         options={{
           title: 'Learn',
+          tabBarIcon: () => null,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
-          title: 'More'
+          title: 'More',
+          tabBarIcon: () => null,
         }}
       />
 
     </Tabs>
   );
-} 
+}

@@ -1,0 +1,5726 @@
+[
+  {
+    "id": "00008",
+    "fen": "r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K b - - 0 24",
+    "moves": [
+      "f2g3",
+      "e6e7",
+      "b2b1",
+      "b3c1",
+      "b1c1",
+      "h6c1"
+    ],
+    "rating": 1877
+  },
+  {
+    "id": "0000D",
+    "fen": "5rk1/1p3ppp/pq3b2/8/8/1P1Q1N2/P4PPP/3R2K1 w - - 2 27",
+    "moves": [
+      "d3d6",
+      "f8d8",
+      "d6d8",
+      "f6d8"
+    ],
+    "rating": 1501
+  },
+  {
+    "id": "0008Q",
+    "fen": "8/4R3/1p2P3/p4r2/P6p/1P3Pk1/4K3/8 w - - 1 64",
+    "moves": [
+      "e7f7",
+      "f5e5",
+      "e2f1",
+      "e5e6"
+    ],
+    "rating": 1355
+  },
+  {
+    "id": "0009B",
+    "fen": "r2qr1k1/b1p2ppp/pp4n1/P1P1p3/4P1n1/B2P2Pb/3NBP1P/RN1QR1K1 b - - 1 16",
+    "moves": [
+      "b6c5",
+      "e2g4",
+      "h3g4",
+      "d1g4"
+    ],
+    "rating": 1103
+  },
+  {
+    "id": "000Pw",
+    "fen": "6k1/5p1p/4p3/4q3/3nN3/2Q3P1/PP3P1P/6K1 w - - 2 37",
+    "moves": [
+      "e4d2",
+      "d4e2",
+      "g1f1",
+      "e2c3"
+    ],
+    "rating": 1422
+  },
+  {
+    "id": "000Sa",
+    "fen": "2Q2bk1/5p1p/p5p1/2p3P1/2r1B3/7P/qPQ2P2/2K4R b - - 0 32",
+    "moves": [
+      "c4c2",
+      "e4c2",
+      "a2a1",
+      "c2b1"
+    ],
+    "rating": 1537
+  },
+  {
+    "id": "000Vc",
+    "fen": "8/8/4k1p1/2KpP2p/5PP1/8/8/8 w - - 0 53",
+    "moves": [
+      "g4h5",
+      "g6h5",
+      "f4f5",
+      "e6e5",
+      "f5f6",
+      "e5f6"
+    ],
+    "rating": 1611
+  },
+  {
+    "id": "000Zo",
+    "fen": "4r3/1k6/pp3r2/1b2P2p/3R1p2/P1R2P2/1P4PP/6K1 w - - 0 35",
+    "moves": [
+      "e5f6",
+      "e8e1",
+      "g1f2",
+      "e1f1"
+    ],
+    "rating": 1353
+  },
+  {
+    "id": "000aY",
+    "fen": "r4rk1/pp3ppp/2n1b3/q1pp2B1/8/P1Q2NP1/1PP1PP1P/2KR3R w - - 0 15",
+    "moves": [
+      "g5e7",
+      "a5c3",
+      "b2c3",
+      "c6e7"
+    ],
+    "rating": 1430
+  },
+  {
+    "id": "000h0",
+    "fen": "5rk1/p5p1/3bpr1p/1Pp4q/3pR3/1P1Q1N2/P4PPP/4R1K1 w - - 4 22",
+    "moves": [
+      "e4e6",
+      "f6f3",
+      "g2f3",
+      "h5h2",
+      "g1f1",
+      "h2h3",
+      "f1e2",
+      "h3e6"
+    ],
+    "rating": 2035
+  },
+  {
+    "id": "000hf",
+    "fen": "r1bqk2r/pp1nbNp1/2p1p2p/8/2BP4/1PN3P1/P3QP1P/3R1RK1 b kq - 0 19",
+    "moves": [
+      "e8f7",
+      "e2e6",
+      "f7f8",
+      "e6f7"
+    ],
+    "rating": 1620
+  },
+  {
+    "id": "000jr",
+    "fen": "5k2/1p4pp/p5n1/5Q2/3BpP2/1P2PP1K/P1q4P/7r b - - 1 33",
+    "moves": [
+      "f8g8",
+      "f5d5",
+      "g8f8",
+      "d4c5",
+      "c2c5",
+      "d5c5"
+    ],
+    "rating": 2053
+  },
+  {
+    "id": "000lC",
+    "fen": "3r3r/pQNk1ppp/1qnb1n2/1B6/8/8/PPP3PP/3R1R1K w - - 5 19",
+    "moves": [
+      "d1d6",
+      "d7d6",
+      "b7b6",
+      "a7b6"
+    ],
+    "rating": 1391
+  },
+  {
+    "id": "000mr",
+    "fen": "5r1k/5rp1/p7/1b2B2p/1P1P1Pq1/2R1Q3/P3p1P1/2R3K1 w - - 0 41",
+    "moves": [
+      "e3g3",
+      "f7f4",
+      "e5f4",
+      "f8f4"
+    ],
+    "rating": 1957
+  },
+  {
+    "id": "000o3",
+    "fen": "8/2p1k3/6p1/1p1P1p2/1P3P2/3K2Pp/7P/8 b - - 1 43",
+    "moves": [
+      "e7d6",
+      "d3d4",
+      "g6g5",
+      "f4g5"
+    ],
+    "rating": 944
+  },
+  {
+    "id": "000qP",
+    "fen": "8/7R/8/5p2/4bk1P/8/2r2K2/6R1 w - - 7 51",
+    "moves": [
+      "f2f1",
+      "f4f3",
+      "f1e1",
+      "c2c1",
+      "e1d2",
+      "c1g1"
+    ],
+    "rating": 1999
+  },
+  {
+    "id": "000rO",
+    "fen": "3R4/8/K7/pB2b3/1p6/1P2k3/3p4/8 w - - 4 58",
+    "moves": [
+      "a6a5",
+      "e5c7",
+      "a5b4",
+      "c7d8"
+    ],
+    "rating": 1110
+  },
+  {
+    "id": "00143",
+    "fen": "r2q1rk1/5ppp/1np5/p1b5/2p1B3/P7/1P3PPP/R1BQ1RK1 b - - 1 17",
+    "moves": [
+      "d8f6",
+      "d1h5",
+      "h7h6",
+      "h5c5"
+    ],
+    "rating": 1780
+  },
+  {
+    "id": "0017R",
+    "fen": "r2qk2r/pp2ppbp/1n1p2p1/3Pn3/2P5/2NBBP1P/PP3P2/R2QK2R b KQkq - 0 12",
+    "moves": [
+      "e5c4",
+      "d3c4",
+      "b6c4",
+      "d1a4",
+      "d8d7",
+      "a4c4"
+    ],
+    "rating": 1677
+  },
+  {
+    "id": "0018P",
+    "fen": "5R2/1p6/p1p5/2P1rk2/2K3p1/2P1p1P1/1P5P/8 b - - 1 44",
+    "moves": [
+      "f5e6",
+      "f8e8",
+      "e6f5",
+      "e8e5",
+      "f5e5",
+      "c4d3",
+      "e5d5",
+      "d3e3",
+      "a6a5",
+      "e3f4",
+      "d5c4",
+      "f4g4"
+    ],
+    "rating": 1904
+  },
+  {
+    "id": "001Fg",
+    "fen": "2R2r1k/pQ4pp/5rp1/3B4/q2n4/7P/P4PP1/5RK1 w - - 3 30",
+    "moves": [
+      "c8c7",
+      "d4e2",
+      "g1h2",
+      "a4f4",
+      "h2h1",
+      "e2g3",
+      "f2g3",
+      "f4f1"
+    ],
+    "rating": 1516
+  },
+  {
+    "id": "001Oo",
+    "fen": "6k1/4p1bp/6p1/1p1pP3/1PpPp3/2P1P3/Q2B1KPP/3q4 b - - 2 23",
+    "moves": [
+      "d1a4",
+      "a2a4",
+      "b5a4",
+      "b4b5",
+      "g8f7",
+      "b5b6"
+    ],
+    "rating": 2078
+  },
+  {
+    "id": "001Wz",
+    "fen": "4r1k1/5ppp/r1p5/p1n1RP2/8/2P2N1P/2P3P1/3R2K1 b - - 0 21",
+    "moves": [
+      "e8e5",
+      "d1d8",
+      "e5e8",
+      "d8e8"
+    ],
+    "rating": 1118
+  },
+  {
+    "id": "001XA",
+    "fen": "1qr2rk1/pb2bppp/8/8/2p1N3/P1Bn2P1/2Q2PBP/1R3RK1 b - - 3 23",
+    "moves": [
+      "b8c7",
+      "b1b7",
+      "c7b7",
+      "e4f6",
+      "e7f6",
+      "g2b7"
+    ],
+    "rating": 1667
+  },
+  {
+    "id": "001aK",
+    "fen": "6k1/5p2/4p3/P1B5/2P4P/4Pnp1/Rb1rN3/5K2 b - - 1 33",
+    "moves": [
+      "d2e2",
+      "f1e2",
+      "g3g2",
+      "e3e4",
+      "f3d4",
+      "e2f2"
+    ],
+    "rating": 2027
+  },
+  {
+    "id": "001cr",
+    "fen": "8/3B2pp/p5k1/2p3P1/1p1p1K2/8/1P6/8 b - - 0 38",
+    "moves": [
+      "c5c4",
+      "d7e8"
+    ],
+    "rating": 1606
+  },
+  {
+    "id": "001gi",
+    "fen": "r6r/1pNk1ppp/2np4/b3p3/4P1b1/N1Q5/P4PPP/R3KB1R w KQ - 3 18",
+    "moves": [
+      "c7a8",
+      "a5c3"
+    ],
+    "rating": 820
+  },
+  {
+    "id": "001h8",
+    "fen": "2r3k1/2r4p/4p1p1/1p1q1pP1/p1bP1P1Q/P6R/5B2/2R3K1 b - - 5 34",
+    "moves": [
+      "c4e2",
+      "h4h7",
+      "c7h7",
+      "c1c8",
+      "g8g7",
+      "c8c7"
+    ],
+    "rating": 1780
+  },
+  {
+    "id": "001kG",
+    "fen": "rnbq3r/1p2bkpp/p4n2/8/2pNP3/2N5/PPP3PP/R1BQ1RK1 b - - 1 11",
+    "moves": [
+      "e7c5",
+      "d1h5",
+      "f7g8",
+      "h5c5"
+    ],
+    "rating": 1904
+  },
+  {
+    "id": "001m3",
+    "fen": "7r/6k1/2b1pp2/8/P1N3p1/5nP1/4RP2/Q4K2 w - - 2 38",
+    "moves": [
+      "e2e6",
+      "h8h1",
+      "f1e2",
+      "h1a1"
+    ],
+    "rating": 1459
+  },
+  {
+    "id": "001om",
+    "fen": "5r1k/pp4pp/5p2/1BbQp1r1/6K1/7P/1PP3P1/3R3R w - - 2 26",
+    "moves": [
+      "g4h4",
+      "c5f2",
+      "g2g3",
+      "f2g3"
+    ],
+    "rating": 1018
+  },
+  {
+    "id": "001pC",
+    "fen": "r4rk1/pp3ppp/3b4/2p1pPB1/7N/2PP3n/PP4PP/R2Q1RqK w - - 5 18",
+    "moves": [
+      "f1g1",
+      "h3f2"
+    ],
+    "rating": 895
+  },
+  {
+    "id": "001u3",
+    "fen": "2r3k1/p1q2pp1/Q3p2p/b1Np4/2nP1P2/4P1P1/5K1P/2B1N3 b - - 3 33",
+    "moves": [
+      "c7b6",
+      "a6c8",
+      "g8h7",
+      "c8b7"
+    ],
+    "rating": 2175
+  },
+  {
+    "id": "001uD",
+    "fen": "6k1/1p3pp1/1p5p/2r1p3/2n5/r3PN2/2RnNPPP/2R3K1 b - - 1 32",
+    "moves": [
+      "f7f6",
+      "f3d2",
+      "c4d2",
+      "c2d2",
+      "c5c1",
+      "e2c1"
+    ],
+    "rating": 1832
+  },
+  {
+    "id": "001w5",
+    "fen": "1rb2rk1/q5P1/4p2p/3p3p/3P1P2/2P5/2QK3P/3R2R1 b - - 0 29",
+    "moves": [
+      "f8f7",
+      "c2h7",
+      "g8h7",
+      "g7g8q"
+    ],
+    "rating": 1039
+  },
+  {
+    "id": "001wR",
+    "fen": "6nr/pp3p1p/k1p5/8/1QN5/2P1P3/4KPqP/8 b - - 5 26",
+    "moves": [
+      "b7b5",
+      "b4a5",
+      "a6b7",
+      "c4d6",
+      "b7b8",
+      "a5d8"
+    ],
+    "rating": 1212
+  },
+  {
+    "id": "001wb",
+    "fen": "r3k2r/pb1p1ppp/1b4q1/1Q2P3/8/2NP1Pn1/PP4PP/R1B2R1K w kq - 1 17",
+    "moves": [
+      "h2g3",
+      "g6h5"
+    ],
+    "rating": 1252
+  },
+  {
+    "id": "001wr",
+    "fen": "r4rk1/p3ppbp/Pp1q1np1/3PpbB1/2B5/2N5/1PPQ1PPP/3RR1K1 w - - 4 18",
+    "moves": [
+      "f2f3",
+      "d6c5",
+      "g1h1",
+      "c5c4"
+    ],
+    "rating": 947
+  },
+  {
+    "id": "001xO",
+    "fen": "k1r1b3/p1r1nppp/1p1qpn2/2Np4/1P1P4/PQRBPN2/5PPP/2R3K1 w - - 0 19",
+    "moves": [
+      "d3a6",
+      "b6c5",
+      "a6c8",
+      "c5c4"
+    ],
+    "rating": 1710
+  },
+  {
+    "id": "001xl",
+    "fen": "8/4R1k1/p5pp/3B4/5q2/8/5P1P/6K1 b - - 5 40",
+    "moves": [
+      "g7f6",
+      "e7f7",
+      "f6e5",
+      "f7f4"
+    ],
+    "rating": 1105
+  },
+  {
+    "id": "002CP",
+    "fen": "r5k1/pp4pp/4p1q1/4p3/3n4/P5P1/1PP2Q1P/2KR1R2 w - - 4 24",
+    "moves": [
+      "f2e3",
+      "g6c2"
+    ],
+    "rating": 926
+  },
+  {
+    "id": "002Ds",
+    "fen": "8/1pp5/p2p4/P2Pk2p/1PP1p2P/2n1K2P/3N4/8 b - - 0 45",
+    "moves": [
+      "b7b6",
+      "b4b5",
+      "c3d1",
+      "e3e2",
+      "a6b5",
+      "a5a6"
+    ],
+    "rating": 1980
+  },
+  {
+    "id": "002HE",
+    "fen": "1qr2rk1/1p1p1ppp/pB2p1n1/7n/2P1P3/1Q2NP1P/PP2B1Pb/3R1RK1 w - - 1 20",
+    "moves": [
+      "g1f2",
+      "b8g3"
+    ],
+    "rating": 1206
+  },
+  {
+    "id": "002Hv",
+    "fen": "8/8/8/3N2p1/5b2/3p3P/5kP1/3K4 w - - 16 56",
+    "moves": [
+      "d5f4",
+      "g5f4",
+      "h3h4",
+      "f2g2",
+      "h4h5",
+      "f4f3",
+      "d1d2",
+      "f3f2"
+    ],
+    "rating": 1603
+  },
+  {
+    "id": "002IE",
+    "fen": "r3brk1/5pp1/p1nqpn1p/P2pN3/2pP4/2P1PN2/5PPP/RB1QK2R b KQ - 4 16",
+    "moves": [
+      "c6e5",
+      "d4e5",
+      "d6e7",
+      "e5f6"
+    ],
+    "rating": 1205
+  },
+  {
+    "id": "002KJ",
+    "fen": "r3kb1r/ppq2ppp/4pn2/2Ppn3/1P4bP/2P2N2/P3BPP1/RNBQ1RK1 b kq - 2 10",
+    "moves": [
+      "f8e7",
+      "f3e5",
+      "c7e5",
+      "e2g4"
+    ],
+    "rating": 1643
+  },
+  {
+    "id": "002LF",
+    "fen": "7r/p2q1pk1/1pp3p1/8/6P1/4Q3/PP1R1P1r/5KN1 b - - 0 38",
+    "moves": [
+      "d7g4",
+      "e3e5",
+      "f7f6",
+      "e5c7",
+      "g7h6",
+      "c7h2"
+    ],
+    "rating": 2145
+  },
+  {
+    "id": "002Mm",
+    "fen": "rn1qr1k1/ppp3pQ/3p1pP1/3Pp3/2P1P3/8/PP3PP1/R1B1K3 b Q - 2 16",
+    "moves": [
+      "g8f8",
+      "h7h8",
+      "f8e7",
+      "h8g7"
+    ],
+    "rating": 1276
+  },
+  {
+    "id": "002O7",
+    "fen": "r3qrk1/2p2pp1/p2bpn1p/2ppNb2/3P1P2/1PP1P1B1/P2N2PP/R2Q1RK1 b - - 0 14",
+    "moves": [
+      "f5g4",
+      "e5g4",
+      "f6g4",
+      "d1g4"
+    ],
+    "rating": 966
+  },
+  {
+    "id": "002Q2",
+    "fen": "7k/p4R1p/3p3r/2pN1n2/2PbBBb1/3P2P1/P3r3/5R1K w - - 1 28",
+    "moves": [
+      "f4h6",
+      "f5g3"
+    ],
+    "rating": 872
+  },
+  {
+    "id": "002Tf",
+    "fen": "r3kbnr/ppp1qppp/2n5/3pP3/5B2/4PQ2/PPP2PPP/RN2KB1R w KQkq - 1 7",
+    "moves": [
+      "f1b5",
+      "e7b4",
+      "b1c3",
+      "b4b2"
+    ],
+    "rating": 1564
+  },
+  {
+    "id": "002Ua",
+    "fen": "r4rk1/pp3ppp/3p1q2/P1P1p3/2B5/2B2n2/2P2P1P/R2Q1RK1 w - - 0 16",
+    "moves": [
+      "g1h1",
+      "f6f4",
+      "d1f3",
+      "f4f3"
+    ],
+    "rating": 1817
+  },
+  {
+    "id": "002Uy",
+    "fen": "8/8/1p6/k7/P1R5/1K5r/8/8 w - - 26 64",
+    "moves": [
+      "c4c3",
+      "h3c3",
+      "b3c3",
+      "a5a4",
+      "c3b2",
+      "a4b4"
+    ],
+    "rating": 1615
+  },
+  {
+    "id": "002VP",
+    "fen": "8/6p1/2B1bn2/6k1/3B4/6K1/4P3/8 b - - 4 44",
+    "moves": [
+      "e6d5",
+      "d4f6",
+      "g5f5",
+      "c6d5"
+    ],
+    "rating": 1469
+  },
+  {
+    "id": "002Z9",
+    "fen": "4r1k1/1p2R1p1/p2p2Pp/P1pP4/5q2/1R3p2/1P1Q3P/5B1K b - - 0 34",
+    "moves": [
+      "f4d2",
+      "e7e8"
+    ],
+    "rating": 1231
+  },
+  {
+    "id": "002bK",
+    "fen": "8/7p/2b1k3/p2p1pPB/1n1P3P/N1p1P3/4K3/8 b - - 1 42",
+    "moves": [
+      "c6b5",
+      "a3b5",
+      "c3c2",
+      "e2d2"
+    ],
+    "rating": 1125
+  },
+  {
+    "id": "002p5",
+    "fen": "r1bqr1k1/pp1nbpp1/2p2n2/6P1/2BP4/P7/1PQNNPP1/R3K2R b KQ - 0 13",
+    "moves": [
+      "f6d5",
+      "c2h7",
+      "g8f8",
+      "h7h8"
+    ],
+    "rating": 899
+  },
+  {
+    "id": "002rd",
+    "fen": "r6k/q1pb1p1p/1b3Pr1/p1ppP2Q/3P2p1/4B3/PP2NRPP/3R2K1 b - - 1 25",
+    "moves": [
+      "d7e6",
+      "e2f4",
+      "c5d4",
+      "f4g6",
+      "f7g6",
+      "h5h6"
+    ],
+    "rating": 1795
+  },
+  {
+    "id": "002uV",
+    "fen": "r2r2k1/1p2qppp/2n1p3/5n2/p2P4/P2Q1N2/BP3PPP/2R1R1K1 w - - 4 20",
+    "moves": [
+      "d3f5",
+      "e6f5",
+      "e1e7",
+      "c6e7"
+    ],
+    "rating": 1589
+  },
+  {
+    "id": "002xh",
+    "fen": "2nk4/8/2PBp1n1/1pK1P1p1/1P4P1/8/8/8 b - - 2 42",
+    "moves": [
+      "g6h4",
+      "c5b5",
+      "h4g2",
+      "b5a6",
+      "g2e3",
+      "a6b7"
+    ],
+    "rating": 2065
+  },
+  {
+    "id": "0039T",
+    "fen": "1r5r/p3kp2/4p2p/4P3/3R1Pp1/6P1/P1P4P/4K2R w K - 1 25",
+    "moves": [
+      "d4a4",
+      "b8b1",
+      "e1f2",
+      "b1h1",
+      "a4a7",
+      "e7f8"
+    ],
+    "rating": 1081
+  },
+  {
+    "id": "003AX",
+    "fen": "2r2rk1/5ppp/bq2p3/p1ppP1N1/Pb1P2P1/1P2P2P/2QN4/2R1K2R b K - 1 18",
+    "moves": [
+      "c5d4",
+      "c2h7"
+    ],
+    "rating": 966
+  },
+  {
+    "id": "003IX",
+    "fen": "8/3pk3/R7/1R2Pp1p/2PPnKr1/8/8/8 w - - 4 43",
+    "moves": [
+      "f4f5",
+      "e4g3"
+    ],
+    "rating": 1713
+  },
+  {
+    "id": "003Jb",
+    "fen": "6k1/3bqr1p/2rpp1pR/p7/Pp1QP3/1B3P2/1PP3P1/2KR4 w - - 6 22",
+    "moves": [
+      "d4a7",
+      "e7g5",
+      "c1b1",
+      "g5h6"
+    ],
+    "rating": 993
+  },
+  {
+    "id": "003S3",
+    "fen": "r4k1r/pNqnppb1/6pn/2p3Np/7P/2P2Q2/PP3PP1/R1B1K2R b KQ - 2 15",
+    "moves": [
+      "a8b8",
+      "g5e6",
+      "f8g8",
+      "e6c7"
+    ],
+    "rating": 1437
+  },
+  {
+    "id": "003Tx",
+    "fen": "2r5/pR5p/5p1k/4p3/4r3/B4nPP/PP3P2/1K2R3 w - - 0 27",
+    "moves": [
+      "e1e4",
+      "f3d2",
+      "b1a1",
+      "c8c1"
+    ],
+    "rating": 1518
+  },
+  {
+    "id": "003UW",
+    "fen": "8/6pk/7p/2p5/2qp4/5PP1/P3QK1P/8 b - - 1 40",
+    "moves": [
+      "c4d5",
+      "e2e4",
+      "d5e4",
+      "f3e4"
+    ],
+    "rating": 1457
+  },
+  {
+    "id": "003YF",
+    "fen": "r4rk1/1pp2ppp/p2p4/2bPp3/2P1Pn1q/P1N2B2/1P3P2/R1BQK1R1 w Q - 1 15",
+    "moves": [
+      "c1f4",
+      "h4f2"
+    ],
+    "rating": 1054
+  },
+  {
+    "id": "003aS",
+    "fen": "8/8/5k1p/6p1/1R4PP/1p2KP2/8/1r6 w - - 0 43",
+    "moves": [
+      "h4h5",
+      "b3b2",
+      "b4b6",
+      "f6e5",
+      "f3f4",
+      "g5f4"
+    ],
+    "rating": 2014
+  },
+  {
+    "id": "003cs",
+    "fen": "2r1kbnr/pp4pp/4p3/3pP1N1/3q4/1P2B3/P3Q1PP/nN3RK1 b k - 1 16",
+    "moves": [
+      "d4e5",
+      "f1f8",
+      "e8f8",
+      "e3c5",
+      "c8c5",
+      "e2e5",
+      "c5c1",
+      "g1f2"
+    ],
+    "rating": 1986
+  },
+  {
+    "id": "003eP",
+    "fen": "8/r1b1q2k/2p3p1/2Pp4/1P2p1n1/2B1P3/NQ6/2K4R b - - 1 36",
+    "moves": [
+      "h7g8",
+      "h1h8",
+      "g8f7",
+      "h8h7",
+      "f7e8",
+      "h7e7"
+    ],
+    "rating": 1156
+  },
+  {
+    "id": "003if",
+    "fen": "8/3q1kpp/1P2p3/4Q3/5P2/4B2P/2r3PK/8 b - - 0 43",
+    "moves": [
+      "d7b7",
+      "e5h5",
+      "f7e7",
+      "e3c5",
+      "c2c5",
+      "h5c5"
+    ],
+    "rating": 1664
+  },
+  {
+    "id": "003jH",
+    "fen": "rn3rk1/p5pp/3N4/4np1q/5Q2/1P3K2/PB1P2P1/2R4R w - - 0 25",
+    "moves": [
+      "f3f2",
+      "e5d3",
+      "f2e3",
+      "d3f4",
+      "h1h5",
+      "f4h5"
+    ],
+    "rating": 1067
+  },
+  {
+    "id": "003jb",
+    "fen": "r3kb1r/p4ppp/b1p1p3/3q4/3Q4/4BN2/PPP2PPP/R3K2R b KQkq - 0 11",
+    "moves": [
+      "c6c5",
+      "d4a4",
+      "a6b5",
+      "a4b5"
+    ],
+    "rating": 983
+  },
+  {
+    "id": "003jv",
+    "fen": "1R6/1p2k2p/p2n2p1/4K3/8/6P1/P6P/8 w - - 10 37",
+    "moves": [
+      "b8h8",
+      "d6f7",
+      "e5e4",
+      "f7h8"
+    ],
+    "rating": 1007
+  },
+  {
+    "id": "003md",
+    "fen": "r1b1k2N/ppp3pp/2n5/2bp4/7q/1B4n1/PPPP1P1P/RNBQ1RK1 w q - 0 10",
+    "moves": [
+      "f1e1",
+      "g3e4",
+      "e1e4",
+      "d5e4",
+      "d1h5",
+      "h4h5",
+      "b3f7",
+      "h5f7"
+    ],
+    "rating": 2134
+  },
+  {
+    "id": "003mh",
+    "fen": "r4k1r/1pp2p2/p2p3p/3N4/3P2q1/8/PPP5/1K2Q1NR b - - 1 23",
+    "moves": [
+      "a8e8",
+      "e1e8",
+      "f8e8",
+      "d5f6",
+      "e8e7",
+      "f6g4"
+    ],
+    "rating": 1424
+  },
+  {
+    "id": "003nQ",
+    "fen": "6rk/pp6/2n5/3ppn1p/3p4/2P2P1q/PP3QNB/R4R1K w - - 2 29",
+    "moves": [
+      "f1g1",
+      "f5g3",
+      "f2g3",
+      "g8g3"
+    ],
+    "rating": 1287
+  },
+  {
+    "id": "003o0",
+    "fen": "r1bqk2r/pp1nbppp/3p4/1B1p4/3P1B2/8/PPP2PPP/R2QK1NR w KQkq - 2 9",
+    "moves": [
+      "g1f3",
+      "d8a5",
+      "d1d2",
+      "a5b5"
+    ],
+    "rating": 1003
+  },
+  {
+    "id": "003r5",
+    "fen": "r2qr1k1/ppp2ppp/4b3/3P4/1nP2Q2/2N2N1P/PP3KP1/R4R2 w - - 1 15",
+    "moves": [
+      "d5e6",
+      "b4d3",
+      "f2g1",
+      "d3f4"
+    ],
+    "rating": 1107
+  },
+  {
+    "id": "003wQ",
+    "fen": "2r2rk1/6pp/3Q1q2/8/3N1B2/6P1/PP1K3P/R4b2 w - - 0 24",
+    "moves": [
+      "a1f1",
+      "f6d6",
+      "f4d6",
+      "f8f1"
+    ],
+    "rating": 1887
+  },
+  {
+    "id": "0040n",
+    "fen": "r7/p2k1pp1/p1p1pn2/3p4/3P4/P3PQp1/1PP2P1q/2K4R w - - 0 20",
+    "moves": [
+      "h1h2",
+      "g3h2",
+      "f3h3",
+      "f6g4"
+    ],
+    "rating": 1233
+  },
+  {
+    "id": "0047P",
+    "fen": "8/1N3k2/6p1/8/2P3P1/pr6/R5K1/8 w - - 1 56",
+    "moves": [
+      "g2f1",
+      "b3b1",
+      "f1e2",
+      "b1b2",
+      "e2d1",
+      "b2a2"
+    ],
+    "rating": 1769
+  },
+  {
+    "id": "0048h",
+    "fen": "4r3/p5k1/2p2R1p/2Pp4/1P1pr1P1/P6P/8/3R3K w - - 1 35",
+    "moves": [
+      "f6c6",
+      "e4e1",
+      "d1e1",
+      "e8e1",
+      "h1g2",
+      "d4d3"
+    ],
+    "rating": 1163
+  },
+  {
+    "id": "004Ao",
+    "fen": "4qk2/1b3rR1/p7/1p2Q3/4P2P/P2P3K/2r5/3R4 w - - 5 41",
+    "moves": [
+      "g7f7",
+      "e8f7",
+      "e5h8",
+      "f8e7"
+    ],
+    "rating": 1711
+  },
+  {
+    "id": "004Ax",
+    "fen": "8/8/4R1kp/p7/5rPK/8/7P/8 b - - 2 42",
+    "moves": [
+      "g6f7",
+      "e6h6",
+      "f4f6",
+      "h6h7",
+      "f7g6",
+      "h7a7"
+    ],
+    "rating": 1987
+  },
+  {
+    "id": "004BW",
+    "fen": "r1bk2r1/ppq2pQp/3bpn2/1BpnN3/5P2/1P6/PBPP2PP/RN2K2R w KQ - 3 13",
+    "moves": [
+      "e5f7",
+      "d8e7",
+      "g7g8",
+      "f6g8"
+    ],
+    "rating": 1790
+  },
+  {
+    "id": "004JD",
+    "fen": "3r4/R7/2p5/p1P2p2/1p4k1/nP6/P2KNP2/8 w - - 3 41",
+    "moves": [
+      "d2e3",
+      "a3c2"
+    ],
+    "rating": 1271
+  },
+  {
+    "id": "004LZ",
+    "fen": "8/7R/5p2/p7/7P/2p5/3k2r1/1K2N3 w - - 3 48",
+    "moves": [
+      "e1g2",
+      "c3c2",
+      "b1a2",
+      "c2c1q",
+      "h7d7",
+      "d2e2"
+    ],
+    "rating": 1203
+  },
+  {
+    "id": "004Lu",
+    "fen": "8/p1p4p/4Pk2/2PP1p1P/1r3r2/5B2/P3RK2/8 b - - 3 38",
+    "moves": [
+      "f6e7",
+      "d5d6",
+      "c7d6",
+      "c5d6",
+      "e7d6",
+      "e6e7"
+    ],
+    "rating": 1152
+  },
+  {
+    "id": "004RF",
+    "fen": "5rk1/5ppp/1p6/1qp2P1Q/3p3P/6R1/6PK/8 b - - 0 30",
+    "moves": [
+      "c5c4",
+      "g3g7",
+      "g8g7",
+      "f5f6",
+      "g7f6",
+      "h5b5"
+    ],
+    "rating": 1746
+  },
+  {
+    "id": "004Ud",
+    "fen": "r1bqk2r/p3Bppp/3p4/1ppn4/4P3/4Q3/PPP2PPP/2KR1B1R b kq - 0 11",
+    "moves": [
+      "d5e7",
+      "f1b5",
+      "c8d7",
+      "d1d6",
+      "d7b5",
+      "d6d8"
+    ],
+    "rating": 1617
+  },
+  {
+    "id": "004WZ",
+    "fen": "r6k/1b3pp1/p1q1pn1p/2p5/P1B5/1PN4Q/2P1RP1P/R4Kr1 w - - 2 26",
+    "moves": [
+      "f1g1",
+      "c6h1"
+    ],
+    "rating": 891
+  },
+  {
+    "id": "004X6",
+    "fen": "1r4k1/p4ppp/2Q5/3pq3/8/P6P/2PR1PP1/Rr4K1 w - - 1 26",
+    "moves": [
+      "a1b1",
+      "b8b1",
+      "d2d1",
+      "b1d1"
+    ],
+    "rating": 1152
+  },
+  {
+    "id": "004XI",
+    "fen": "8/3kqp2/4p3/p2p4/3P1P2/4P1rP/7r/1QR2K2 b - - 1 34",
+    "moves": [
+      "e7a3",
+      "b1b7",
+      "d7e8",
+      "c1c8"
+    ],
+    "rating": 982
+  },
+  {
+    "id": "004d8",
+    "fen": "8/4kr2/R2p4/1p1Pp1p1/5p2/3K1P2/PPP5/8 b - - 0 39",
+    "moves": [
+      "g5g4",
+      "a6a7",
+      "e7f6",
+      "a7f7",
+      "f6f7",
+      "f3g4"
+    ],
+    "rating": 1608
+  },
+  {
+    "id": "004kB",
+    "fen": "4rr1k/pQpn2pp/3p1q2/8/8/2P5/PP3PPP/RN3RK1 w - - 1 16",
+    "moves": [
+      "b7c7",
+      "f6f2",
+      "f1f2",
+      "e8e1",
+      "f2f1",
+      "e1f1"
+    ],
+    "rating": 1209
+  },
+  {
+    "id": "004mT",
+    "fen": "5Q2/8/1b1kp1p1/5p2/3p4/5qPK/7P/8 b - - 1 51",
+    "moves": [
+      "d6c6",
+      "f8a8",
+      "c6d6",
+      "a8f3"
+    ],
+    "rating": 1287
+  },
+  {
+    "id": "004nd",
+    "fen": "3q2k1/2r5/pp3p1Q/2b1n3/P3N3/2P5/1P4PP/R6K b - - 0 24",
+    "moves": [
+      "c7d7",
+      "e4f6",
+      "d8f6",
+      "h6f6"
+    ],
+    "rating": 898
+  },
+  {
+    "id": "004sY",
+    "fen": "8/2k3n1/3p2p1/1KpP2Pp/2P4P/7B/8/8 w - - 0 57",
+    "moves": [
+      "b5a6",
+      "c7d8",
+      "a6b5",
+      "g7f5"
+    ],
+    "rating": 2191
+  },
+  {
+    "id": "004u0",
+    "fen": "6k1/ppq3pp/2p1rp2/4r3/4p1Q1/P5RP/1P3PP1/3R2K1 b - - 3 34",
+    "moves": [
+      "e6e8",
+      "d1d7",
+      "c7d7",
+      "g4d7"
+    ],
+    "rating": 1386
+  },
+  {
+    "id": "004zI",
+    "fen": "2q3k1/4br1p/6RQ/1p1n2p1/7P/1P4P1/1B2PP2/6K1 b - - 0 27",
+    "moves": [
+      "h7g6",
+      "h6h8"
+    ],
+    "rating": 1451
+  },
+  {
+    "id": "0050w",
+    "fen": "5rk1/1p2p1rp/p2p4/2pPb2R/2P1P3/1P1BKP1R/8/8 b - - 4 30",
+    "moves": [
+      "g7g3",
+      "h3g3",
+      "e5g3",
+      "h5g5",
+      "g8f7",
+      "g5g3"
+    ],
+    "rating": 1066
+  },
+  {
+    "id": "0054a",
+    "fen": "r1b2rk1/ppq2ppp/8/4b2Q/4R3/3B4/PP3PPP/R1B3K1 b - - 1 15",
+    "moves": [
+      "g7g6",
+      "h5e5",
+      "c7e5",
+      "e4e5"
+    ],
+    "rating": 1484
+  },
+  {
+    "id": "0055Y",
+    "fen": "r1b2rk1/p3pp2/2B4b/2Qpq3/3N2pp/4P3/2P2PPP/1R2K2R b K - 1 23",
+    "moves": [
+      "h6e3",
+      "f2e3",
+      "e5e3",
+      "e1d1"
+    ],
+    "rating": 2041
+  },
+  {
+    "id": "005Bm",
+    "fen": "4rk2/p1q5/1p3Q1b/8/1p5N/2P1p3/P3P3/2K5 b - - 0 43",
+    "moves": [
+      "c7f7",
+      "h4g6",
+      "f8g8",
+      "f6h8"
+    ],
+    "rating": 1229
+  },
+  {
+    "id": "005Ep",
+    "fen": "5kr1/ppR3p1/3R3p/8/1r1n4/8/1P3PPP/2K5 b - - 4 31",
+    "moves": [
+      "d4b5",
+      "d6d8"
+    ],
+    "rating": 950
+  },
+  {
+    "id": "005HG",
+    "fen": "r2q1rk1/p1p2pp1/3bbn1p/4N3/2Q5/1P4P1/PB1PPP1P/RN2K2R w KQ - 1 12",
+    "moves": [
+      "c4c2",
+      "d6e5",
+      "b2e5",
+      "d8d5",
+      "f2f3",
+      "d5e5"
+    ],
+    "rating": 1744
+  },
+  {
+    "id": "005YX",
+    "fen": "2rr4/2N2pk1/p1Q1b1pp/1p4q1/3pP3/1B1P4/PPP3PP/6RK w - - 7 25",
+    "moves": [
+      "c7e6",
+      "f7e6",
+      "c6b7",
+      "g7h8"
+    ],
+    "rating": 1823
+  },
+  {
+    "id": "005do",
+    "fen": "7r/pp1k4/4p1b1/3pP1Np/3P1P1K/8/P7/2R5 b - - 7 42",
+    "moves": [
+      "h8f8",
+      "c1c7",
+      "d7c7",
+      "g5e6",
+      "c7b6",
+      "e6f8"
+    ],
+    "rating": 1439
+  },
+  {
+    "id": "005f3",
+    "fen": "r5k1/2p1pp2/pp4p1/1q1r4/5P2/2QP2R1/PP6/1K4R1 b - - 0 32",
+    "moves": [
+      "d5h5",
+      "g3g6",
+      "f7g6",
+      "g1g6",
+      "g8f7",
+      "c3g7",
+      "f7e8",
+      "g7g8",
+      "e8d7",
+      "g8e6",
+      "d7d8",
+      "g6g8"
+    ],
+    "rating": 1902
+  },
+  {
+    "id": "005jJ",
+    "fen": "r1b1qrk1/pp1n1pbp/2pp1np1/4p3/2PP1B2/2NBPN1P/PP3PP1/R2Q1RK1 w - - 0 10",
+    "moves": [
+      "d4e5",
+      "d6e5",
+      "f4h2",
+      "e5e4"
+    ],
+    "rating": 1215
+  },
+  {
+    "id": "005nD",
+    "fen": "3rk2r/2qn1pp1/p1Q1R3/3n3p/8/8/PP4PP/5R1K b k - 0 23",
+    "moves": [
+      "f7e6",
+      "c6e6",
+      "d5e7",
+      "e6f7"
+    ],
+    "rating": 1028
+  },
+  {
+    "id": "005wJ",
+    "fen": "r3kb1r/ppqn1ppp/4pn2/1Q2Nb2/3P4/8/PP2PPPP/RNB1KB1R w KQkq - 4 9",
+    "moves": [
+      "e5d7",
+      "c7c1"
+    ],
+    "rating": 1537
+  },
+  {
+    "id": "005wy",
+    "fen": "1r6/pp2kpp1/2n1p1n1/3p2PQ/5P2/2PqP3/PP1N4/2KR3R w - - 3 27",
+    "moves": [
+      "h5h7",
+      "c6b4",
+      "c3b4",
+      "b8c8",
+      "d2c4",
+      "c8c4"
+    ],
+    "rating": 1901
+  },
+  {
+    "id": "005x9",
+    "fen": "r1b1kb1Q/ppp4p/6pB/3P4/2pn4/8/PPP1qPPP/RN1K3R w q - 2 13",
+    "moves": [
+      "d1c1",
+      "e2c2"
+    ],
+    "rating": 886
+  },
+  {
+    "id": "005xu",
+    "fen": "8/3k4/1K1P4/2P3r1/R7/5b2/8/8 b - - 0 68",
+    "moves": [
+      "g5g8",
+      "a4a7",
+      "d7e6",
+      "a7e7",
+      "e6d5",
+      "d6d7"
+    ],
+    "rating": 1914
+  },
+  {
+    "id": "0061g",
+    "fen": "6k1/pp3pp1/2p1q1Pp/3b4/8/6Q1/PB3Pp1/3RrNK1 b - - 2 27",
+    "moves": [
+      "e1d1",
+      "g3b8",
+      "e6e8",
+      "b8e8"
+    ],
+    "rating": 801
+  },
+  {
+    "id": "0068B",
+    "fen": "r1q3k1/4bppp/pp2pn2/4B3/8/2N2Q2/PPPR1PPP/6K1 b - - 0 18",
+    "moves": [
+      "f6d7",
+      "d2d7",
+      "c8d7",
+      "f3a8"
+    ],
+    "rating": 1423
+  },
+  {
+    "id": "0068D",
+    "fen": "7r/pppk4/2pb1r2/8/2NP2p1/2P5/PP2RPP1/4R1K1 w - - 2 26",
+    "moves": [
+      "c4d6",
+      "f6h6",
+      "f2f4",
+      "g4g3",
+      "e2e7",
+      "d7d6",
+      "g1f1",
+      "h6h1"
+    ],
+    "rating": 1918
+  },
+  {
+    "id": "006E1",
+    "fen": "5rk1/R4pp1/1p5p/3Q4/1PPp2q1/3P2P1/5P2/4nK2 w - - 0 34",
+    "moves": [
+      "f1e1",
+      "f8e8",
+      "e1f1",
+      "g4h3",
+      "d5g2",
+      "e8e1",
+      "f1e1",
+      "h3g2"
+    ],
+    "rating": 1640
+  },
+  {
+    "id": "006GK",
+    "fen": "2kr1br1/ppBb1ppp/8/3P2Q1/3n2n1/5N2/PP3qPP/RN2R2K b - - 0 16",
+    "moves": [
+      "d4f3",
+      "g5d8"
+    ],
+    "rating": 1020
+  },
+  {
+    "id": "006HV",
+    "fen": "1r6/5k2/2p1pNp1/p5Pp/1pQ1P2P/2P4R/KP3P2/3q4 w - - 4 31",
+    "moves": [
+      "c4c6",
+      "b4b3",
+      "a2a3",
+      "d1a1"
+    ],
+    "rating": 1145
+  },
+  {
+    "id": "006OI",
+    "fen": "8/p7/5k2/P5R1/6KP/8/8/5r2 w - - 5 53",
+    "moves": [
+      "g5g8",
+      "f1g1",
+      "g4f4",
+      "g1g8"
+    ],
+    "rating": 843
+  },
+  {
+    "id": "006RM",
+    "fen": "1k1r3r/2q5/pp1n2p1/8/1Q6/3R2P1/PPP2P1P/3R2K1 b - - 4 29",
+    "moves": [
+      "c7c5",
+      "b4c5",
+      "b6c5",
+      "d3d6",
+      "d8d6",
+      "d1d6"
+    ],
+    "rating": 1448
+  },
+  {
+    "id": "006cZ",
+    "fen": "3r1rk1/1p4p1/p1p3Qp/2q5/8/3n1N1P/PP1R2P1/5R1K b - - 7 28",
+    "moves": [
+      "g8h8",
+      "d2d3",
+      "d8d3",
+      "g6d3"
+    ],
+    "rating": 1376
+  },
+  {
+    "id": "006fF",
+    "fen": "r1b4r/pp1k2pp/2nb2q1/1B1p2B1/3p3Q/8/PPP2PPP/3RR1K1 b - - 5 17",
+    "moves": [
+      "h7h6",
+      "h4g4",
+      "d7c7",
+      "g5d8",
+      "h8d8",
+      "g4g6"
+    ],
+    "rating": 1995
+  },
+  {
+    "id": "006i7",
+    "fen": "r4rk1/3nqpp1/2p1bn1p/3pN3/1p1P4/2NQP2P/1PB2PP1/R4RK1 w - - 0 18",
+    "moves": [
+      "e5c6",
+      "e7d6",
+      "a1a8",
+      "f8a8",
+      "c6b4",
+      "d6b4"
+    ],
+    "rating": 1769
+  },
+  {
+    "id": "006ia",
+    "fen": "1r4k1/4bpp1/1rp2n1p/3p4/3P4/2N1B1P1/Pq2QPKP/2R1R3 w - - 3 24",
+    "moves": [
+      "e3h6",
+      "b2e2",
+      "e1e2",
+      "e7a3",
+      "h6e3",
+      "a3c1"
+    ],
+    "rating": 2073
+  },
+  {
+    "id": "006om",
+    "fen": "1r3k2/5p1p/2p1pp2/P2n4/2r1N3/P4PK1/2R2P1P/2R5 b - - 9 29",
+    "moves": [
+      "c4a4",
+      "e4c5",
+      "a4a5",
+      "c5d7",
+      "f8g7",
+      "d7b8"
+    ],
+    "rating": 1910
+  },
+  {
+    "id": "006pe",
+    "fen": "r4r2/2q1NN2/4bQpk/2n4p/pp5P/8/1PP2PP1/2KR3R b - - 0 28",
+    "moves": [
+      "e6f7",
+      "e7f5",
+      "h6h7",
+      "f6g7"
+    ],
+    "rating": 1661
+  },
+  {
+    "id": "006wz",
+    "fen": "2r5/4ppkp/5bp1/1p6/1P6/P3B3/2r2PPP/1R1R2K1 b - - 2 22",
+    "moves": [
+      "f6b2",
+      "b1b2",
+      "c2b2",
+      "e3d4",
+      "f7f6",
+      "d4b2"
+    ],
+    "rating": 1428
+  },
+  {
+    "id": "006yP",
+    "fen": "6R1/8/Kpk1p3/1p1pP3/6P1/PPP1r3/8/8 b - - 3 40",
+    "moves": [
+      "e3c3",
+      "g8c8",
+      "c6d7",
+      "c8c3"
+    ],
+    "rating": 819
+  },
+  {
+    "id": "0071K",
+    "fen": "3N1r2/6R1/kp6/p2pPp1Q/2pP2P1/2q5/2P5/2K5 w - - 0 38",
+    "moves": [
+      "g7a7",
+      "a6a7",
+      "h5h7",
+      "a7a6"
+    ],
+    "rating": 1137
+  },
+  {
+    "id": "00734",
+    "fen": "rn3bk1/2rqp2p/2p3p1/3p1p2/3P1P1B/pP1BP3/P1Q2PRP/1KR5 b - - 0 26",
+    "moves": [
+      "b8a6",
+      "d3f5",
+      "e7e6",
+      "f5g6"
+    ],
+    "rating": 1661
+  },
+  {
+    "id": "00761",
+    "fen": "3r2k1/1b3pbR/p2P2P1/3p2N1/2p5/2P2N2/PP6/2K5 b - - 0 28",
+    "moves": [
+      "f7g6",
+      "h7g7",
+      "g8g7",
+      "g5e6",
+      "g7g8",
+      "e6d8"
+    ],
+    "rating": 1525
+  },
+  {
+    "id": "007AS",
+    "fen": "r3kb1r/3nnpp1/4p1bp/1NppP3/3P4/6N1/P2BBPPP/R3K2R b KQkq - 0 17",
+    "moves": [
+      "a8b8",
+      "b5d6",
+      "e8d8",
+      "d2a5"
+    ],
+    "rating": 1585
+  },
+  {
+    "id": "007Rn",
+    "fen": "4r1k1/p4p1p/1p6/6q1/3P2n1/P4Q2/1P1B2P1/7K w - - 0 34",
+    "moves": [
+      "d2g5",
+      "e8e1",
+      "f3f1",
+      "e1f1"
+    ],
+    "rating": 992
+  },
+  {
+    "id": "007eS",
+    "fen": "6k1/p4p2/1p5p/4r3/P3B3/1P3P2/2PK2PP/8 w - - 0 29",
+    "moves": [
+      "d2e3",
+      "f7f5",
+      "g2g4",
+      "f5e4"
+    ],
+    "rating": 1275
+  },
+  {
+    "id": "007en",
+    "fen": "rn3rk1/4pp1p/3p2pB/2q4P/3bP1b1/Pp2Q3/1P2B3/1K1R2NR w - - 0 20",
+    "moves": [
+      "e3d4",
+      "c5c2",
+      "b1a1",
+      "a8a3",
+      "b2a3",
+      "c2a2"
+    ],
+    "rating": 1764
+  },
+  {
+    "id": "007gO",
+    "fen": "2r3rk/5p2/4p2p/4q3/1Q6/8/1P3PPP/R4RK1 w - - 0 31",
+    "moves": [
+      "a1c1",
+      "e5g5",
+      "g2g3",
+      "c8c1"
+    ],
+    "rating": 2197
+  },
+  {
+    "id": "007ku",
+    "fen": "r1bq3Q/1np2kp1/p5B1/1p1Pp3/1Pn2BP1/2b2P2/P3K3/R4N2 b - - 5 35",
+    "moves": [
+      "f7g6",
+      "h8h5",
+      "g6f6",
+      "f4g5"
+    ],
+    "rating": 1627
+  },
+  {
+    "id": "007tv",
+    "fen": "r3k1nr/1pp2ppp/1pnp2q1/4p1B1/2B1P3/3P1Q1P/PPP2PP1/R4RK1 b kq - 0 11",
+    "moves": [
+      "g6g5",
+      "f3f7",
+      "e8d8",
+      "f7f8",
+      "d8d7",
+      "f8a8"
+    ],
+    "rating": 1124
+  },
+  {
+    "id": "0082f",
+    "fen": "r4rk1/2q2ppp/3pp3/4Pb1N/pp6/1B4Q1/PPP3PP/1K1RR3 b - - 0 21",
+    "moves": [
+      "a4b3",
+      "g3g7"
+    ],
+    "rating": 951
+  },
+  {
+    "id": "0088O",
+    "fen": "7Q/2p5/1p2prp1/p4k1p/P4p1P/8/6RK/3q4 b - - 2 37",
+    "moves": [
+      "d1a4",
+      "g2g5",
+      "f5e4",
+      "h8f6"
+    ],
+    "rating": 1133
+  },
+  {
+    "id": "008D5",
+    "fen": "r1bqk2r/pp3ppp/4p2n/3pP3/1b1P1P2/2N5/PP4PP/R1BQKB1R b KQkq - 2 9",
+    "moves": [
+      "h6f5",
+      "d1a4",
+      "c8d7",
+      "a4b4"
+    ],
+    "rating": 1408
+  },
+  {
+    "id": "008LT",
+    "fen": "r4rk1/6p1/b3p1nN/p1pp4/1p3P1q/3P1Q1B/PPP2PK1/R6R b - - 0 26",
+    "moves": [
+      "g8h8",
+      "h6f7",
+      "f8f7",
+      "h3e6"
+    ],
+    "rating": 2110
+  },
+  {
+    "id": "008Sk",
+    "fen": "8/6pp/3Bp2k/p2pP2P/P2bp1PK/8/r7/5R2 b - - 2 37",
+    "moves": [
+      "d4f2",
+      "f1f2",
+      "g7g5",
+      "h4g3",
+      "a2f2",
+      "g3f2"
+    ],
+    "rating": 2025
+  },
+  {
+    "id": "008Y3",
+    "fen": "r5k1/1p1rqpp1/p3pnp1/2PN4/8/1Q5P/PP3PP1/3RR1K1 b - - 0 24",
+    "moves": [
+      "e7c5",
+      "d5f6",
+      "g7f6",
+      "d1d7"
+    ],
+    "rating": 1075
+  },
+  {
+    "id": "008cl",
+    "fen": "r3k2r/ppp2p1p/2n1pp2/7q/2PN2b1/2BP1Pb1/PP2B1P1/R2Q1RK1 w kq - 1 16",
+    "moves": [
+      "f3g4",
+      "h5h2"
+    ],
+    "rating": 826
+  },
+  {
+    "id": "008lc",
+    "fen": "7k/pb1qn2n/1p2R2Q/2p2p2/2Pp4/3B4/PP3PrP/4RK2 b - - 1 27",
+    "moves": [
+      "g2g7",
+      "h6g7",
+      "h8g7",
+      "e6e7",
+      "d7e7",
+      "e1e7"
+    ],
+    "rating": 2005
+  },
+  {
+    "id": "008nF",
+    "fen": "2rq1rk1/7p/1n4pb/1R2p3/pPpP1P2/P1B5/3NQ1PP/2R3K1 w - - 0 31",
+    "moves": [
+      "e2e5",
+      "f8e8",
+      "e5e8",
+      "d8e8"
+    ],
+    "rating": 2133
+  },
+  {
+    "id": "008oX",
+    "fen": "4r1k1/2R3pp/2p4q/1p1p4/3P4/P7/1PP2R2/1K1N4 b - - 3 32",
+    "moves": [
+      "e8e1",
+      "c7c8",
+      "e1e8",
+      "c8e8"
+    ],
+    "rating": 976
+  },
+  {
+    "id": "008rw",
+    "fen": "rn2kb1r/pp2pppp/2p2n2/4q3/8/2N4Q/PPPPBPPP/R1B1K2R b KQkq - 2 8",
+    "moves": [
+      "g7g6",
+      "h3c8"
+    ],
+    "rating": 918
+  },
+  {
+    "id": "008tL",
+    "fen": "8/7k/pR5p/3p4/5r2/2P1p2P/P5P1/6K1 w - - 0 40",
+    "moves": [
+      "b6a6",
+      "e3e2",
+      "a6e6",
+      "f4f1"
+    ],
+    "rating": 1085
+  },
+  {
+    "id": "0092z",
+    "fen": "2r3k1/2qR1ppp/p7/2p2Q2/P7/7P/5PP1/6K1 b - - 3 26",
+    "moves": [
+      "c7c6",
+      "f5f7",
+      "g8h8",
+      "f7g7"
+    ],
+    "rating": 994
+  },
+  {
+    "id": "0095W",
+    "fen": "8/pp1r2kp/q2P1ppb/4p3/2N1P3/1Q5P/PPR2PP1/6K1 w - - 3 32",
+    "moves": [
+      "c4e5",
+      "f6e5",
+      "c2c7",
+      "a6d6"
+    ],
+    "rating": 1712
+  },
+  {
+    "id": "009BH",
+    "fen": "3r2k1/6p1/4Q3/4B3/1p3P2/4PKP1/3q4/8 b - - 17 51",
+    "moves": [
+      "g8h8",
+      "e6h6",
+      "h8g8",
+      "h6g7"
+    ],
+    "rating": 1563
+  },
+  {
+    "id": "009FP",
+    "fen": "r1b1k1nr/ppp2pbp/3ppqp1/8/2BnP3/N2P2QP/PPP2PP1/R1B1K2R b KQkq - 4 9",
+    "moves": [
+      "e6e5",
+      "c1g5",
+      "f6g5",
+      "g3g5"
+    ],
+    "rating": 1274
+  },
+  {
+    "id": "009FS",
+    "fen": "r2qr1k1/p5bp/1pp1b1p1/8/2QN1p2/2P1n2P/PP3PP1/R1B1RNK1 w - - 1 18",
+    "moves": [
+      "d4e6",
+      "e3c4",
+      "e6d8",
+      "e8e1"
+    ],
+    "rating": 1702
+  },
+  {
+    "id": "009IO",
+    "fen": "3rk3/5p1r/p2Np1p1/3bP3/P2n4/8/1P3RPP/5RK1 b - - 4 25",
+    "moves": [
+      "e8e7",
+      "f2f7",
+      "h7f7",
+      "f1f7"
+    ],
+    "rating": 1163
+  },
+  {
+    "id": "009J1",
+    "fen": "rn2k2r/pp2bp1p/2p1pNp1/6B1/5P2/7P/PPP4P/2K1RR2 b - - 3 17",
+    "moves": [
+      "e8f8",
+      "g5h6"
+    ],
+    "rating": 1214
+  },
+  {
+    "id": "009Os",
+    "fen": "r2b2k1/1p3q1p/p2p4/3P2p1/2P1PRQr/8/P2B3P/2R4K w - - 1 29",
+    "moves": [
+      "g4g3",
+      "h4f4",
+      "d2f4",
+      "f7f4",
+      "g3f4",
+      "g5f4"
+    ],
+    "rating": 1392
+  },
+  {
+    "id": "009Wc",
+    "fen": "1r3rk1/1pq2pbp/p1p1pnp1/2N1N3/3P4/1QP5/PP3PPP/3RR1K1 w - - 2 19",
+    "moves": [
+      "e5d7",
+      "f6d7",
+      "c5d7",
+      "c7d7"
+    ],
+    "rating": 1084
+  },
+  {
+    "id": "009XT",
+    "fen": "rn1qk2r/pp3ppp/3bp1b1/3p4/3Pn2N/3BB3/PPP2PPP/RN1Q1RK1 w kq - 4 10",
+    "moves": [
+      "h4g6",
+      "d6h2",
+      "g1h1",
+      "h7g6"
+    ],
+    "rating": 2069
+  },
+  {
+    "id": "009aD",
+    "fen": "r4k1r/pp3pp1/4p3/3pP1np/6bq/1PP2P2/P3B1PP/RN1Q1RK1 w - - 1 14",
+    "moves": [
+      "f3g4",
+      "h5g4",
+      "e2g4",
+      "h4h2"
+    ],
+    "rating": 1427
+  },
+  {
+    "id": "009bR",
+    "fen": "4r2k/3q2r1/1p4pQ/p1pP4/2P4P/1N4p1/PP3RK1/8 b - - 1 37",
+    "moves": [
+      "g7h7",
+      "f2f8",
+      "e8f8",
+      "h6f8"
+    ],
+    "rating": 1048
+  },
+  {
+    "id": "009eX",
+    "fen": "2r3k1/7p/6q1/p1Np4/Qp2pr2/P4P2/1PR2P1K/5R2 w - - 0 36",
+    "moves": [
+      "f1g1",
+      "f4h4"
+    ],
+    "rating": 1032
+  },
+  {
+    "id": "009f8",
+    "fen": "8/1p4p1/pb2ppkp/3n4/3P4/P3BN1P/1P2KPP1/8 b - - 0 26",
+    "moves": [
+      "g6f5",
+      "f3h4",
+      "f5e4",
+      "f2f3"
+    ],
+    "rating": 1116
+  },
+  {
+    "id": "009hH",
+    "fen": "k3r3/p3q3/1pp5/3pnB2/1P1Q4/1KPP4/P4R2/8 w - - 0 41",
+    "moves": [
+      "f2e2",
+      "e5f3",
+      "e2e7",
+      "f3d4",
+      "c3d4",
+      "e8e7"
+    ],
+    "rating": 1877
+  },
+  {
+    "id": "009lk",
+    "fen": "1R6/6pk/2p4p/3bP2r/5B1P/2P2qP1/P4P1Q/4R1K1 w - - 2 40",
+    "moves": [
+      "e1e3",
+      "f3d1",
+      "e3e1",
+      "d1e1"
+    ],
+    "rating": 934
+  },
+  {
+    "id": "009oc",
+    "fen": "5Q2/pbp3np/1p1pB1pk/1P6/P3q2P/6K1/8/8 b - - 1 32",
+    "moves": [
+      "e4e6",
+      "f8f4",
+      "g6g5",
+      "f4g5"
+    ],
+    "rating": 1166
+  },
+  {
+    "id": "009uB",
+    "fen": "3br2r/5k1p/4p1pQ/P5P1/1B5P/P6q/5R2/6K1 b - - 1 35",
+    "moves": [
+      "f7g8",
+      "f2f8",
+      "e8f8",
+      "h6f8"
+    ],
+    "rating": 1074
+  },
+  {
+    "id": "009wR",
+    "fen": "1R2R3/p7/1p1k3p/1Pb5/P5p1/6P1/5rKP/8 w - - 6 41",
+    "moves": [
+      "g2h1",
+      "f2f1",
+      "h1g2",
+      "f1g1"
+    ],
+    "rating": 1282
+  },
+  {
+    "id": "009zR",
+    "fen": "3r4/p1p2ppp/4k3/6Q1/5P2/4P3/Prqn2PP/3R1RK1 w - - 3 22",
+    "moves": [
+      "g5d8",
+      "d2f3",
+      "g1h1",
+      "c2g2"
+    ],
+    "rating": 1620
+  },
+  {
+    "id": "009zS",
+    "fen": "r3r1k1/1p3p1p/p1p3p1/8/6bP/Q3b3/PP2B1P1/R3K2R w KQ - 2 20",
+    "moves": [
+      "g2g3",
+      "g4e2",
+      "e1e2",
+      "e3c5",
+      "e2f3",
+      "c5a3"
+    ],
+    "rating": 1522
+  },
+  {
+    "id": "00A1H",
+    "fen": "2r3k1/4brp1/2p3b1/2Pp1q1p/3B3P/2P2N2/PP3P1K/R2Q2R1 w - - 1 31",
+    "moves": [
+      "f3g5",
+      "f5f4",
+      "h2g2",
+      "e7g5"
+    ],
+    "rating": 2041
+  },
+  {
+    "id": "00A5m",
+    "fen": "8/1p6/p1p2p2/P3b3/1PK3P1/2PBk3/8/8 b - - 3 60",
+    "moves": [
+      "e3d2",
+      "d3f5",
+      "e5c7",
+      "f5c8",
+      "b7b6",
+      "a5b6",
+      "c7b6",
+      "c8a6"
+    ],
+    "rating": 1965
+  },
+  {
+    "id": "00A5v",
+    "fen": "4r1k1/pp1qr1p1/7p/2pPR3/2P2p2/1PQ2P2/P5PP/4R1K1 w - - 3 33",
+    "moves": [
+      "c3d2",
+      "e7e5",
+      "e1e5",
+      "e8e5"
+    ],
+    "rating": 876
+  },
+  {
+    "id": "00A9Q",
+    "fen": "2rq1rk1/1p3p1p/p1pn2p1/P2p4/1P1PnP2/3NP3/5PBP/R1Q3RK w - - 2 22",
+    "moves": [
+      "d3c5",
+      "e4f2"
+    ],
+    "rating": 1096
+  },
+  {
+    "id": "00AB1",
+    "fen": "8/7Q/3p1kp1/1p6/2b5/2P4P/5PPK/4q3 b - - 8 36",
+    "moves": [
+      "e1c3",
+      "h7h8",
+      "f6e6",
+      "h8c3"
+    ],
+    "rating": 1048
+  },
+  {
+    "id": "00AGs",
+    "fen": "rn2k2Q/5p2/2p1p1r1/1q4p1/8/8/4NPPP/3R1K1R b q - 5 23",
+    "moves": [
+      "e8e7",
+      "h8d8"
+    ],
+    "rating": 895
+  },
+  {
+    "id": "00AHY",
+    "fen": "r6k/3NR1p1/4n2p/5b2/p6P/6R1/8/6K1 w - - 2 43",
+    "moves": [
+      "h4h5",
+      "a4a3",
+      "g3a3",
+      "a8a3",
+      "e7e8",
+      "h8h7"
+    ],
+    "rating": 1358
+  },
+  {
+    "id": "00AOH",
+    "fen": "6k1/1R6/1p2p1pp/4P3/p1N2P2/6PK/7P/1r6 w - - 0 48",
+    "moves": [
+      "b7b6",
+      "b1b6",
+      "c4b6",
+      "a4a3",
+      "b6d7",
+      "a3a2"
+    ],
+    "rating": 873
+  },
+  {
+    "id": "00AVR",
+    "fen": "br1qkb1r/p1pp1ppp/4Pn2/6B1/3Qn3/5NP1/P3PPBP/RN1R2K1 b k - 0 15",
+    "moves": [
+      "d7e6",
+      "d4a4",
+      "d8d7",
+      "d1d7"
+    ],
+    "rating": 1747
+  },
+  {
+    "id": "00AXb",
+    "fen": "5kr1/pp3p1p/1q2pBb1/1B1p4/P7/5P2/1P4rP/2Q1K2R b K - 0 21",
+    "moves": [
+      "g2g1",
+      "h1g1",
+      "b6g1",
+      "b5f1",
+      "g6c2",
+      "c1f4"
+    ],
+    "rating": 2115
+  },
+  {
+    "id": "00Aae",
+    "fen": "1R6/1P6/4pkp1/5p2/3P3p/3KP3/8/1r6 b - - 0 43",
+    "moves": [
+      "h4h3",
+      "b8f8",
+      "f6e7",
+      "b7b8q",
+      "b1b8",
+      "f8b8"
+    ],
+    "rating": 1020
+  },
+  {
+    "id": "00Aas",
+    "fen": "3r1rk1/1p2q1pp/5p2/8/1P1n4/6Q1/PPbB1PPP/R2B1RK1 w - - 9 20",
+    "moves": [
+      "d1c2",
+      "d4e2",
+      "g1h1",
+      "e2g3",
+      "f2g3",
+      "d8d2"
+    ],
+    "rating": 1119
+  },
+  {
+    "id": "00AbP",
+    "fen": "4r1k1/pp3pp1/2p5/7b/4P2P/2P2N2/PP4K1/3R4 b - - 0 24",
+    "moves": [
+      "e8e4",
+      "d1d8",
+      "g8h7",
+      "f3g5"
+    ],
+    "rating": 804
+  },
+  {
+    "id": "00AcQ",
+    "fen": "8/1bpp2k1/1p5r/1P2P3/3P1P2/2P1n1K1/2Q3P1/8 w - - 0 30",
+    "moves": [
+      "c2a2",
+      "h6g6",
+      "g3f2",
+      "g6g2"
+    ],
+    "rating": 1710
+  },
+  {
+    "id": "00AdI",
+    "fen": "3r4/4kp1p/1PQ1p1p1/p3b3/1p2P2P/1P6/6PK/8 w - - 1 36",
+    "moves": [
+      "h2h3",
+      "d8d3",
+      "g2g3",
+      "d3g3",
+      "h3h2",
+      "g3c3"
+    ],
+    "rating": 1340
+  },
+  {
+    "id": "00Af3",
+    "fen": "8/8/2B2p1p/P4Pp1/3p1kP1/1b1Pb2P/8/4K3 b - - 0 50",
+    "moves": [
+      "f4g3",
+      "a5a6",
+      "b3c4",
+      "a6a7"
+    ],
+    "rating": 1119
+  },
+  {
+    "id": "00AfZ",
+    "fen": "2r3kR/Q7/5q2/1brpN3/5Pp1/4P1P1/6K1/1B6 b - - 2 43",
+    "moves": [
+      "f6h8",
+      "a7f7"
+    ],
+    "rating": 1033
+  },
+  {
+    "id": "00AhO",
+    "fen": "r1b2rk1/2q2p1p/1p2pbp1/pP6/2P1Q3/P2B1N2/5PPP/3R1RK1 w - - 0 20",
+    "moves": [
+      "e4a8",
+      "c8b7",
+      "a8a7",
+      "f8a8",
+      "a7a8",
+      "b7a8"
+    ],
+    "rating": 1243
+  },
+  {
+    "id": "00Ahb",
+    "fen": "1k4nr/pp1r1ppp/4p3/1Nb2q2/2Pp4/6P1/PP3P1P/R1BQR1K1 b - - 2 14",
+    "moves": [
+      "g8h6",
+      "c1f4",
+      "f5f4",
+      "g3f4"
+    ],
+    "rating": 1135
+  },
+  {
+    "id": "00Al5",
+    "fen": "2r3k1/p2q1pbp/1p2pnp1/nB1p4/3P4/1Pr1P2P/P1QB1PP1/2R2RK1 w - - 0 19",
+    "moves": [
+      "b5d7",
+      "c3c2",
+      "d7c8",
+      "c2d2"
+    ],
+    "rating": 1589
+  },
+  {
+    "id": "00AoZ",
+    "fen": "8/1R6/p1pk4/6bp/1QP5/P7/KP6/3r2q1 b - - 2 44",
+    "moves": [
+      "g1c5",
+      "b7d7",
+      "d6d7",
+      "b4c5"
+    ],
+    "rating": 1033
+  },
+  {
+    "id": "00Aq4",
+    "fen": "2k1r3/pppn1pp1/3b2b1/3p2Pp/2B2P2/3P3P/PPPR4/2K3NR w - - 0 18",
+    "moves": [
+      "c4d5",
+      "e8e1",
+      "d2d1",
+      "d6f4",
+      "c1b1",
+      "e1d1"
+    ],
+    "rating": 1475
+  },
+  {
+    "id": "00Ar2",
+    "fen": "r2q1r2/1n4pk/p6p/1pp2pb1/3n1B2/P1NPN2P/1PPQ1PP1/R3R1K1 w - - 0 21",
+    "moves": [
+      "c3d5",
+      "g5f4",
+      "d5f4",
+      "d8g5",
+      "d2d1",
+      "g5f4"
+    ],
+    "rating": 1763
+  },
+  {
+    "id": "00Au2",
+    "fen": "r5r1/pp2kp2/2p5/3pQ3/3P4/2NB4/PPP2q2/1K6 b - - 1 28",
+    "moves": [
+      "e7d7",
+      "d3f5",
+      "f2f5",
+      "e5f5"
+    ],
+    "rating": 949
+  },
+  {
+    "id": "00AuR",
+    "fen": "8/4bkp1/R6P/4p3/Pp2P3/1P1rB3/6P1/6K1 b - - 0 33",
+    "moves": [
+      "d3e3",
+      "h6h7",
+      "e3e1",
+      "g1h2"
+    ],
+    "rating": 1695
+  },
+  {
+    "id": "00B2k",
+    "fen": "r4rk1/pbp3pp/1p1pp3/6B1/2PPp2q/3nP2P/PP3P2/R2QKBR1 w Q - 8 16",
+    "moves": [
+      "f1d3",
+      "h4f2"
+    ],
+    "rating": 830
+  },
+  {
+    "id": "00B3B",
+    "fen": "2K5/3P4/5b2/p1B5/P7/3k4/6p1/8 w - - 7 77",
+    "moves": [
+      "d7d8q",
+      "f6d8",
+      "c8d8",
+      "d3c4"
+    ],
+    "rating": 1482
+  },
+  {
+    "id": "00B7G",
+    "fen": "1rb2r1k/4q2p/p2p4/3B1p2/1pPb4/1P2NQ2/P5PP/2R2RK1 w - - 1 24",
+    "moves": [
+      "g1h1",
+      "e7e3",
+      "f3e3",
+      "d4e3"
+    ],
+    "rating": 1643
+  },
+  {
+    "id": "00B8m",
+    "fen": "3b4/3P4/pp2Pk2/5r2/P6p/3Q4/8/7K w - - 1 43",
+    "moves": [
+      "d3f5",
+      "f6f5",
+      "e6e7",
+      "d8e7",
+      "d7d8q",
+      "e7d8"
+    ],
+    "rating": 1277
+  },
+  {
+    "id": "00BCa",
+    "fen": "1r6/p2kp1P1/3p4/2pP4/2P2B2/pN6/5PK1/8 b - - 1 41",
+    "moves": [
+      "a3a2",
+      "b3c5",
+      "d6c5",
+      "f4b8",
+      "a2a1q",
+      "g7g8q"
+    ],
+    "rating": 1560
+  },
+  {
+    "id": "00BJm",
+    "fen": "r2q1rk1/1Q2bppp/p1N1p3/1p6/2pP1n2/2P5/PP3PPP/R4RK1 b - - 1 18",
+    "moves": [
+      "d8d5",
+      "c6e7",
+      "g8h8",
+      "e7d5"
+    ],
+    "rating": 1044
+  },
+  {
+    "id": "00BM8",
+    "fen": "r4rk1/pp2bppp/2ppnn2/8/N1P1P3/q1P4P/P2N2PB/R2Q1R1K b - - 0 16",
+    "moves": [
+      "a8d8",
+      "d2b1",
+      "a3a4",
+      "d1a4"
+    ],
+    "rating": 1588
+  },
+  {
+    "id": "00BNd",
+    "fen": "1rr3k1/3bppbp/3p1np1/1B1N4/P2BP3/5P2/P2R2PP/R5K1 b - - 0 21",
+    "moves": [
+      "d7b5",
+      "d5e7",
+      "g8f8",
+      "e7c8"
+    ],
+    "rating": 982
+  },
+  {
+    "id": "00BPh",
+    "fen": "r4rk1/1b1p1p1p/p2NpQpq/1p6/3R4/P7/1P3PPP/3R2K1 b - - 9 23",
+    "moves": [
+      "b7d5",
+      "d4d5",
+      "h6g7",
+      "f6g7"
+    ],
+    "rating": 1839
+  },
+  {
+    "id": "00BSo",
+    "fen": "2r3k1/4R1pp/p1p2p2/2p5/2P5/1PbN3P/P4PP1/6K1 w - - 0 25",
+    "moves": [
+      "d3c5",
+      "c3b4",
+      "e7a7",
+      "b4c5"
+    ],
+    "rating": 1257
+  },
+  {
+    "id": "00BZ6",
+    "fen": "1r1r1bk1/3n1p1p/1qp3p1/2N1p3/PpQ1P3/4BP2/4N1PP/1R3RK1 w - - 0 24",
+    "moves": [
+      "f1c1",
+      "f8c5",
+      "e3c5",
+      "d7c5"
+    ],
+    "rating": 2089
+  },
+  {
+    "id": "00Bex",
+    "fen": "1rb1qrk1/6bp/2np4/2pNpp2/2P5/3P1B2/1B3PPP/1R1QR1K1 b - - 0 22",
+    "moves": [
+      "c8e6",
+      "d5c7",
+      "e8f7",
+      "c7e6"
+    ],
+    "rating": 1695
+  },
+  {
+    "id": "00Bg0",
+    "fen": "8/3k4/3P1K2/p2R4/5r2/5P2/8/8 w - - 1 57",
+    "moves": [
+      "d5f5",
+      "f4f5",
+      "f6f5",
+      "a5a4",
+      "f5e4",
+      "a4a3",
+      "e4d3",
+      "a3a2"
+    ],
+    "rating": 1293
+  },
+  {
+    "id": "00Bg4",
+    "fen": "3r2k1/1q3ppp/p2rp3/Qp1B4/7P/P4P2/1PP3P1/1K1R3R b - - 0 21",
+    "moves": [
+      "d6d5",
+      "a5d8",
+      "d5d8",
+      "d1d8"
+    ],
+    "rating": 1373
+  },
+  {
+    "id": "00Bm8",
+    "fen": "8/6kp/4b1q1/1p6/1PpPp2Q/2P1P3/r2N2P1/5RK1 w - - 7 34",
+    "moves": [
+      "d2e4",
+      "g6g2"
+    ],
+    "rating": 1126
+  },
+  {
+    "id": "00Bn0",
+    "fen": "r1bqkb1r/pp1pnppp/2n1p3/1N6/5B2/8/PPP1PPPP/R2QKBNR b KQkq - 4 6",
+    "moves": [
+      "e6e5",
+      "b5d6"
+    ],
+    "rating": 1037
+  },
+  {
+    "id": "00Bot",
+    "fen": "8/5p2/p3kP2/8/5r2/R1P5/4P3/4K3 b - - 2 52",
+    "moves": [
+      "f4f6",
+      "a3a6",
+      "e6e5",
+      "a6f6"
+    ],
+    "rating": 818
+  },
+  {
+    "id": "00Bp0",
+    "fen": "1r2kr2/pp3p1p/2b1pn2/4N3/2P5/1N1B4/P3KP1P/6R1 b - - 4 21",
+    "moves": [
+      "f6e4",
+      "e5c6",
+      "b7c6",
+      "d3e4"
+    ],
+    "rating": 1265
+  },
+  {
+    "id": "00BrZ",
+    "fen": "r6r/pp2kb2/3p1p1Q/1N1Pp3/3bP3/P2B2P1/1P4PP/7K w - - 6 28",
+    "moves": [
+      "h6d2",
+      "h8h2",
+      "h1h2",
+      "a8h8",
+      "d2h6",
+      "h8h6"
+    ],
+    "rating": 1382
+  },
+  {
+    "id": "00Bse",
+    "fen": "8/5p2/1R4k1/6p1/8/3r2PP/5K2/8 b - - 3 40",
+    "moves": [
+      "g6h5",
+      "g3g4",
+      "h5h4",
+      "b6h6"
+    ],
+    "rating": 849
+  },
+  {
+    "id": "00Bul",
+    "fen": "rnbqk2r/pp3ppp/5n2/3pN3/2B5/2P5/P1PPQPPP/R1B1K2R b KQkq - 1 8",
+    "moves": [
+      "d5c4",
+      "e5c6",
+      "c8e6",
+      "c6d8"
+    ],
+    "rating": 1198
+  },
+  {
+    "id": "00C3O",
+    "fen": "r2qkbnr/pp4pp/2p2p2/4n2b/2B1P3/2N2N2/PPP3PP/R1BQ1RK1 w kq - 0 10",
+    "moves": [
+      "d1e2",
+      "h5f3",
+      "g2f3",
+      "d8d4"
+    ],
+    "rating": 2070
+  },
+  {
+    "id": "00C8Y",
+    "fen": "rnb2rk1/pp3p1p/3p2Pb/4p1q1/3pQ3/8/PPP1PPP1/RN2KBNR w KQ - 1 12",
+    "moves": [
+      "g1f3",
+      "g5c1"
+    ],
+    "rating": 1034
+  },
+  {
+    "id": "00C8e",
+    "fen": "8/5p1k/5Ppb/2p3P1/1p6/8/KB5Q/3q4 b - - 4 58",
+    "moves": [
+      "d1a4",
+      "a2b1",
+      "a4d1",
+      "b2c1"
+    ],
+    "rating": 1546
+  },
+  {
+    "id": "00CBU",
+    "fen": "8/2pR2kp/pb4p1/8/5p1P/B6K/P1r5/6r1 b - - 3 39",
+    "moves": [
+      "g7h6",
+      "a3f8",
+      "h6h5",
+      "d7h7"
+    ],
+    "rating": 1818
+  },
+  {
+    "id": "00CMj",
+    "fen": "7R/8/8/6p1/2p1p1k1/2PbK2p/P7/8 w - - 4 71",
+    "moves": [
+      "e3f2",
+      "e4e3",
+      "f2e3",
+      "g4g3"
+    ],
+    "rating": 1642
+  },
+  {
+    "id": "00CWE",
+    "fen": "3r4/1p4p1/2pBkbBp/p1P5/3rp3/P7/1PK2P2/4R3 b - - 1 31",
+    "moves": [
+      "e6d5",
+      "g6f7"
+    ],
+    "rating": 1509
+  },
+  {
+    "id": "00CXr",
+    "fen": "r2k2nr/pp2qBb1/3p3p/Q5p1/3n1B2/2N2R2/PPP3P1/R5K1 b - - 1 18",
+    "moves": [
+      "b7b6",
+      "a5d5",
+      "d4f3",
+      "g2f3",
+      "a8c8",
+      "f4d6"
+    ],
+    "rating": 1957
+  },
+  {
+    "id": "00CYP",
+    "fen": "3rk2r/p1p2pp1/1p6/2pQ1b2/2Pn1P2/8/PP1P1KBq/R1B1R3 b - - 3 25",
+    "moves": [
+      "e8f8",
+      "d5d8"
+    ],
+    "rating": 1273
+  },
+  {
+    "id": "00CcK",
+    "fen": "8/8/3p4/4kp2/1pP3pP/1RbK2P1/8/8 w - - 2 42",
+    "moves": [
+      "b3c3",
+      "b4c3",
+      "d3c3",
+      "f5f4",
+      "c3d3",
+      "f4g3"
+    ],
+    "rating": 1691
+  },
+  {
+    "id": "00CiZ",
+    "fen": "5r1k/6b1/3p3p/1P1q2pQ/r5P1/3p1N1P/3R2P1/4R2K w - - 2 34",
+    "moves": [
+      "e1d1",
+      "f8f3",
+      "g2f3",
+      "d5f3"
+    ],
+    "rating": 1362
+  },
+  {
+    "id": "00Cqg",
+    "fen": "2rr2k1/pp4bp/4qpp1/3Pp3/8/4Q2P/4B1P1/2RR3K b - - 0 26",
+    "moves": [
+      "c8c1",
+      "d5e6",
+      "d8d1",
+      "e2d1",
+      "c1d1",
+      "h1h2"
+    ],
+    "rating": 1421
+  },
+  {
+    "id": "00Cs4",
+    "fen": "2r1q1k1/8/b2b1r1p/Pp1pNpp1/3Pn3/1RPQ3P/P1B1NPP1/4R1K1 w - - 3 28",
+    "moves": [
+      "a2a4",
+      "b5a4",
+      "d3a6",
+      "a4b3"
+    ],
+    "rating": 1401
+  },
+  {
+    "id": "00CtS",
+    "fen": "Q5k1/5q2/p2p4/b1p1pr2/P7/6P1/4KP1R/8 b - - 3 38",
+    "moves": [
+      "g8g7",
+      "a8h8",
+      "g7g6",
+      "h8h6"
+    ],
+    "rating": 978
+  },
+  {
+    "id": "00Cwz",
+    "fen": "1r5r/5pk1/4p3/2Np2PP/p1nP4/n1P5/P3B3/K1R4R w - - 2 34",
+    "moves": [
+      "c5a4",
+      "b8b1",
+      "c1b1",
+      "a3c2"
+    ],
+    "rating": 1495
+  },
+  {
+    "id": "00D77",
+    "fen": "5rk1/bpp3pp/p1npb3/4p3/1P2Nr1q/P1PP3P/1B1QBPR1/2K3R1 b - - 2 21",
+    "moves": [
+      "h4h3",
+      "g2g7",
+      "g8h8",
+      "e4g5"
+    ],
+    "rating": 1934
+  },
+  {
+    "id": "00DBP",
+    "fen": "5k1r/pp1b1p2/4p2p/2KpP2B/5P2/P5R1/7P/8 b - - 4 34",
+    "moves": [
+      "h8g8",
+      "g3g8",
+      "f8g8",
+      "c5d6"
+    ],
+    "rating": 1303
+  },
+  {
+    "id": "00DBg",
+    "fen": "rn2kbnr/pp6/2p2p2/4P3/4P1pq/2N3N1/PPPB2B1/R2Q1RK1 w kq - 1 17",
+    "moves": [
+      "g1f2",
+      "f8c5",
+      "d2e3",
+      "c5e3",
+      "f2e3",
+      "h4g3"
+    ],
+    "rating": 1083
+  },
+  {
+    "id": "00DEc",
+    "fen": "8/p5pk/1p3b1p/3r3P/6P1/3nBN2/P4PK1/4R3 w - - 3 30",
+    "moves": [
+      "e1d1",
+      "d3f4",
+      "e3f4",
+      "d5d1"
+    ],
+    "rating": 1091
+  },
+  {
+    "id": "00DII",
+    "fen": "2rr2k1/p5p1/1p5p/2pP1p1P/2q5/P4QR1/5PP1/4R1K1 b - - 3 31",
+    "moves": [
+      "c4d5",
+      "e1e8",
+      "g8f7",
+      "f3d5",
+      "d8d5",
+      "e8c8"
+    ],
+    "rating": 1750
+  },
+  {
+    "id": "00DKr",
+    "fen": "3r1k2/2p1R3/p2p2n1/1p6/1P1P2Q1/7P/5qPK/3R4 w - - 2 42",
+    "moves": [
+      "d1e1",
+      "g6e7",
+      "e1e4",
+      "f8e8"
+    ],
+    "rating": 2090
+  },
+  {
+    "id": "00DPI",
+    "fen": "3r2k1/1B3p1p/6p1/3N4/3p2P1/6r1/5KP1/3R4 b - - 5 35",
+    "moves": [
+      "g3g4",
+      "d5f6",
+      "g8g7",
+      "f6g4"
+    ],
+    "rating": 960
+  },
+  {
+    "id": "00DWo",
+    "fen": "b4b1r/3k1ppp/p2p4/1p2p3/3nq3/N1P1B3/PP3PPP/R2Q1RK1 w - - 1 16",
+    "moves": [
+      "c3d4",
+      "e4g2"
+    ],
+    "rating": 1063
+  },
+  {
+    "id": "00DcC",
+    "fen": "5k2/6pp/p1b3P1/2N2P1r/p7/8/1KP5/5R2 b - - 0 36",
+    "moves": [
+      "h7h6",
+      "c5e6",
+      "f8e7",
+      "e6g7"
+    ],
+    "rating": 1390
+  },
+  {
+    "id": "00DdW",
+    "fen": "5rk1/4bppp/4b3/1p1pPpPP/2pP4/2P5/rqNQKP2/2RRN3 b - - 5 23",
+    "moves": [
+      "e7a3",
+      "c1b1",
+      "b2b3",
+      "b1b3"
+    ],
+    "rating": 1693
+  },
+  {
+    "id": "00DkJ",
+    "fen": "3r1bnr/2p2ppp/2b5/R1k5/5P2/2N5/4N1PP/1R4K1 b - - 3 21",
+    "moves": [
+      "c5d6",
+      "b1d1",
+      "d6e7",
+      "a5e5",
+      "e7f6",
+      "d1d8"
+    ],
+    "rating": 1613
+  },
+  {
+    "id": "00Dke",
+    "fen": "5bk1/2Q2p1p/5qp1/p7/P1Bp4/1Pr4P/5PP1/3R2K1 b - - 5 27",
+    "moves": [
+      "c3c2",
+      "c4f7",
+      "g8g7",
+      "c7c2"
+    ],
+    "rating": 1197
+  },
+  {
+    "id": "00Dt6",
+    "fen": "5rk1/p4p1p/4p1p1/5nq1/8/5QPP/5PK1/2RR4 w - - 6 35",
+    "moves": [
+      "c1b1",
+      "f5h4",
+      "g2f1",
+      "h4f3"
+    ],
+    "rating": 1204
+  },
+  {
+    "id": "00Dxh",
+    "fen": "8/8/8/6R1/2pk2P1/1r3K1P/8/8 w - - 0 48",
+    "moves": [
+      "f3g2",
+      "c4c3",
+      "g5g7",
+      "c3c2"
+    ],
+    "rating": 1352
+  },
+  {
+    "id": "00E29",
+    "fen": "r1bq1rk1/4bppp/p1n5/3P4/Pp6/3B1N2/1B3PPP/R2Q1RK1 b - - 0 17",
+    "moves": [
+      "d8d5",
+      "d3h7",
+      "g8h7",
+      "d1d5"
+    ],
+    "rating": 956
+  },
+  {
+    "id": "00EBZ",
+    "fen": "3rr1k1/p4pp1/1pp4p/3pPQ2/1P3P2/2P3qP/P2R2P1/5RK1 w - - 1 24",
+    "moves": [
+      "f1f3",
+      "g3e1",
+      "g1h2",
+      "e1d2"
+    ],
+    "rating": 831
+  },
+  {
+    "id": "00EDN",
+    "fen": "rnbq1rk1/p4ppp/1p2p3/2p5/2QPn3/2P1PN2/P3BPPP/R1B2RK1 w - - 0 11",
+    "moves": [
+      "c1a3",
+      "c8a6",
+      "c4a6",
+      "b8a6"
+    ],
+    "rating": 1612
+  },
+  {
+    "id": "00EDa",
+    "fen": "r1bk3r/ppp1np1p/3p2pP/1N2P1q1/2BP1n2/8/PPP3P1/R1BQ2KR w - - 1 14",
+    "moves": [
+      "e5d6",
+      "g5g2"
+    ],
+    "rating": 1121
+  },
+  {
+    "id": "00EEp",
+    "fen": "3k2q1/pb1p3p/1p1P4/2p5/2P2Q1K/8/P7/5R2 b - - 2 36",
+    "moves": [
+      "b7g2",
+      "f4f8",
+      "g8f8",
+      "f1f8"
+    ],
+    "rating": 1646
+  },
+  {
+    "id": "00ERL",
+    "fen": "1r2R1k1/2Q4p/pp6/2p2n2/P2P1P1q/2P4P/2PB2b1/4R1K1 b - - 0 29",
+    "moves": [
+      "b8e8",
+      "e1e8"
+    ],
+    "rating": 886
+  },
+  {
+    "id": "00EWi",
+    "fen": "8/8/1R3pkp/1pP5/1P3PKP/r7/8/8 w - - 2 48",
+    "moves": [
+      "b6b5",
+      "f6f5"
+    ],
+    "rating": 896
+  },
+  {
+    "id": "00EXP",
+    "fen": "2n3k1/p4ppp/2p1p3/P1NrP3/1n1r4/3N4/5PPP/1R1R2K1 w - - 0 29",
+    "moves": [
+      "d3b4",
+      "d4d1",
+      "b1d1",
+      "d5d1"
+    ],
+    "rating": 863
+  },
+  {
+    "id": "00EXS",
+    "fen": "r3r1k1/p2Q1p1p/1p2p1p1/8/1P1P4/P3P3/1B2Nb1q/2KR1R2 w - - 0 19",
+    "moves": [
+      "f1h1",
+      "f2e3",
+      "c1b1",
+      "h2e2"
+    ],
+    "rating": 1551
+  },
+  {
+    "id": "00Ea3",
+    "fen": "3r4/p5k1/1p1qprnp/1Q1pN1p1/3P1pP1/1PP5/P5PP/4RRK1 b - - 3 29",
+    "moves": [
+      "g6e5",
+      "d4e5",
+      "d6c5",
+      "b5c5",
+      "b6c5",
+      "e5f6"
+    ],
+    "rating": 1317
+  },
+  {
+    "id": "00EbJ",
+    "fen": "r2q1rk1/ppp2ppp/2nbb3/8/6n1/2NPBN2/PPP1BPPP/R2QK2R w KQ - 5 9",
+    "moves": [
+      "f3g5",
+      "g4e3",
+      "f2e3",
+      "d8g5"
+    ],
+    "rating": 1201
+  },
+  {
+    "id": "00Ec4",
+    "fen": "2rq1r1k/p5pp/8/1p1BpPb1/2Pp2Q1/P2P2R1/6PP/R5K1 b - - 3 25",
+    "moves": [
+      "c8c7",
+      "g4g5",
+      "d8g5",
+      "g3g5"
+    ],
+    "rating": 827
+  },
+  {
+    "id": "00EgR",
+    "fen": "N2k3r/1b1n1Bpp/p7/1pb1P3/6P1/4p3/PPP4P/1K1R3R w - - 1 20",
+    "moves": [
+      "e5e6",
+      "b7h1",
+      "d1d7",
+      "d8c8",
+      "d7c7",
+      "c8b8"
+    ],
+    "rating": 1794
+  },
+  {
+    "id": "00Enl",
+    "fen": "2kr4/1pp5/p1b2R1n/2PpP3/3B2p1/2P1Q1Pp/PPq4P/5RK1 w - - 3 27",
+    "moves": [
+      "f6h6",
+      "c2g2"
+    ],
+    "rating": 864
+  },
+  {
+    "id": "00EoE",
+    "fen": "r1b1k3/ppr4p/5p2/5p2/8/2P3P1/P4PP1/4RK1R b q - 1 23",
+    "moves": [
+      "e8f7",
+      "h1h7",
+      "f7g6",
+      "h7c7"
+    ],
+    "rating": 974
+  },
+  {
+    "id": "00Er4",
+    "fen": "r3k2r/p1bN2pp/2p1pp2/3p3b/3P1q2/2N4P/PPPQ1PP1/R3R1K1 w kq - 0 16",
+    "moves": [
+      "e1e6",
+      "e8d7",
+      "d2f4",
+      "c7f4"
+    ],
+    "rating": 1345
+  },
+  {
+    "id": "00Erm",
+    "fen": "3r4/6k1/1p1pr1p1/p1p2p2/PnP1p1P1/1P6/3R1PBP/4R1K1 b - - 0 29",
+    "moves": [
+      "b4d3",
+      "d2d3",
+      "e4d3",
+      "e1e6",
+      "d3d2",
+      "g2f3"
+    ],
+    "rating": 1402
+  },
+  {
+    "id": "00Evs",
+    "fen": "5qk1/pQ3pp1/7p/b2N1b2/P3r3/5K2/7P/R4B2 b - - 1 24",
+    "moves": [
+      "g7g5",
+      "d5f6",
+      "g8h8",
+      "f6e4"
+    ],
+    "rating": 1077
+  },
+  {
+    "id": "00Ezc",
+    "fen": "rnb1k2r/ppp4p/3b1qp1/3P1pBQ/4p2N/2N5/PPP2PPP/R3R1K1 b kq - 1 13",
+    "moves": [
+      "f6f7",
+      "c3e4",
+      "f5e4",
+      "e1e4"
+    ],
+    "rating": 2005
+  },
+  {
+    "id": "00F1l",
+    "fen": "8/2k1b3/5p2/RBpK1Pp1/Pp1p2P1/3P4/2r5/8 b - - 2 45",
+    "moves": [
+      "b4b3",
+      "a5a7",
+      "c7b8",
+      "a7e7"
+    ],
+    "rating": 836
+  },
+  {
+    "id": "00F2o",
+    "fen": "6k1/4qpp1/3p3p/8/2BP4/1Pn5/2Qn1PPP/6K1 w - - 0 29",
+    "moves": [
+      "c2c3",
+      "e7e1",
+      "c4f1",
+      "e1f1"
+    ],
+    "rating": 978
+  },
+  {
+    "id": "00F3S",
+    "fen": "3r1rk1/5ppp/p5q1/1p1P4/2PpP3/P6Q/B4PPP/2R3K1 b - - 0 29",
+    "moves": [
+      "g6e4",
+      "a2b1",
+      "e4b1",
+      "c1b1"
+    ],
+    "rating": 1330
+  },
+  {
+    "id": "00F5G",
+    "fen": "2rqrbk1/pp3ppp/4n3/3p1N2/3NnBQ1/2P4P/PP3PP1/R4RK1 b - - 14 22",
+    "moves": [
+      "e6f4",
+      "f5h6",
+      "g8h8",
+      "h6f7"
+    ],
+    "rating": 1538
+  },
+  {
+    "id": "00F6y",
+    "fen": "2k3r1/ppp2prp/1q2b3/8/Q7/2P1R1P1/P4P1P/4R1K1 b - - 3 23",
+    "moves": [
+      "e6d7",
+      "e3e8",
+      "d7e8",
+      "e1e8",
+      "g8e8",
+      "a4e8"
+    ],
+    "rating": 878
+  },
+  {
+    "id": "00FAe",
+    "fen": "5Rbk/6pp/8/p3P3/Pp1pq3/8/1P4PP/3Q2K1 w - - 1 35",
+    "moves": [
+      "d1b3",
+      "e4e1",
+      "f8f1",
+      "e1f1",
+      "g1f1",
+      "g8b3"
+    ],
+    "rating": 1694
+  },
+  {
+    "id": "00FF5",
+    "fen": "r3k3/ppp1qp2/1b1p3p/4p2r/2B1P1b1/P1PP1P2/1P4PQ/RN3R1K b q - 2 18",
+    "moves": [
+      "e7h4",
+      "c4f7",
+      "e8e7",
+      "f7h5"
+    ],
+    "rating": 1987
+  },
+  {
+    "id": "00FH6",
+    "fen": "r6r/1q2bpk1/7p/p1p1pPpn/Pp2P1nP/1P1B1N2/2P3P1/2BRR1QK w - - 7 30",
+    "moves": [
+      "c1b2",
+      "h5g3"
+    ],
+    "rating": 1023
+  },
+  {
+    "id": "00FND",
+    "fen": "8/1P6/8/7p/3P4/3k1p1P/4p3/3K4 w - - 0 49",
+    "moves": [
+      "d1e1",
+      "d3e3",
+      "h3h4",
+      "f3f2"
+    ],
+    "rating": 1965
+  },
+  {
+    "id": "00FON",
+    "fen": "1k6/8/8/6p1/1pp5/p4PP1/N1P4P/7K w - - 0 38",
+    "moves": [
+      "h2h4",
+      "b4b3",
+      "c2b3",
+      "c4b3"
+    ],
+    "rating": 936
+  },
+  {
+    "id": "00FPo",
+    "fen": "7R/1K3p2/6k1/PP4p1/8/6rp/8/8 b - - 2 47",
+    "moves": [
+      "g5g4",
+      "a5a6",
+      "h3h2",
+      "h8h2"
+    ],
+    "rating": 1793
+  },
+  {
+    "id": "00Feu",
+    "fen": "4R1k1/p4r1p/1pp2rp1/8/5B1q/4QP1P/P1P2PK1/8 b - - 2 28",
+    "moves": [
+      "f7f8",
+      "f4g5",
+      "h4g5",
+      "e3g5"
+    ],
+    "rating": 2016
+  },
+  {
+    "id": "00FjB",
+    "fen": "rnbk3r/pppp1Bpp/8/5p2/4p3/2PP4/P1P2PPP/R1B1K2R b KQ - 0 13",
+    "moves": [
+      "h8f8",
+      "c1g5"
+    ],
+    "rating": 879
+  },
+  {
+    "id": "00G0z",
+    "fen": "Q4n1k/p2b2pp/3b4/2p5/4pq2/2Pn3P/PP1NBPP1/R1B2RK1 w - - 1 23",
+    "moves": [
+      "d2e4",
+      "f4h2"
+    ],
+    "rating": 1339
+  },
+  {
+    "id": "00G1l",
+    "fen": "5k2/1R6/3pp1P1/2p5/1pr1PK2/5P2/8/8 b - - 0 60",
+    "moves": [
+      "c4c1",
+      "f4g5",
+      "c1g1",
+      "g5f6"
+    ],
+    "rating": 1838
+  },
+  {
+    "id": "00G7g",
+    "fen": "3r1rk1/p4pp1/b1p4p/8/BPPq4/P2P3P/2Q3P1/RNB4K b - - 2 27",
+    "moves": [
+      "d4a1",
+      "c1b2",
+      "a1b2",
+      "c2b2"
+    ],
+    "rating": 1340
+  },
+  {
+    "id": "00G81",
+    "fen": "3r4/5k2/p4Pp1/2pK2Pp/2R5/P7/8/8 w - - 7 51",
+    "moves": [
+      "d5c5",
+      "d8c8",
+      "c5d4",
+      "c8c4",
+      "d4c4",
+      "h5h4"
+    ],
+    "rating": 1399
+  },
+  {
+    "id": "00GAf",
+    "fen": "r5k1/5pp1/1p1rb2p/3pR2q/p1pP4/P1P3Q1/5PPN/4R1K1 b - - 1 30",
+    "moves": [
+      "h5g6",
+      "g3g6",
+      "f7g6",
+      "e5e6",
+      "d6e6",
+      "e1e6"
+    ],
+    "rating": 1328
+  },
+  {
+    "id": "00GBV",
+    "fen": "3r1rk1/pp2n1pp/8/8/Nq6/1PB5/P3QPPP/4R1K1 b - - 1 25",
+    "moves": [
+      "b4d6",
+      "e2e7",
+      "d6e7",
+      "e1e7"
+    ],
+    "rating": 1455
+  },
+  {
+    "id": "00GBX",
+    "fen": "r6k/pp2n1pp/2nN4/4p1Br/1PB5/2P4b/P3Nb1P/R2R3K b - - 1 22",
+    "moves": [
+      "h5g5",
+      "d6f7",
+      "h8g8",
+      "f7g5"
+    ],
+    "rating": 929
+  },
+  {
+    "id": "00GVf",
+    "fen": "2b2k2/6q1/pn4p1/1rp2p2/8/8/1P2Q1P1/1K2R2R b - - 3 32",
+    "moves": [
+      "c8d7",
+      "h1h8",
+      "g7h8",
+      "e2e7",
+      "f8g8",
+      "e7d8"
+    ],
+    "rating": 1560
+  },
+  {
+    "id": "00GY4",
+    "fen": "3k2r1/pR5R/3r4/4p1q1/7Q/3Pn1PP/PP5K/8 b - - 0 27",
+    "moves": [
+      "g5h4",
+      "b7b8"
+    ],
+    "rating": 1219
+  },
+  {
+    "id": "00GYk",
+    "fen": "1r4k1/p3p1bp/1n3qp1/6B1/6Q1/1P4pP/P5B1/3R3K b - - 0 29",
+    "moves": [
+      "f6e5",
+      "g5f4",
+      "e5f4",
+      "g4f4"
+    ],
+    "rating": 1647
+  },
+  {
+    "id": "00GiQ",
+    "fen": "5r2/1p3p1k/6pp/p1qp1P2/7Q/5N2/6PP/5N1K b - - 4 31",
+    "moves": [
+      "b7b5",
+      "f3g5",
+      "h7g7",
+      "f5f6",
+      "g7f6",
+      "g5e4"
+    ],
+    "rating": 1854
+  },
+  {
+    "id": "00Gt0",
+    "fen": "R7/4k3/5p2/3p2p1/4b2p/2K1P2P/5PP1/8 w - - 2 47",
+    "moves": [
+      "f2f3",
+      "d5d4",
+      "c3d4",
+      "e4a8"
+    ],
+    "rating": 1052
+  },
+  {
+    "id": "00GuD",
+    "fen": "1n5k/4r1p1/p2q1rPp/1ppB4/8/3P4/PPP1RPQ1/2K4R b - - 4 25",
+    "moves": [
+      "e7e2",
+      "h1h6",
+      "g7h6",
+      "g6g7",
+      "h8h7",
+      "g7g8q"
+    ],
+    "rating": 1165
+  },
+  {
+    "id": "00Gvp",
+    "fen": "8/2kn1p2/8/3P4/R7/2P1N3/1r2K3/8 w - - 13 70",
+    "moves": [
+      "e2d3",
+      "d7c5",
+      "d3d4",
+      "c5a4"
+    ],
+    "rating": 979
+  },
+  {
+    "id": "00Gvr",
+    "fen": "8/1b3pp1/1k4Pp/4K2P/4PP2/8/8/8 b - - 0 46",
+    "moves": [
+      "f7f6",
+      "e5e6",
+      "b7e4",
+      "e6f7"
+    ],
+    "rating": 1134
+  },
+  {
+    "id": "00H1C",
+    "fen": "r3r3/1kpRnqpp/p4p2/Qp2P2P/1N6/4Pb2/PPP3P1/2K2R2 b - - 0 22",
+    "moves": [
+      "e7c6",
+      "a5c7"
+    ],
+    "rating": 1389
+  },
+  {
+    "id": "00H2I",
+    "fen": "4rrk1/ppp2pp1/7p/3n4/3P3q/1P2p2P/P5P1/R1BQRBK1 w - - 2 23",
+    "moves": [
+      "c1b2",
+      "h4f2",
+      "g1h2",
+      "f2b2"
+    ],
+    "rating": 2033
+  },
+  {
+    "id": "00H87",
+    "fen": "6k1/2q1pp2/p5pB/2p4n/3pP1Q1/P2P3P/1r4P1/5RK1 b - - 1 30",
+    "moves": [
+      "c7g3",
+      "g4c8",
+      "g8h7",
+      "f1f7",
+      "h5g7",
+      "f7g7",
+      "h7h6",
+      "c8h8",
+      "h6g5",
+      "g7g6",
+      "g5g6",
+      "h8g8",
+      "g6f6",
+      "g8g3"
+    ],
+    "rating": 1958
+  },
+  {
+    "id": "00H9n",
+    "fen": "7k/6p1/8/4p3/Pp1b4/1P3b1q/3Q2P1/5RK1 w - - 0 45",
+    "moves": [
+      "d2d4",
+      "h3g2"
+    ],
+    "rating": 893
+  },
+  {
+    "id": "00HAM",
+    "fen": "R2q1r1k/1p3Qpp/1n6/3P2pP/2PP2P1/1P6/2K5/5R2 b - - 0 29",
+    "moves": [
+      "d8a8",
+      "f7f8",
+      "a8f8",
+      "f1f8"
+    ],
+    "rating": 953
+  },
+  {
+    "id": "00HDS",
+    "fen": "6k1/pp2R3/6pp/8/3r4/P4BbP/1P4P1/6K1 b - - 3 38",
+    "moves": [
+      "d4c4",
+      "f3d5",
+      "g8f8",
+      "e7f7",
+      "f8e8",
+      "d5c4"
+    ],
+    "rating": 1506
+  },
+  {
+    "id": "00HEh",
+    "fen": "3R1rk1/pp3ppp/2p3b1/2n3P1/2B2q1P/5N2/PPP1QP2/4R1K1 b - - 0 23",
+    "moves": [
+      "f8d8",
+      "e2e8",
+      "d8e8",
+      "e1e8"
+    ],
+    "rating": 803
+  },
+  {
+    "id": "00HEx",
+    "fen": "b7/5pk1/R3pn1p/8/3NP3/5P2/6PP/2rB2K1 w - - 1 31",
+    "moves": [
+      "a6a8",
+      "c1d1",
+      "g1f2",
+      "d1d4"
+    ],
+    "rating": 975
+  },
+  {
+    "id": "00HGG",
+    "fen": "8/pp6/2p1kpp1/3p4/3P1PPp/1P3K2/P1P4P/8 w - - 0 31",
+    "moves": [
+      "g4g5",
+      "f6g5",
+      "f3g4",
+      "g5f4",
+      "g4f4",
+      "e6f6"
+    ],
+    "rating": 1682
+  },
+  {
+    "id": "00HHN",
+    "fen": "4r2k/p6p/1p3R2/2p5/2P5/1P4R1/r5PP/2K5 w - - 0 32",
+    "moves": [
+      "f6f7",
+      "e8e1"
+    ],
+    "rating": 848
+  },
+  {
+    "id": "00HIV",
+    "fen": "8/8/1p1k1n1p/4p3/1PP2pp1/3K4/3N1PPP/8 b - - 3 37",
+    "moves": [
+      "h6h5",
+      "d2e4",
+      "f6e4",
+      "d3e4"
+    ],
+    "rating": 862
+  },
+  {
+    "id": "00HJd",
+    "fen": "r1bqkb1r/pp2pppp/2p2n2/2PnN3/2BP1B2/8/PP3PPP/RN1QR1K1 b kq - 2 12",
+    "moves": [
+      "d5f4",
+      "c4f7"
+    ],
+    "rating": 1261
+  },
+  {
+    "id": "00HZC",
+    "fen": "4r1k1/pp1qn3/2p4R/6p1/3P1rR1/3Q2P1/PP3P1P/6K1 b - - 0 31",
+    "moves": [
+      "f4g4",
+      "d3h7",
+      "g8f8",
+      "h6f6"
+    ],
+    "rating": 1518
+  },
+  {
+    "id": "00HZa",
+    "fen": "6k1/6pp/1p6/p1n5/4qp2/1P2PN2/P4PPP/3Q2K1 b - - 0 28",
+    "moves": [
+      "f4e3",
+      "d1d8",
+      "g8f7",
+      "f3g5",
+      "f7g6",
+      "g5e4"
+    ],
+    "rating": 937
+  },
+  {
+    "id": "00HeG",
+    "fen": "8/1p5k/p3pQq1/3pP3/2p3P1/2P5/PP6/2K5 w - - 3 33",
+    "moves": [
+      "f6h4",
+      "g6h6",
+      "h4h6",
+      "h7h6"
+    ],
+    "rating": 854
+  },
+  {
+    "id": "00HnR",
+    "fen": "q5kr/p4p2/3Bb1p1/4p2p/5n2/2P5/P1Q2PPP/3R1RK1 w - - 4 21",
+    "moves": [
+      "d6e5",
+      "a8g2"
+    ],
+    "rating": 939
+  },
+  {
+    "id": "00HoG",
+    "fen": "5r1k/5r2/2b2RQp/1p1p2p1/1q4P1/8/8/1B3R1K b - - 0 36",
+    "moves": [
+      "f7f6",
+      "g6h7"
+    ],
+    "rating": 1513
+  },
+  {
+    "id": "00Hpe",
+    "fen": "1rr3k1/4Qppp/qp2p3/P2pn3/3N4/4P2P/5PP1/RR4K1 b - - 3 29",
+    "moves": [
+      "b6a5",
+      "b1b8",
+      "c8b8",
+      "e7c7",
+      "b8c8",
+      "c7e5"
+    ],
+    "rating": 1748
+  },
+  {
+    "id": "00Htd",
+    "fen": "rnbqk2r/1p3ppp/p4b2/2Pp4/8/2N2N2/PP2PPPP/R2QKB1R w KQkq - 0 9",
+    "moves": [
+      "d1d5",
+      "f6c3",
+      "b2c3",
+      "d8d5"
+    ],
+    "rating": 962
+  },
+  {
+    "id": "00Hut",
+    "fen": "r4rk1/4p1bp/3p2p1/q1pP1P2/4QP2/4B3/1p5P/1BKR3R w - - 0 22",
+    "moves": [
+      "c1c2",
+      "a5c3"
+    ],
+    "rating": 1342
+  },
+  {
+    "id": "00Huv",
+    "fen": "3r2q1/5prk/p3pQpp/1p2P3/2p4R/2P2P1P/PPB2P2/6K1 b - - 2 29",
+    "moves": [
+      "g8f8",
+      "h4h6",
+      "h7g8",
+      "f6h4"
+    ],
+    "rating": 1870
+  },
+  {
+    "id": "00Hxb",
+    "fen": "1rbr1k2/p4ppp/2B5/2pR1NP1/2P5/P7/7P/4R1K1 b - - 0 27",
+    "moves": [
+      "d8d5",
+      "e1e8"
+    ],
+    "rating": 1125
+  },
+  {
+    "id": "00HzX",
+    "fen": "4r1k1/5pp1/2R4p/1p6/8/1PP3QP/2q2PP1/6K1 w - - 0 29",
+    "moves": [
+      "c6h6",
+      "c2c1",
+      "g1h2",
+      "c1h6"
+    ],
+    "rating": 1638
+  },
+  {
+    "id": "00I8g",
+    "fen": "4rk2/3Rnrp1/8/4Q1p1/7P/6K1/8/8 w - - 0 50",
+    "moves": [
+      "h4g5",
+      "e7f5",
+      "e5f5",
+      "f7f5"
+    ],
+    "rating": 897
+  },
+  {
+    "id": "00ICz",
+    "fen": "2k2rr1/1p1q3p/1p2p3/1NbpQ3/P1p2P2/6P1/6KP/R4R2 b - - 0 31",
+    "moves": [
+      "f8f5",
+      "b5a7",
+      "c8d8",
+      "e5b8",
+      "d8e7",
+      "b8g8"
+    ],
+    "rating": 1247
+  },
+  {
+    "id": "00IDw",
+    "fen": "4r3/pN3kpp/2N1b3/2R5/5b2/P7/1P3PPP/7K w - - 1 30",
+    "moves": [
+      "g2g3",
+      "e6h3",
+      "c5c1",
+      "f4c1"
+    ],
+    "rating": 1862
+  },
+  {
+    "id": "00IDz",
+    "fen": "8/8/2p2P2/K2b3p/7N/P1k5/8/8 w - - 0 63",
+    "moves": [
+      "f6f7",
+      "d5f7",
+      "a5b6",
+      "f7d5",
+      "b6c5",
+      "c3b3"
+    ],
+    "rating": 1633
+  },
+  {
+    "id": "00IEW",
+    "fen": "6k1/6p1/R6p/3P1N2/8/3K4/2r2b2/8 b - - 5 57",
+    "moves": [
+      "c2c8",
+      "f5e7",
+      "g8f7",
+      "e7c8"
+    ],
+    "rating": 949
+  },
+  {
+    "id": "00IF1",
+    "fen": "1k6/p1p5/P2p4/3P4/1PK2N1p/4P3/5r2/4B3 b - - 12 57",
+    "moves": [
+      "f2f4",
+      "e3f4",
+      "h4h3",
+      "e1g3"
+    ],
+    "rating": 1271
+  },
+  {
+    "id": "00IF7",
+    "fen": "b3k2r/4bpp1/2q1p2p/1p1nP3/1Pp1N3/2P5/2B2PPP/2BQR1K1 w k - 0 19",
+    "moves": [
+      "c1e3",
+      "d5c3",
+      "d1g4",
+      "c3e4"
+    ],
+    "rating": 1698
+  },
+  {
+    "id": "00IFk",
+    "fen": "r1b4r/ppk2ppp/2p5/3n2B1/2P5/6P1/P1P1B2P/2KR3R b - - 0 16",
+    "moves": [
+      "d5c3",
+      "g5f4",
+      "c7b6",
+      "c4c5",
+      "b6c5",
+      "f4e3"
+    ],
+    "rating": 2150
+  },
+  {
+    "id": "00IHi",
+    "fen": "8/4R3/1k6/8/p7/1p1N2P1/5KP1/r7 w - - 0 55",
+    "moves": [
+      "e7e1",
+      "a1e1",
+      "f2e1",
+      "a4a3",
+      "e1d2",
+      "a3a2",
+      "d2c3",
+      "a2a1q"
+    ],
+    "rating": 1816
+  },
+  {
+    "id": "00IMS",
+    "fen": "1r4k1/r5q1/p2p1pP1/4pP2/2p1P2Q/2PbnBK1/P6R/2R5 b - - 7 35",
+    "moves": [
+      "e3f5",
+      "e4f5",
+      "d3f5",
+      "f3d5"
+    ],
+    "rating": 1729
+  },
+  {
+    "id": "00IPp",
+    "fen": "4Q3/6pk/p3p2p/5p2/1p1P2P1/4q2P/2B1n2B/7K w - - 0 35",
+    "moves": [
+      "g4f5",
+      "e3f3"
+    ],
+    "rating": 1572
+  },
+  {
+    "id": "00ISm",
+    "fen": "5r2/4bp1k/2ppq1p1/4p1Q1/4N2P/3P4/1P1R1P2/4K1R1 b - - 0 29",
+    "moves": [
+      "e7g5",
+      "e4g5",
+      "h7h6",
+      "g5e6"
+    ],
+    "rating": 907
+  },
+  {
+    "id": "00ITc",
+    "fen": "3r1rk1/3b1pp1/7p/8/N2Qp1n1/1P6/PB1q1PP1/R5K1 b - - 1 25",
+    "moves": [
+      "d7a4",
+      "d4g7"
+    ],
+    "rating": 921
+  },
+  {
+    "id": "00IUT",
+    "fen": "1r2r1k1/ppp1q1pp/4b3/4P3/1Q1p1P2/8/P5PP/R1BR2K1 w - - 6 19",
+    "moves": [
+      "d1d4",
+      "c7c5",
+      "b4a3",
+      "c5d4",
+      "a3e7",
+      "e8e7"
+    ],
+    "rating": 1536
+  },
+  {
+    "id": "00IUW",
+    "fen": "8/Q1p1r1kp/5pp1/3P3r/4P3/2N2bPq/PPP2R1P/5RK1 w - - 3 23",
+    "moves": [
+      "a7e3",
+      "h3g3",
+      "h2g3",
+      "h5h1"
+    ],
+    "rating": 1679
+  },
+  {
+    "id": "00IYg",
+    "fen": "r1b2r2/pp2npp1/1qn1p1k1/3pP1N1/3P3P/P7/1P1Q1PP1/RN2K2R b KQ - 0 13",
+    "moves": [
+      "f7f6",
+      "h4h5",
+      "g6h6",
+      "g5e6",
+      "h6h7",
+      "e6f8"
+    ],
+    "rating": 1886
+  },
+  {
+    "id": "00IaZ",
+    "fen": "4R3/1k2R3/3K2p1/1P6/1P6/2rp3r/8/8 b - - 3 45",
+    "moves": [
+      "b7b6",
+      "e8b8"
+    ],
+    "rating": 923
+  },
+  {
+    "id": "00IbM",
+    "fen": "6k1/5rp1/p2B3p/P1Pp4/1P6/2q1P2P/4Q1P1/6K1 w - - 0 34",
+    "moves": [
+      "e2a6",
+      "c3e1",
+      "g1h2",
+      "f7f1",
+      "a6f1",
+      "e1f1"
+    ],
+    "rating": 1629
+  },
+  {
+    "id": "00IiM",
+    "fen": "r5k1/pp4p1/1n6/3pB3/3P2pb/2NQ1r2/PP6/2K3R1 w - - 2 24",
+    "moves": [
+      "d3f3",
+      "g4f3",
+      "g1g7",
+      "g8f8"
+    ],
+    "rating": 1669
+  },
+  {
+    "id": "00InW",
+    "fen": "8/2p5/pp1p4/3PnN2/PPP1Pp2/5P1p/5K1k/8 b - - 3 46",
+    "moves": [
+      "e5f3",
+      "f2f3",
+      "h2g1",
+      "f3f4",
+      "h3h2",
+      "f5g3"
+    ],
+    "rating": 1421
+  },
+  {
+    "id": "00IpT",
+    "fen": "r1bk3r/ppp1n2p/3pNQ2/8/2BpP2p/8/PPPq2PP/R5K1 b - - 2 21",
+    "moves": [
+      "d8d7",
+      "f6h8",
+      "d7c6",
+      "h8e8"
+    ],
+    "rating": 2130
+  },
+  {
+    "id": "00IqI",
+    "fen": "r5k1/pp3ppp/2p5/4pb2/2B2q2/P1P1nP2/1P1Q3P/3R1R1K b - - 1 22",
+    "moves": [
+      "e3c4",
+      "d2d8",
+      "a8d8",
+      "d1d8"
+    ],
+    "rating": 1434
+  },
+  {
+    "id": "00Ivf",
+    "fen": "8/2p4r/1p3k2/p2Pp1p1/P1P1RpP1/1P3P1r/4R1K1/8 w - - 7 46",
+    "moves": [
+      "e4e5",
+      "h3h2",
+      "g2f1",
+      "h2h1",
+      "f1f2",
+      "h7h2"
+    ],
+    "rating": 1591
+  },
+  {
+    "id": "00J1Y",
+    "fen": "1q3r2/p5k1/1p2pbpp/2p2p2/2P1N3/2P2PQP/PP3P2/6RK b - - 2 29",
+    "moves": [
+      "f5e4",
+      "g3g6",
+      "g7h8",
+      "g6h6"
+    ],
+    "rating": 1162
+  },
+  {
+    "id": "00J1t",
+    "fen": "r1qr3k/pp3pB1/1np1pb2/8/3P3P/2N2PR1/PP1Q2P1/2KR4 b - - 0 22",
+    "moves": [
+      "f6g7",
+      "d2g5",
+      "d8g8",
+      "g5h5",
+      "g7h6",
+      "h5h6"
+    ],
+    "rating": 1757
+  },
+  {
+    "id": "00J5r",
+    "fen": "r4rk1/1p4p1/p1p1n1Pp/q3p3/4P3/2N1QP2/PPP5/2KR3R w - - 0 21",
+    "moves": [
+      "h1h6",
+      "g7h6",
+      "e3h6",
+      "a5c7"
+    ],
+    "rating": 2112
+  },
+  {
+    "id": "00J7i",
+    "fen": "3r2k1/pQ3ppp/4R1n1/2q5/2P5/2B3P1/P4PBP/6K1 b - - 0 24",
+    "moves": [
+      "f7e6",
+      "b7g7"
+    ],
+    "rating": 999
+  },
+  {
+    "id": "00JAo",
+    "fen": "8/5r2/6pk/7p/7P/5PK1/R7/8 b - - 2 58",
+    "moves": [
+      "g6g5",
+      "a2a6",
+      "h6g7",
+      "h4g5"
+    ],
+    "rating": 1508
+  },
+  {
+    "id": "00JFF",
+    "fen": "4r1k1/ppqb3p/6B1/3pb2Q/8/2P5/PP1B2PP/5RK1 b - - 0 20",
+    "moves": [
+      "h7g6",
+      "h5g6",
+      "e5g7",
+      "f1f7",
+      "c7c5",
+      "g1h1",
+      "c5f8",
+      "f7f8"
+    ],
+    "rating": 2015
+  },
+  {
+    "id": "00JH5",
+    "fen": "8/2Q2pk1/8/3pp2P/8/2Pq4/KP6/8 b - - 1 36",
+    "moves": [
+      "d3c4",
+      "c7c4",
+      "d5c4",
+      "b2b4"
+    ],
+    "rating": 2061
+  },
+  {
+    "id": "00JMV",
+    "fen": "8/1p4pk/pPp4b/P1P1P3/3pq1b1/2Q5/6PP/2B2RK1 w - - 0 32",
+    "moves": [
+      "c3e1",
+      "e4e1",
+      "f1e1",
+      "h6c1"
+    ],
+    "rating": 2164
+  },
+  {
+    "id": "00JO7",
+    "fen": "5rk1/ppq3pR/4p1r1/3p4/8/2P4Q/PP3RPP/6K1 b - - 0 22",
+    "moves": [
+      "c7c5",
+      "h7h8"
+    ],
+    "rating": 986
+  },
+  {
+    "id": "00JR7",
+    "fen": "r4rk1/pp2q1p1/2p1p2p/3nP1pP/3P2P1/2PQ1R2/PPB5/R5K1 b - - 1 23",
+    "moves": [
+      "f8f3",
+      "d3h7",
+      "g8f7",
+      "c2g6",
+      "f7f8",
+      "h7h8"
+    ],
+    "rating": 1361
+  },
+  {
+    "id": "00JYV",
+    "fen": "r2q1rk1/p1p1bppp/2pp1nb1/4p3/4P1PN/2NP3P/PPP2PK1/R1BQ1R2 b - - 4 11",
+    "moves": [
+      "f6e4",
+      "h4g6",
+      "e4c3",
+      "g6e7",
+      "d8e7",
+      "b2c3"
+    ],
+    "rating": 1603
+  },
+  {
+    "id": "00JZk",
+    "fen": "7k/1q5p/3Q2p1/8/P3p3/1p2B2P/1br3P1/R5K1 b - - 0 32",
+    "moves": [
+      "b7f7",
+      "a1f1",
+      "f7f1",
+      "g1f1"
+    ],
+    "rating": 2121
+  },
+  {
+    "id": "00JaW",
+    "fen": "8/r7/Pk5p/3R2p1/4p1P1/4P3/3K4/8 b - - 0 48",
+    "moves": [
+      "a7a6",
+      "d5d6",
+      "b6a5",
+      "d6a6",
+      "a5a6",
+      "d2c3",
+      "a6b7",
+      "c3d4"
+    ],
+    "rating": 1080
+  },
+  {
+    "id": "00JfN",
+    "fen": "r6r/1bpnk3/1p1pB3/pP1P3q/P3PQP1/2b2N1P/2P2P2/R3R1K1 b - - 0 24",
+    "moves": [
+      "h5h3",
+      "f4f7",
+      "e7d8",
+      "f7d7"
+    ],
+    "rating": 944
+  },
+  {
+    "id": "00JqT",
+    "fen": "2r2rk1/pp2R3/5p2/3p1q2/3P4/4QPPp/PP3R1P/6K1 w - - 2 30",
+    "moves": [
+      "g3g4",
+      "f5b1",
+      "f2f1",
+      "b1b2",
+      "e3e6",
+      "g8h8"
+    ],
+    "rating": 1912
+  },
+  {
+    "id": "00JsQ",
+    "fen": "r1b1k1nr/pp1np2p/2q1Npp1/2P1p3/2B5/2N3B1/PPPR1PPP/2K4R b kq - 2 14",
+    "moves": [
+      "d7c5",
+      "d2d8",
+      "e8f7",
+      "d8f8"
+    ],
+    "rating": 2030
+  },
+  {
+    "id": "00JzT",
+    "fen": "8/7p/6pK/5p2/4p3/1k4P1/5P1P/8 w - - 2 44",
+    "moves": [
+      "h6h7",
+      "g6g5",
+      "g3g4",
+      "f5f4"
+    ],
+    "rating": 1674
+  },
+  {
+    "id": "00K7b",
+    "fen": "7k/1p4p1/pP1r4/4qp2/P2Nn3/1Q5P/2N3K1/3R4 w - - 4 48",
+    "moves": [
+      "g2f1",
+      "e5f4",
+      "b3f3",
+      "f4f3",
+      "d4f3",
+      "d6d1"
+    ],
+    "rating": 1934
+  },
+  {
+    "id": "00K8j",
+    "fen": "r2q2kr/p4pp1/4b2p/n1Qn4/5B2/4P3/PP3PPP/2KR1BNR w - - 1 14",
+    "moves": [
+      "f4c7",
+      "d8c7",
+      "c5c7",
+      "d5c7"
+    ],
+    "rating": 1403
+  },
+  {
+    "id": "00KHR",
+    "fen": "8/6pk/1Q1p2n1/4p3/2P3P1/P2PP2P/1B4K1/4q3 w - - 1 35",
+    "moves": [
+      "g2f3",
+      "g6h4",
+      "f3e4",
+      "e1h1"
+    ],
+    "rating": 1426
+  },
+  {
+    "id": "00KMV",
+    "fen": "1r3k2/1p1q1p2/p2p1np1/2pP2bp/2P1P1n1/1PQ3P1/P3N1K1/3N1R1R b - - 11 28",
+    "moves": [
+      "f6e4",
+      "c3h8",
+      "f8e7",
+      "h8b8"
+    ],
+    "rating": 943
+  },
+  {
+    "id": "00KNK",
+    "fen": "r3r1k1/p1p4p/3b4/4p1qN/8/1P1b1Q2/P2P1PP1/B5KR b - - 2 22",
+    "moves": [
+      "e5e4",
+      "h5f6",
+      "g8f8",
+      "f6h7",
+      "f8e7",
+      "a1f6",
+      "g5f6",
+      "f3f6"
+    ],
+    "rating": 2036
+  },
+  {
+    "id": "00KO5",
+    "fen": "2r2rk1/3p1ppp/p3p3/1p2q3/6P1/3Q4/PP5P/1K2RR2 b - - 0 22",
+    "moves": [
+      "e5h2",
+      "f1h1",
+      "h2c2",
+      "d3c2",
+      "c8c2",
+      "b1c2"
+    ],
+    "rating": 1333
+  },
+  {
+    "id": "00KOz",
+    "fen": "8/r4k2/7R/5PK1/1n6/8/8/8 b - - 3 56",
+    "moves": [
+      "b4d5",
+      "h6h7",
+      "f7f8",
+      "h7a7"
+    ],
+    "rating": 968
+  },
+  {
+    "id": "00KSB",
+    "fen": "r7/4kpRp/2p2p1P/p1P1n3/Pp6/1B6/5PP1/6K1 b - - 2 35",
+    "moves": [
+      "a8h8",
+      "f2f4",
+      "e5d7",
+      "g7f7"
+    ],
+    "rating": 1483
+  },
+  {
+    "id": "00KVO",
+    "fen": "4r3/p1R3p1/4r2p/3k1n2/3p4/P5B1/1P4PP/4R1K1 w - - 2 28",
+    "moves": [
+      "c7a7",
+      "e6e1",
+      "g3e1",
+      "e8e1"
+    ],
+    "rating": 834
+  },
+  {
+    "id": "00KYE",
+    "fen": "r1b2k1r/pp4p1/2pq2p1/3p4/3p4/1N6/PPP2PPP/R2Q1RK1 w - - 0 17",
+    "moves": [
+      "d1d4",
+      "d6h2"
+    ],
+    "rating": 917
+  },
+  {
+    "id": "00KYU",
+    "fen": "3r4/p2n2kp/1p2Bpp1/2r2N2/4q3/6QP/P5P1/5R1K b - - 1 40",
+    "moves": [
+      "g7f8",
+      "g3d6",
+      "f8e8",
+      "d6e7"
+    ],
+    "rating": 1325
+  },
+  {
+    "id": "00Kbj",
+    "fen": "8/8/6p1/PR3p2/1P3k2/7P/r5P1/7K w - - 1 39",
+    "moves": [
+      "h3h4",
+      "f4g3",
+      "b5d5",
+      "a2a1",
+      "d5d1",
+      "a1d1"
+    ],
+    "rating": 1484
+  },
+  {
+    "id": "00Kd8",
+    "fen": "3R4/3P4/8/5p2/5kPp/8/3r1KP1/8 w - - 1 64",
+    "moves": [
+      "f2g1",
+      "f4g3",
+      "g1f1",
+      "f5g4"
+    ],
+    "rating": 2133
+  },
+  {
+    "id": "00Keu",
+    "fen": "R7/1p3kp1/2pK3p/3p1PP1/1r1B2nP/8/1P6/8 b - - 2 39",
+    "moves": [
+      "b4d4",
+      "g5g6",
+      "f7f6",
+      "a8f8"
+    ],
+    "rating": 853
+  },
+  {
+    "id": "00KgR",
+    "fen": "5r1k/1pq3p1/2p2P1p/3pPQ2/1p1P4/7P/1rB4K/5R2 b - - 1 35",
+    "moves": [
+      "f8f6",
+      "f5h7"
+    ],
+    "rating": 853
+  },
+  {
+    "id": "00KhM",
+    "fen": "5rk1/5ppp/1R6/3Qp3/2B1P3/2q3P1/3R1PKP/1r6 b - - 0 27",
+    "moves": [
+      "b1b6",
+      "d5f7",
+      "f8f7",
+      "d2d8"
+    ],
+    "rating": 1339
+  },
+  {
+    "id": "00Kia",
+    "fen": "5r1k/4n1pp/1p6/pP5Q/P2pB2K/6P1/2P4P/4q3 b - - 4 37",
+    "moves": [
+      "g7g6",
+      "h5e5",
+      "h8g8",
+      "e4d5",
+      "e7d5",
+      "e5e1"
+    ],
+    "rating": 1704
+  },
+  {
+    "id": "00Knu",
+    "fen": "r2q1rk1/p3bpp1/2pp1nb1/4p1Q1/8/1B3N1P/PPP3P1/R1B2RK1 b - - 0 18",
+    "moves": [
+      "f6e4",
+      "g5g6",
+      "d8b6",
+      "g1h2"
+    ],
+    "rating": 1872
+  },
+  {
+    "id": "00Kq4",
+    "fen": "r2qk3/5p1r/p1p1p3/1p1pP1p1/P1nP2Pn/2P2NB1/2P2P2/R1QR2K1 w q - 1 21",
+    "moves": [
+      "f3g5",
+      "d8g5",
+      "c1g5",
+      "h4f3",
+      "g1g2",
+      "f3g5"
+    ],
+    "rating": 1419
+  },
+  {
+    "id": "00Ksa",
+    "fen": "8/5p2/5pk1/8/4PP2/6r1/5K2/7R b - - 2 46",
+    "moves": [
+      "g3g4",
+      "f2f3",
+      "g4g5",
+      "f4g5"
+    ],
+    "rating": 1853
+  },
+  {
+    "id": "00Kxt",
+    "fen": "r2q1r2/p3ppkp/3p2p1/1N2n2P/4P1P1/5P2/PPPQ4/R3K2R w KQ - 1 16",
+    "moves": [
+      "h5g6",
+      "e5f3",
+      "e1e2",
+      "f3d2"
+    ],
+    "rating": 905
+  },
+  {
+    "id": "00Kyy",
+    "fen": "8/P7/8/5k2/8/5pr1/5r2/R6K w - - 0 50",
+    "moves": [
+      "a7a8q",
+      "g3h3",
+      "h1g1",
+      "f2g2",
+      "g1f1",
+      "h3h1"
+    ],
+    "rating": 1204
+  },
+  {
+    "id": "00L1Y",
+    "fen": "3rkb1r/pp2pbpp/2p5/q7/3Q1B2/2P3P1/PP2PP1P/RN2K2R w KQk - 0 15",
+    "moves": [
+      "d4b4",
+      "a5d5",
+      "e1g1",
+      "e7e5",
+      "b4b7",
+      "e5f4"
+    ],
+    "rating": 1811
+  },
+  {
+    "id": "00L4x",
+    "fen": "1r4k1/4Ppbp/p5p1/2q5/p2n4/P2Q2B1/r2N1PPP/3KR2R b - - 0 27",
+    "moves": [
+      "g7h6",
+      "e7e8q",
+      "b8e8",
+      "e1e8"
+    ],
+    "rating": 1226
+  },
+  {
+    "id": "00L84",
+    "fen": "6k1/5pp1/7p/2p5/2P5/2rp2PP/PR3P2/5K2 w - - 0 37",
+    "moves": [
+      "b2b3",
+      "c3c1",
+      "f1g2",
+      "d3d2"
+    ],
+    "rating": 1107
+  },
+  {
+    "id": "00LBF",
+    "fen": "3r2k1/1b2qpb1/pp4p1/3rp3/3R2P1/2P2NBP/PP2Q2K/3R4 b - - 0 33",
+    "moves": [
+      "e7d7",
+      "d4d5",
+      "b7d5",
+      "c3c4"
+    ],
+    "rating": 2179
+  },
+  {
+    "id": "00LG5",
+    "fen": "6k1/5r1p/4b1pQ/5q2/3B3P/2P5/6P1/4R1K1 w - - 7 36",
+    "moves": [
+      "e1e2",
+      "f5f1",
+      "g1h2",
+      "f1e2"
+    ],
+    "rating": 1113
+  },
+  {
+    "id": "00LH7",
+    "fen": "6k1/6Bp/6pP/3q1p2/p2PnQ2/2r5/P5PK/4R3 b - - 1 39",
+    "moves": [
+      "d5d6",
+      "e1e4",
+      "d6f4",
+      "e4f4"
+    ],
+    "rating": 1529
+  },
+  {
+    "id": "00LI0",
+    "fen": "r2qk2r/pp1n1ppp/4pn2/3p2B1/1b1P4/2N1QN1P/PPb1BPP1/R4RK1 w kq - 0 12",
+    "moves": [
+      "c3d5",
+      "f6d5",
+      "g5d8",
+      "d5e3"
+    ],
+    "rating": 1302
+  },
+  {
+    "id": "00LMb",
+    "fen": "8/8/1n4kP/1P3p2/3P1K2/2p1N3/8/8 w - - 4 49",
+    "moves": [
+      "f4e5",
+      "b6c4",
+      "e3c4",
+      "c3c2"
+    ],
+    "rating": 1787
+  },
+  {
+    "id": "00LNB",
+    "fen": "kr6/1pR4p/p4R2/n2r4/P3p3/4B3/6PP/6K1 b - - 0 38",
+    "moves": [
+      "d5d3",
+      "f6a6",
+      "b7a6",
+      "c7a7"
+    ],
+    "rating": 1013
+  },
+  {
+    "id": "00LO6",
+    "fen": "2r3k1/3q1pp1/1rp5/2Rn2Np/1p1N3n/1Q2P3/5PP1/2R3K1 w - - 0 33",
+    "moves": [
+      "c5d5",
+      "c6d5",
+      "c1c8",
+      "d7c8"
+    ],
+    "rating": 1655
+  },
+  {
+    "id": "00LOy",
+    "fen": "5k2/1p3pp1/p3pb2/r7/2P2B2/1P6/1PR1K1PP/8 b - - 0 33",
+    "moves": [
+      "f6e5",
+      "b3b4",
+      "a5a1",
+      "f4e5"
+    ],
+    "rating": 1472
+  },
+  {
+    "id": "00LRq",
+    "fen": "1k6/1p1q4/P2p3p/1NpPpn1Q/5b2/2P3r1/1P2B1P1/R6K b - - 3 28",
+    "moves": [
+      "g3g7",
+      "a6a7",
+      "b8a8",
+      "b5c7",
+      "d7c7",
+      "h5e8",
+      "c7b8",
+      "a7b8q"
+    ],
+    "rating": 2064
+  },
+  {
+    "id": "00LSv",
+    "fen": "3r3k/1p4pp/2p3q1/8/3Q4/8/PP4rP/R4R1K b - - 1 28",
+    "moves": [
+      "g2g1",
+      "d4g1",
+      "g6e4",
+      "g1g2"
+    ],
+    "rating": 1794
+  },
+  {
+    "id": "00LUV",
+    "fen": "5r2/6k1/p3p2p/1p2P3/1P1p2R1/3Q3P/3r1qPK/8 b - - 1 31",
+    "moves": [
+      "g7h8",
+      "d3g6",
+      "f2g2",
+      "g4g2",
+      "d2g2",
+      "g6g2"
+    ],
+    "rating": 1551
+  },
+  {
+    "id": "00LWX",
+    "fen": "2r4k/5p2/4pNp1/6Pp/q6P/7r/2PQ4/1RKN4 w - - 2 37",
+    "moves": [
+      "d2b4",
+      "c8c2"
+    ],
+    "rating": 818
+  },
+  {
+    "id": "00LZf",
+    "fen": "r1b1kb1r/pppp1ppp/2n1p3/3nN3/3P2q1/4B3/PPP1BPPP/RN1Q1RK1 b kq - 9 8",
+    "moves": [
+      "d5e3",
+      "f2e3",
+      "g4g5",
+      "e5f7",
+      "g5e3",
+      "g1h1"
+    ],
+    "rating": 2185
+  },
+  {
+    "id": "00Lh9",
+    "fen": "4r3/7P/1p4Q1/1b4B1/1k4n1/8/1P2n1PK/4R3 w - - 2 41",
+    "moves": [
+      "h2h1",
+      "e2g3",
+      "h1g1",
+      "e8e1"
+    ],
+    "rating": 1324
+  },
+  {
+    "id": "00Lhb",
+    "fen": "2n4k/p3b2p/Pp6/1PpPp3/2B1PpP1/1P6/5BK1/8 b - - 0 33",
+    "moves": [
+      "c8d6",
+      "f2c5",
+      "b6c5",
+      "b5b6",
+      "a7b6",
+      "a6a7"
+    ],
+    "rating": 1790
+  },
+  {
+    "id": "00LoE",
+    "fen": "2k5/1p4p1/p4b2/3p4/3P4/2PQN3/PP3q2/1K6 w - - 0 37",
+    "moves": [
+      "e3d5",
+      "f2g1",
+      "b1c2",
+      "g1g2"
+    ],
+    "rating": 1858
+  },
+  {
+    "id": "00Lqo",
+    "fen": "2Q5/p5pk/1r2p3/K2pP2p/3P4/2P4R/PPq5/8 b - - 12 41",
+    "moves": [
+      "c2b2",
+      "h3h5",
+      "h7g6",
+      "c8e8"
+    ],
+    "rating": 1175
+  },
+  {
+    "id": "00Lt1",
+    "fen": "r4k2/pp3p2/2pNR2p/5Qp1/1P3n2/3P4/P1PK1qPP/8 w - - 6 31",
+    "moves": [
+      "d2c3",
+      "f4d5",
+      "c3b3",
+      "f2f5",
+      "d6f5",
+      "f7e6"
+    ],
+    "rating": 1740
+  },
+  {
+    "id": "00Lyc",
+    "fen": "4R3/1p4k1/1q1N1bpp/3B4/5p1P/p4P2/3RK1P1/8 w - - 4 42",
+    "moves": [
+      "d6e4",
+      "b6b5",
+      "d2d3",
+      "b5e8"
+    ],
+    "rating": 1975
+  },
+  {
+    "id": "00M0i",
+    "fen": "r3r2k/p2n1p1R/5n2/qp3Q2/3P4/B3Pp2/P4P1P/1B5K b - - 0 23",
+    "moves": [
+      "h8g8",
+      "f5g5"
+    ],
+    "rating": 1141
+  },
+  {
+    "id": "00M1q",
+    "fen": "2r3k1/2r1q1p1/p3p1Q1/1p1p4/nP1P4/2P4R/P4PPP/2R3K1 b - - 0 30",
+    "moves": [
+      "e7f6",
+      "g6h7",
+      "g8f7",
+      "h3f3",
+      "f6f3",
+      "g2f3"
+    ],
+    "rating": 1391
+  },
+  {
+    "id": "00M6i",
+    "fen": "6k1/1N4pp/p7/4bp2/P1P5/1r6/6PP/2R3K1 w - - 1 33",
+    "moves": [
+      "b7c5",
+      "e5d4",
+      "g1f1",
+      "d4c5"
+    ],
+    "rating": 1143
+  },
+  {
+    "id": "00M92",
+    "fen": "3q1r1k/p3r1pp/1p1b1p2/2p1n3/3pR2N/1QPP2P1/PP1B1P1P/R5K1 b - - 3 21",
+    "moves": [
+      "e5d3",
+      "h4g6",
+      "h7g6",
+      "e4h4"
+    ],
+    "rating": 945
+  },
+  {
+    "id": "00MBF",
+    "fen": "7k/np2b1pp/p1b2p2/2P1pq2/PPQ4P/5PP1/1B5K/3BN3 b - - 0 29",
+    "moves": [
+      "c6d7",
+      "d1b3",
+      "f5h3",
+      "h2g1",
+      "d7e6",
+      "c4e6",
+      "h3e6",
+      "b3e6"
+    ],
+    "rating": 2017
+  },
+  {
+    "id": "00MDG",
+    "fen": "3r2k1/4ppnp/pp2q1p1/2p5/4N3/3rP3/P2P1QPP/3R1RK1 b - - 1 28",
+    "moves": [
+      "e6e4",
+      "f2f7",
+      "g8h8",
+      "f7f8",
+      "d8f8",
+      "f1f8"
+    ],
+    "rating": 1053
+  },
+  {
+    "id": "00MDy",
+    "fen": "8/pp6/2p1k3/2Pp2pp/1P1P1p2/P2K1P2/6PP/8 w - - 0 42",
+    "moves": [
+      "g2g3",
+      "f4g3",
+      "h2g3",
+      "h5h4",
+      "g3h4",
+      "g5h4"
+    ],
+    "rating": 1752
+  },
+  {
+    "id": "00ME0",
+    "fen": "8/1p6/p1b5/5k1p/1PB1p2P/P3P1K1/8/8 b - - 2 35",
+    "moves": [
+      "f5e5",
+      "c4f7",
+      "c6d7",
+      "f7h5"
+    ],
+    "rating": 1657
+  },
+  {
+    "id": "00MFe",
+    "fen": "3r3k/p5pp/2r2q2/2p4Q/8/8/P5PP/3R1R1K b - - 5 29",
+    "moves": [
+      "d8d1",
+      "h5e8",
+      "f6f8",
+      "e8f8"
+    ],
+    "rating": 1334
+  },
+  {
+    "id": "00MGA",
+    "fen": "r3r1k1/6b1/p2Nn2p/1P1Qp3/6nq/2P5/1PB2PP1/R1B1R1K1 w - - 1 30",
+    "moves": [
+      "g2g3",
+      "h4h2",
+      "g1f1",
+      "h2f2"
+    ],
+    "rating": 919
+  },
+  {
+    "id": "00MIY",
+    "fen": "6k1/3R3p/1p5q/3P4/3QP1pN/6P1/PPr3B1/5rK1 w - - 0 25",
+    "moves": [
+      "g1f1",
+      "h6c1",
+      "d4d1",
+      "c1d1"
+    ],
+    "rating": 1500
+  },
+  {
+    "id": "00MNf",
+    "fen": "r1b3k1/pp3Rpp/3p4/2pN4/2P4b/5Q1P/PPP3P1/4qNK1 b - - 0 21",
+    "moves": [
+      "h4f6",
+      "f7f6",
+      "g7f6",
+      "f3f6"
+    ],
+    "rating": 2027
+  },
+  {
+    "id": "00MS3",
+    "fen": "rn1qr1k1/1p2bppp/2p2B2/p2p4/3P4/2N2N2/PPP1QPPP/2KRR3 b - - 0 12",
+    "moves": [
+      "e7f6",
+      "e2e8",
+      "d8e8",
+      "e1e8"
+    ],
+    "rating": 809
+  },
+  {
+    "id": "00MTG",
+    "fen": "4r1k1/2p1qpp1/3p4/1p1P2PQ/1P5b/3R3P/2PBr3/5RK1 b - - 6 26",
+    "moves": [
+      "h4f2",
+      "f1f2",
+      "e2f2",
+      "g1f2"
+    ],
+    "rating": 823
+  },
+  {
+    "id": "00MTn",
+    "fen": "2rqk2r/3n4/1p2p3/p3N2p/Q1PP2p1/P2BP3/3K1Pb1/R6R w k - 0 22",
+    "moves": [
+      "h1h5",
+      "h8h5",
+      "d3g6",
+      "e8e7",
+      "a4d7",
+      "d8d7"
+    ],
+    "rating": 1434
+  },
+  {
+    "id": "00MWz",
+    "fen": "8/8/2B5/4pK2/3k1pPp/5n1P/8/8 b - - 3 57",
+    "moves": [
+      "f3g1",
+      "g4g5",
+      "g1e2",
+      "g5g6"
+    ],
+    "rating": 844
+  },
+  {
+    "id": "00MYL",
+    "fen": "1R6/3k1Q2/p2b1p2/2r1p3/3n4/P6P/5PP1/4qBK1 b - - 1 40",
+    "moves": [
+      "d7c6",
+      "f7b7"
+    ],
+    "rating": 1116
+  },
+  {
+    "id": "00MZr",
+    "fen": "1k5r/ppp5/2p5/3n4/5pQ1/3P1P1r/PPP2K2/5R2 w - - 2 26",
+    "moves": [
+      "f1g1",
+      "h3h2",
+      "g1g2",
+      "d5e3"
+    ],
+    "rating": 2013
+  },
+  {
+    "id": "00Mbv",
+    "fen": "2k2b1r/pp3ppp/1n6/BN2p1P1/2Q1Nn1P/8/PP3P2/2KR4 b - - 0 24",
+    "moves": [
+      "b6c4",
+      "d1d8"
+    ],
+    "rating": 1572
+  },
+  {
+    "id": "00MeO",
+    "fen": "r1b1kb1r/1p2np2/p1p4p/4PPp1/3PN3/8/PPP3PP/R1B2RK1 b kq - 0 15",
+    "moves": [
+      "c8f5",
+      "e4d6",
+      "e8d7",
+      "d6f5"
+    ],
+    "rating": 1423
+  },
+  {
+    "id": "00Msq",
+    "fen": "r5k1/1pp2Bp1/5n1p/1q2N3/3P4/7P/5PP1/4Q1K1 b - - 2 30",
+    "moves": [
+      "g8f8",
+      "f7c4",
+      "b5c4",
+      "e5c4"
+    ],
+    "rating": 1842
+  },
+  {
+    "id": "00MwU",
+    "fen": "3r1b1R/ppq3p1/2k3P1/3p4/1P1Q4/4PP2/P1P5/2K5 b - - 0 26",
+    "moves": [
+      "a7a6",
+      "h8f8",
+      "d8f8",
+      "d4c5",
+      "c6d7",
+      "c5f8"
+    ],
+    "rating": 1769
+  },
+  {
+    "id": "00MyT",
+    "fen": "r3q3/1ppknr2/p5pB/2pPn3/4P3/8/PPQ3BP/2K2R1R w - - 0 22",
+    "moves": [
+      "c2c5",
+      "e5d3",
+      "c1c2",
+      "d3c5"
+    ],
+    "rating": 923
+  },
+  {
+    "id": "00Mzs",
+    "fen": "r6r/p5pp/1p3nk1/5n2/1q6/5N2/P5PP/R2QR2K b - - 1 24",
+    "moves": [
+      "a8d8",
+      "f3e5",
+      "g6g5",
+      "e5f7"
+    ],
+    "rating": 2034
+  },
+  {
+    "id": "00N3B",
+    "fen": "r2q1rk1/1bb2ppp/p1n1p3/4P3/Np1P4/1B2NP2/1P4PP/2RQ1RK1 b - - 0 20",
+    "moves": [
+      "d8d4",
+      "d1d4",
+      "c6d4",
+      "c1c7",
+      "d4b3",
+      "c7b7"
+    ],
+    "rating": 1080
+  },
+  {
+    "id": "00NBR",
+    "fen": "8/1p2np2/1Pp1k3/p1P3p1/P2K3p/7P/4BPP1/8 b - - 1 33",
+    "moves": [
+      "e7d5",
+      "e2c4",
+      "e6d7",
+      "c4d5"
+    ],
+    "rating": 2001
+  },
+  {
+    "id": "00NEO",
+    "fen": "4qr2/pR1b2pk/5p1p/4pPP1/3bB3/3P3Q/P1r4P/4BR1K b - - 0 24",
+    "moves": [
+      "d7c6",
+      "h3h6",
+      "h7g8",
+      "h6g7"
+    ],
+    "rating": 1927
+  },
+  {
+    "id": "00NHK",
+    "fen": "r1b2rk1/1p2b1p1/pqn1p1P1/3pP3/1P1P4/P1N1P3/6P1/R2QK2R b KQ - 0 17",
+    "moves": [
+      "c6e5",
+      "h1h8",
+      "g8h8",
+      "d1h5",
+      "h8g8",
+      "h5h7"
+    ],
+    "rating": 1905
+  },
+  {
+    "id": "00NKk",
+    "fen": "2r2rk1/pp4q1/4Q3/3p4/3P4/P1P5/1P3PPP/4R1K1 b - - 0 25",
+    "moves": [
+      "g8h8",
+      "e1e3",
+      "c8c7",
+      "e3h3"
+    ],
+    "rating": 1838
+  },
+  {
+    "id": "00NOI",
+    "fen": "3r4/2k2p1p/pp2pp2/2p5/3nN3/6P1/PPP2PRP/2K5 w - - 2 23",
+    "moves": [
+      "e4f6",
+      "d4e2",
+      "c1b1",
+      "d8d1"
+    ],
+    "rating": 964
+  },
+  {
+    "id": "00NR5",
+    "fen": "R5k1/3r2pp/3N4/1nP5/6P1/1P3P2/P2K2n1/8 b - - 1 30",
+    "moves": [
+      "d7d8",
+      "a8d8"
+    ],
+    "rating": 900
+  },
+  {
+    "id": "00NUS",
+    "fen": "4rk2/pbp2pp1/1p1b4/3P1q2/QPBPN3/1KP2P2/P5r1/R3R3 w - - 0 25",
+    "moves": [
+      "e4d6",
+      "f5c2",
+      "b3a3",
+      "c2b2"
+    ],
+    "rating": 1427
+  },
+  {
+    "id": "00NUc",
+    "fen": "6k1/6pp/1PP5/4b3/3p4/Br5P/4prP1/R5RK w - - 1 30",
+    "moves": [
+      "c6c7",
+      "b3h3",
+      "g2h3",
+      "f2h2"
+    ],
+    "rating": 1544
+  },
+  {
+    "id": "00NVe",
+    "fen": "2B4k/p1p3pb/8/5pnr/8/2P2R2/PPP2K2/6R1 w - - 6 34",
+    "moves": [
+      "c8f5",
+      "g5f3",
+      "f5g4",
+      "f3g1"
+    ],
+    "rating": 1821
+  },
+  {
+    "id": "00Nay",
+    "fen": "r2q1r2/ppp2pk1/3p1n2/4p1p1/2B1P3/2NP2Q1/PPP5/2K4R b - - 0 19",
+    "moves": [
+      "g7g6",
+      "g3h3",
+      "f8h8",
+      "h3f5",
+      "g6g7",
+      "f5g5"
+    ],
+    "rating": 1850
+  },
+  {
+    "id": "00Nej",
+    "fen": "6k1/1p3pp1/pB2qb1p/2P5/1P6/6QP/4r1P1/3R3K b - - 4 33",
+    "moves": [
+      "f6e5",
+      "d1d8",
+      "g8h7",
+      "g3d3",
+      "e6g6",
+      "d3e2"
+    ],
+    "rating": 1072
+  },
+  {
+    "id": "00Nf5",
+    "fen": "r1bq1rk1/pp2bppp/2pp1n2/8/5P2/5N2/PBPPB1PP/RN1Q1RK1 w - - 5 11",
+    "moves": [
+      "b1c3",
+      "d8b6",
+      "g1h1",
+      "b6b2",
+      "a1b1",
+      "b2a3"
+    ],
+    "rating": 1423
+  },
+  {
+    "id": "00Ngg",
+    "fen": "3qk2r/1p1bbppp/4pn2/1BPp1n2/3P4/4PN2/5PPP/BN1QK2R w Kk - 1 15",
+    "moves": [
+      "d1e2",
+      "d8a5",
+      "a1c3",
+      "a5b5"
+    ],
+    "rating": 1484
+  },
+  {
+    "id": "00NiV",
+    "fen": "rn2qrk1/ppp2N1p/3pPpB1/3n4/6b1/8/P1QN1PPP/R4RK1 b - - 0 18",
+    "moves": [
+      "h7g6",
+      "c2g6"
+    ],
+    "rating": 850
+  },
+  {
+    "id": "00Nih",
+    "fen": "8/3K4/8/5k1p/7P/8/8/8 w - - 1 62",
+    "moves": [
+      "d7e7",
+      "f5g4",
+      "e7e6",
+      "g4h4"
+    ],
+    "rating": 1178
+  },
+  {
+    "id": "00Nqd",
+    "fen": "8/p7/5P2/PP1bp3/4N3/K2p4/2k5/8 b - - 0 48",
+    "moves": [
+      "d3d2",
+      "e4d2",
+      "c2d2",
+      "b5b6",
+      "a7b6",
+      "a5b6"
+    ],
+    "rating": 1618
+  },
+  {
+    "id": "00Nte",
+    "fen": "r4k2/8/2p3Bb/4p1n1/3q4/PQ6/2K2P2/1N4R1 w - - 3 30",
+    "moves": [
+      "g1g5",
+      "d4f2",
+      "b1d2",
+      "h6g5",
+      "b3f3",
+      "f2f3"
+    ],
+    "rating": 1698
+  },
+  {
+    "id": "00Nua",
+    "fen": "8/1p1k2r1/p1p5/2P1R3/1P1pP3/P2r4/5RPK/8 w - - 1 31",
+    "moves": [
+      "a3a4",
+      "g7h7",
+      "h2g1",
+      "d3d1",
+      "f2f1",
+      "h7h1",
+      "g1h1",
+      "d1f1"
+    ],
+    "rating": 1841
+  },
+  {
+    "id": "00O14",
+    "fen": "6k1/3P1pp1/4p3/p7/Q3R3/3q1PP1/1P3PK1/2r5 w - - 0 37",
+    "moves": [
+      "a4d4",
+      "d3f1",
+      "g2h2",
+      "f1h1"
+    ],
+    "rating": 996
+  },
+  {
+    "id": "00O37",
+    "fen": "r1q1r1k1/1p3pp1/n1p4p/p1bpp2P/P3P3/2P2P2/1P1QBP2/R1BK3R b - - 3 23",
+    "moves": [
+      "c5f2",
+      "e2a6",
+      "b7a6",
+      "d2f2"
+    ],
+    "rating": 1300
+  },
+  {
+    "id": "00O3h",
+    "fen": "5k2/R3Rp2/6p1/1p5p/1P5K/2nr4/7P/8 b - - 7 43",
+    "moves": [
+      "d3d4",
+      "h4g5",
+      "c3e4",
+      "g5h6"
+    ],
+    "rating": 1150
+  },
+  {
+    "id": "00O8m",
+    "fen": "r3r1k1/ppp2ppp/2nn1q2/8/3P4/P1P1P1P1/2Q3BP/R1B1KR2 b Q - 4 16",
+    "moves": [
+      "f6e6",
+      "d4d5",
+      "e6e5",
+      "d5c6"
+    ],
+    "rating": 1409
+  },
+  {
+    "id": "00O9Z",
+    "fen": "5QR1/5p1p/1b3qp1/p6k/P2P4/8/1P2rPPP/5RK1 w - - 7 32",
+    "moves": [
+      "g8h8",
+      "f6f2",
+      "f1f2",
+      "e2e1",
+      "f2f1",
+      "b6d4",
+      "g1h1",
+      "e1f1"
+    ],
+    "rating": 1628
+  },
+  {
+    "id": "00O9a",
+    "fen": "1k3r2/q5r1/2Qp3p/N2Bp3/4P1p1/P7/1PP2PPP/R5K1 w - - 12 35",
+    "moves": [
+      "a5c4",
+      "a7f2",
+      "g1h1",
+      "f2f1",
+      "a1f1",
+      "f8f1"
+    ],
+    "rating": 985
+  },
+  {
+    "id": "00OCQ",
+    "fen": "1rr3k1/5p1p/p5pQ/4p3/4q3/B3P3/PPPR1PPP/2KR4 w - - 6 27",
+    "moves": [
+      "c2c3",
+      "c8c3",
+      "b2c3",
+      "b8b1"
+    ],
+    "rating": 915
+  },
+  {
+    "id": "00ON5",
+    "fen": "8/k1p5/P7/3N4/3P2pp/3K2n1/6P1/8 w - - 1 47",
+    "moves": [
+      "d3e3",
+      "h4h3",
+      "e3f2",
+      "h3h2",
+      "f2g3",
+      "h2h1q"
+    ],
+    "rating": 1849
+  },
+  {
+    "id": "00OOp",
+    "fen": "5rk1/1bR3q1/pQ6/8/6r1/4R2P/P7/6K1 w - - 0 28",
+    "moves": [
+      "h3g4",
+      "g7g4",
+      "e3g3",
+      "g4g3"
+    ],
+    "rating": 1053
+  },
+  {
+    "id": "00OPc",
+    "fen": "1k1rr3/ppp1q3/8/4nQNp/8/2P4P/PP4P1/2K1R2R w - - 0 25",
+    "moves": [
+      "g5f3",
+      "e5d3",
+      "f5d3",
+      "d8d3",
+      "e1e7",
+      "e8e7"
+    ],
+    "rating": 2107
+  },
+  {
+    "id": "00OPk",
+    "fen": "6rk/7p/R2N3P/1r6/1P5K/P7/8/8 b - - 4 50",
+    "moves": [
+      "b5d5",
+      "d6f7"
+    ],
+    "rating": 815
+  },
+  {
+    "id": "00OQt",
+    "fen": "8/8/8/p3b3/P1B2pKp/1Pk1p2P/6P1/8 w - - 8 50",
+    "moves": [
+      "g4h4",
+      "c3d2",
+      "h4g4",
+      "e3e2",
+      "c4e2",
+      "d2e2"
+    ],
+    "rating": 1680
+  },
+  {
+    "id": "00OXc",
+    "fen": "8/5K1p/1p4pk/8/3brp2/5R2/8/8 b - - 5 50",
+    "moves": [
+      "g6g5",
+      "f3h3"
+    ],
+    "rating": 843
+  },
+  {
+    "id": "00OYl",
+    "fen": "3r4/5p2/k3p1p1/2B1Pr2/2P3n1/1p3NPp/4QP1P/6K1 w - - 0 34",
+    "moves": [
+      "f3h4",
+      "f5e5",
+      "e2f1",
+      "e5c5"
+    ],
+    "rating": 1918
+  },
+  {
+    "id": "00Ocp",
+    "fen": "r3k3/p1pbq3/2p2p2/4p1p1/2B3p1/2P4r/P1P2PQP/3RR1K1 b q - 3 20",
+    "moves": [
+      "e7c5",
+      "g2e4",
+      "f6f5",
+      "e4e5",
+      "c5e5",
+      "e1e5"
+    ],
+    "rating": 2098
+  },
+  {
+    "id": "00Oim",
+    "fen": "1r3rk1/q5pp/2R5/3P4/8/1p2NpPb/1P3P1P/2QR2K1 w - - 0 32",
+    "moves": [
+      "c1c4",
+      "a7e3",
+      "f2e3",
+      "f3f2"
+    ],
+    "rating": 1175
+  },
+  {
+    "id": "00Oqz",
+    "fen": "5r2/7r/2kpqB1P/p1p1p2Q/P3P3/2PP4/5P1K/6R1 w - - 0 40",
+    "moves": [
+      "g1g6",
+      "f8f6",
+      "g6f6",
+      "e6f6"
+    ],
+    "rating": 860
+  },
+  {
+    "id": "00Or5",
+    "fen": "r2qkbnr/pp5p/8/4Nb2/3p4/1QN5/PP2PPPP/R3KB1R b KQkq - 1 12",
+    "moves": [
+      "d4c3",
+      "b3f7"
+    ],
+    "rating": 1507
+  },
+  {
+    "id": "00OxK",
+    "fen": "3r2k1/1p3p2/p1n2P2/2P3P1/1P2p3/P2pP3/3B4/2R3K1 w - - 0 33",
+    "moves": [
+      "c1c4",
+      "c6e5",
+      "c4e4",
+      "e5f3",
+      "g1f2",
+      "f3d2"
+    ],
+    "rating": 1249
+  },
+  {
+    "id": "00Ozz",
+    "fen": "3kRr2/3n1B1p/2pP4/p1n5/Ppp5/8/1P3PPP/4R1K1 b - - 8 32",
+    "moves": [
+      "f8e8",
+      "e1e8"
+    ],
+    "rating": 865
+  },
+  {
+    "id": "00P6j",
+    "fen": "r2n2k1/1bRq1rpp/1p6/3P4/p3Q3/B3P3/PP3PPP/3R2K1 b - - 0 20",
+    "moves": [
+      "d7c7",
+      "e4e8",
+      "f7f8",
+      "e8f8"
+    ],
+    "rating": 1326
+  },
+  {
+    "id": "00P6s",
+    "fen": "Qn3rk1/p1p3pp/1p2Pb2/8/3q4/5P2/PPP4P/R3KBNR w KQ - 0 14",
+    "moves": [
+      "a8e4",
+      "f6h4",
+      "e1e2",
+      "d4f2"
+    ],
+    "rating": 1613
+  },
+  {
+    "id": "00P7n",
+    "fen": "r4rk1/p1p1R1pp/2p2p2/5P2/6Q1/1P5P/q5PK/8 b - - 1 30",
+    "moves": [
+      "a2b3",
+      "g4g7"
+    ],
+    "rating": 1048
+  },
+  {
+    "id": "00PF3",
+    "fen": "2kr3r/Qpp2ppp/3b1n2/8/3N4/4P1Pq/PP1B1P1P/2R2RK1 w - - 4 18",
+    "moves": [
+      "d4b5",
+      "f6g4",
+      "b5d6",
+      "d8d6",
+      "c1c7",
+      "c8c7"
+    ],
+    "rating": 1392
+  },
+  {
+    "id": "00PGi",
+    "fen": "3r1q1k/pppb2pp/2np4/6N1/5B2/1Q4P1/PP4PP/4R2K b - - 11 24",
+    "moves": [
+      "b7b6",
+      "g5f7",
+      "f8f7",
+      "b3f7"
+    ],
+    "rating": 1029
+  },
+  {
+    "id": "00PHg",
+    "fen": "R7/P4p2/5k1p/q5n1/5R2/7P/5PK1/8 b - - 2 46",
+    "moves": [
+      "f6e5",
+      "a8e8",
+      "e5f4",
+      "a7a8q",
+      "a5a8",
+      "e8a8"
+    ],
+    "rating": 1400
+  },
+  {
+    "id": "00PUc",
+    "fen": "3r3k/pp4bp/3Bn1p1/7n/8/8/PP3P1K/R4RN1 w - - 1 27",
+    "moves": [
+      "a1d1",
+      "d8d6",
+      "d1d6",
+      "g7e5",
+      "h2h1",
+      "e5d6"
+    ],
+    "rating": 1474
+  },
+  {
+    "id": "00PZo",
+    "fen": "7r/8/3b4/3p4/5PR1/2kN4/4KP2/8 w - - 1 67",
+    "moves": [
+      "f4f5",
+      "h8e8",
+      "e2f3",
+      "c3d3"
+    ],
+    "rating": 1130
+  },
+  {
+    "id": "00Pbs",
+    "fen": "3r1rk1/Q3qppp/8/1ppb4/2Pn1B1n/2N3P1/PP3P2/R2R1K2 w - - 0 21",
+    "moves": [
+      "a7e7",
+      "d5g2",
+      "f1e1",
+      "h4f3"
+    ],
+    "rating": 2095
+  },
+  {
+    "id": "00Pc8",
+    "fen": "rnb2r2/pp4k1/2p3pp/4Np2/2BP4/8/PP4PP/2KRR3 b - - 0 18",
+    "moves": [
+      "b8d7",
+      "e5d7",
+      "c8d7",
+      "e1e7",
+      "g7f6",
+      "e7d7"
+    ],
+    "rating": 1087
+  },
+  {
+    "id": "00PgQ",
+    "fen": "3r4/P1R5/7P/4p3/8/4p3/2p1K3/1k6 w - - 1 55",
+    "moves": [
+      "e2e3",
+      "c2c1q",
+      "c7c1",
+      "b1c1",
+      "e3e4",
+      "d8e8"
+    ],
+    "rating": 2199
+  },
+  {
+    "id": "00Pms",
+    "fen": "r1b1kr2/p1p2pQp/1p2pP2/8/8/1P4P1/P2KNP1P/R1B4q b q - 0 17",
+    "moves": [
+      "c8a6",
+      "g7f8",
+      "e8f8",
+      "c1a3",
+      "f8e8",
+      "a1h1"
+    ],
+    "rating": 2159
+  },
+  {
+    "id": "00Pr6",
+    "fen": "r1b2rk1/p4ppp/2p5/6q1/2p3P1/3P1Q1P/PPP5/1K2RR2 b - - 0 17",
+    "moves": [
+      "c4d3",
+      "f3f7",
+      "f8f7",
+      "e1e8",
+      "f7f8",
+      "f1f8"
+    ],
+    "rating": 1433
+  },
+  {
+    "id": "00PrK",
+    "fen": "r7/7R/P3k3/4p2p/3b2p1/3K4/8/5R2 b - - 7 55",
+    "moves": [
+      "a8a6",
+      "h7h6",
+      "e6d5",
+      "h6a6"
+    ],
+    "rating": 969
+  },
+  {
+    "id": "00Pu5",
+    "fen": "6k1/1b3pbp/6p1/1Nr3q1/1Q1p4/P7/5PPP/4RBK1 b - - 0 27",
+    "moves": [
+      "c5c1",
+      "e1e8",
+      "g7f8",
+      "b4f8"
+    ],
+    "rating": 1394
+  },
+  {
+    "id": "00PvP",
+    "fen": "8/6B1/7p/1p4p1/1Pp3P1/5P1k/4K2b/8 b - - 18 51",
+    "moves": [
+      "h6h5",
+      "g4h5",
+      "h3h4",
+      "h5h6",
+      "h4h5",
+      "h6h7"
+    ],
+    "rating": 843
+  },
+  {
+    "id": "00PvX",
+    "fen": "8/n7/P7/3k4/PK6/7P/5PP1/8 w - - 0 53",
+    "moves": [
+      "b4a5",
+      "d5c5",
+      "f2f3",
+      "a7c6"
+    ],
+    "rating": 1660
+  },
+  {
+    "id": "00Pw1",
+    "fen": "5r1k/2p3Rp/3p4/p2Pn3/1p2B3/1P6/PKP2r1P/6R1 b - - 1 28",
+    "moves": [
+      "f2e2",
+      "g7h7"
+    ],
+    "rating": 1086
+  },
+  {
+    "id": "00Q4m",
+    "fen": "5r2/1b3k2/1q4p1/p3Pp1p/2pn1P1P/4Q1P1/P6K/R1R2B2 w - - 2 34",
+    "moves": [
+      "f1g2",
+      "d4f3",
+      "e3f3",
+      "b7f3"
+    ],
+    "rating": 1132
+  },
+  {
+    "id": "00Q4v",
+    "fen": "8/2p1b3/q1Pp2k1/3Pp3/4Pr2/1Q3PK1/3N2P1/7R w - - 1 47",
+    "moves": [
+      "h1e1",
+      "e7h4",
+      "g3h2",
+      "h4e1"
+    ],
+    "rating": 1228
+  },
+  {
+    "id": "00Q8H",
+    "fen": "8/5b2/3k3p/6p1/3P1pP1/2N2K1P/8/8 w - - 6 48",
+    "moves": [
+      "h3h4",
+      "f7d5",
+      "f3f2",
+      "g5h4"
+    ],
+    "rating": 1765
+  },
+  {
+    "id": "00QBx",
+    "fen": "rn1qk2r/pb3ppp/5n2/2b5/7N/2N1p1P1/PP1PPP1P/R1BQKB1R w KQkq - 0 9",
+    "moves": [
+      "h4g2",
+      "e3f2"
+    ],
+    "rating": 1222
+  },
+  {
+    "id": "00QCD",
+    "fen": "3r1rk1/1Q3ppp/1q2pb2/8/1P1N4/4P1P1/3B1PBP/R5K1 b - - 0 23",
+    "moves": [
+      "b6b7",
+      "g2b7",
+      "f6d4",
+      "e3d4"
+    ],
+    "rating": 1041
+  },
+  {
+    "id": "00QCe",
+    "fen": "1k5r/n2r2pp/5p2/ppN5/5P2/8/2R3PP/1R4K1 b - - 3 28",
+    "moves": [
+      "d7c7",
+      "c5a6",
+      "b8b7",
+      "a6c7"
+    ],
+    "rating": 1400
+  },
+  {
+    "id": "00QHM",
+    "fen": "6k1/pp3rpp/4Nb2/4p3/1B1r4/6PK/PP5P/2R5 b - - 0 28",
+    "moves": [
+      "d4b4",
+      "c1c8",
+      "f6d8",
+      "c8d8",
+      "f7f8",
+      "d8f8"
+    ],
+    "rating": 906
+  },
+  {
+    "id": "00QN3",
+    "fen": "r1b1B2k/pp4pp/2pb4/4q3/8/8/PPP3PP/R2Q1R1K w - - 1 17",
+    "moves": [
+      "g2g3",
+      "e5e4",
+      "d1f3",
+      "e4e8"
+    ],
+    "rating": 1901
+  },
+  {
+    "id": "00QOa",
+    "fen": "6rk/1pp1R1p1/6Bp/2b4P/8/pP3PK1/P1P5/8 w - - 5 32",
+    "moves": [
+      "e7c7",
+      "c5d6",
+      "f3f4",
+      "d6c7"
+    ],
+    "rating": 861
+  },
+  {
+    "id": "00QQS",
+    "fen": "2r3k1/1p1q1ppp/4p3/Q7/3P4/P1B5/1Pr2PPP/R5K1 b - - 0 22",
+    "moves": [
+      "d7d4",
+      "c3d4",
+      "c2c1",
+      "a5e1"
+    ],
+    "rating": 1828
+  },
+  {
+    "id": "00QVZ",
+    "fen": "8/7p/4K3/6p1/2k3P1/8/5P2/8 b - - 0 43",
+    "moves": [
+      "c4d4",
+      "e6f5",
+      "h7h6",
+      "f5g6",
+      "d4e4",
+      "g6h6"
+    ],
+    "rating": 1487
+  },
+  {
+    "id": "00QW1",
+    "fen": "8/3r1ppp/4p3/k3P3/pR2R2P/2P5/2Kr1PP1/8 w - - 4 31",
+    "moves": [
+      "c2c1",
+      "d2d1",
+      "c1b2",
+      "d7d2",
+      "b2a3",
+      "d1a1"
+    ],
+    "rating": 984
+  },
+  {
+    "id": "00QY3",
+    "fen": "2k3r1/pp5p/4p3/2p2p2/2P5/P4P1q/1PQ1RR1b/7K w - - 0 32",
+    "moves": [
+      "f2h2",
+      "h3f1"
+    ],
+    "rating": 1048
+  },
+  {
+    "id": "00QZ3",
+    "fen": "r1bq3r/ppppnkpp/2n5/b5N1/4P3/B1P5/P4PPP/RN1QK2R b KQ - 1 9",
+    "moves": [
+      "f7f8",
+      "d1f3",
+      "f8e8",
+      "f3f7"
+    ],
+    "rating": 1137
+  },
+  {
+    "id": "00QjF",
+    "fen": "8/8/1pr1p1kp/pbPp2pN/3Pp1P1/1P2K3/P6P/2R5 b - - 0 29",
+    "moves": [
+      "e6e5",
+      "c5b6",
+      "c6c1",
+      "b6b7",
+      "c1e1",
+      "e3d2"
+    ],
+    "rating": 2077
+  }
+]
