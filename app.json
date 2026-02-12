@@ -4,7 +4,7 @@
     "slug": "Checkfall",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/knight_black.png",
     "scheme": "checkfall",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -24,7 +24,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/knight_black.png"
     },
     "plugins": [
       "expo-router",

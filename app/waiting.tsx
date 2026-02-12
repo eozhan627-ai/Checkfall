@@ -1,53 +1,49 @@
-//import { useRouter } from "expo-router";
-//import { useEffect } from "react";
-//import { ActivityIndicator, Text, View } from "react-native";
-//import { socket } from "../lib/socket";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
+import { getSocket } from "../lib/socket";
 
-//export default function WaitingScreen() {
-//const router = useRouter();
+export default function WaitingScreen() {
+  const router = useRouter();
+  const [status, setStatus] = useState("Suche nach Gegner… ");
 
-//useEffect(() => {
-//if (socket.connected) {
-//socket.emit("find_game");
-//} else {
-//  socket.on("connect", () => socket.emit("find_game"));
-//}
+  useEffect(() => {
+    const socket = getSocket();
 
-//const startGame = (data: any) => {
-//console.log("🎮 start_game received", data);
-//router.push(`/game?roomId=${data.roomId}&white=${data.white}&black=${data.black}`);
-//};
+    // Wenn Socket schon verbunden ist, direkt emitten
+    if (socket.connected) {
+      console.log("🟢 SOCKET ALREADY CONNECTED", socket.id);
+      socket.emit("find_match");
+    }
 
+    // Listener für connect
+    const onConnect = () => {
+      console.log("🟢 SOCKET CONNECTED", socket.id);
+      socket.emit("find_match");
+    };
+    socket.on("connect", onConnect);
 
-//  socket.on("game_start", startGame);
-//return () => {
-//socket.off("game_start ", startGame);
-//};
-//}, []);
+    // Listener für game_start
+    const onGameStart = (data: { roomId: string; white: string; black: string }) => {
+      console.log("🎮 Game start received", data);
+      setStatus("Gegner gefunden! Starte Spiel…  ");
+      setTimeout(() => {
+        router.push({ pathname: "/game", params: data });
+      }, 500);
+    };
+    socket.on("game_start", onGameStart);
 
-//return (
-//<View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-// <ActivityIndicator size="large" />
-//<Text>Searching for opponent…  </Text>
-//</View>
-//);
-//}
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+    // Cleanup
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("game_start", onGameStart);
+    };
+  }, []);
 
-export default function ComingSoonPage() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Coming Soon 🚀</Text>
-      <Text style={styles.subtitle}>
-        Diese Funktion wird bald verfügbar sein.
-      </Text>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <ActivityIndicator size="large" />
+      <Text>{status}</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 28, fontWeight: "bold", marginBottom: 10 },
-  subtitle: { fontSize: 16, color: "#555", textAlign: "center", paddingHorizontal: 20 },
-});

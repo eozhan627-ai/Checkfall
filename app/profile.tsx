@@ -1,165 +1,103 @@
-// src/components/ProfileAvatar.tsx
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect, useState } from 'react';
-import { FlatList, Image, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as ImagePicker from "expo-image-picker";
+import React, { useEffect, useState } from "react";
+import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { AccountType, getCurrentAccount, updateAccount } from "../lib/account";
 
-// Standard-Figuren
-const figureAvatars: { key: string; image: any; color: 'white' | 'black' }[] = [
-    { key: 'pawn_white', image: require('../assets/images/pawn_white.png'), color: 'white' },
-    { key: 'rook_white', image: require('../assets/images/rook_white.png'), color: 'white' },
-    { key: 'knight_white', image: require('../assets/images/knight_white.png'), color: 'white' },
-    { key: 'bishop_white', image: require('../assets/images/bishop_white.png'), color: 'white' },
-    { key: 'queen_white', image: require('../assets/images/queen_white.png'), color: 'white' },
-    { key: 'king_white', image: require('../assets/images/king_white.png'), color: 'white' },
+export default function Profile() {
+    const [account, setAccount] = useState<AccountType | null>(null);
+    const [username, setUsername] = useState("");
+    const [editingName, setEditingName] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const placeholder = require("../assets/images/knight_black.png"); // Dein Platzhalter-Avatar
 
-    { key: 'pawn_black', image: require('../assets/images/pawn_black.png'), color: 'black' },
-    { key: 'rook_black', image: require('../assets/images/rook_black.png'), color: 'black' },
-    { key: 'knight_black', image: require('../assets/images/knight_black.png'), color: 'black' },
-    { key: 'bishop_black', image: require('../assets/images/bishop_black.png'), color: 'black' },
-    { key: 'queen_black', image: require('../assets/images/queen_black.png'), color: 'black' },
-];
-
-export default function ProfileAvatar() {
-    const [avatar, setAvatar] = useState(figureAvatars[0]);
-    const [modalVisible, setModalVisible] = useState(false);
-    // Lade gespeicherten Avatar
+    // Account laden
     useEffect(() => {
         (async () => {
-            try {
-                const savedKey = await AsyncStorage.getItem('userAvatar');
-                if (savedKey) {
-                    const saved = figureAvatars.find(a => a.key === savedKey);
-                    if (saved) setAvatar(saved);
-                }
-            } catch (e) {
-                console.log('Fehler beim Laden des Avatars:', e);
+            const acc = await getCurrentAccount();
+            if (acc) {
+                setAccount(acc);
+                setUsername(acc.username);
             }
+            setLoading(false);
         })();
     }, []);
-    // Speichern des Avatars
-    const saveAvatar = async (item: { key: string; image: any; color: 'white' | 'black' }) => {
-        try {
-            await AsyncStorage.setItem('userAvatar', item.key);
-            setAvatar(item);
-        } catch (e) {
-            console.log('Fehler beim Speichern des Avatars:', e);
+
+    // Avatar ändern
+    const changeAvatar = async () => {
+        // Berechtigung prüfen
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+            Alert.alert("Berechtigung benötigt", "Bitte erlaube den Zugriff auf die Galerie.");
+            return;
+        }
+
+        // Bild auswählen
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,   // Zuschneiden erlauben
+            aspect: [1, 1],        // quadratisch
+            quality: 0.8,
+        });
+
+        if (!result.canceled && account) {
+            const uri = result.assets[0].uri;
+            // Account updaten
+            const updated = await updateAccount(account.id, { avatar: uri });
+            setAccount(updated);
         }
     };
 
+    // Username speichern
+    const saveUsername = async () => {
+        if (!username.trim() || !account) return;
+        const updated = await updateAccount(account.id, { username });
+        setAccount(updated);
+        setEditingName(false);
+        Alert.alert("Gespeichert");
+    };
+
+    if (loading) return <View style={styles.center}><Text>Lade Profil...</Text></View>;
+    if (!account) return <View style={styles.center}><Text>Kein Account gefunden</Text></View>;
 
     return (
         <View style={styles.container}>
-            <View style={styles.container}>
-                <Text style={styles.text}>Profil</Text>
-            </View>
-
-
-            <TouchableOpacity onPress={() => setModalVisible(true)}>
-                <Image source={avatar.image} style={styles.avatarImage} />
+            <TouchableOpacity onPress={changeAvatar}>
+                <Image
+                    source={account.avatar ? { uri: account.avatar } : placeholder}
+                    style={styles.avatar}
+                />
             </TouchableOpacity>
 
-
-            <Modal visible={modalVisible} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.title}>Wähle dein Profilbild</Text>
-                        <FlatList<{ key: string; image: any; color: 'white' | 'black' }>
-                            data={figureAvatars}
-                            keyExtractor={(item) => item.key}
-                            numColumns={3}
-                            renderItem={({ item }: { item: { key: string; image: any; color: 'white' | 'black' } }) => (
-                                <TouchableOpacity
-                                    style={styles.figureButton}
-                                    onPress={() => {
-                                        saveAvatar(item);   // wir speichern jetzt das ganze Objekt
-                                        setModalVisible(false);
-                                    }}
-                                >
-                                    <Image source={item.image} style={styles.figureImage} />
-                                </TouchableOpacity>
-                            )}
+            <View style={styles.nameContainer}>
+                {editingName ? (
+                    <>
+                        <TextInput
+                            style={styles.input}
+                            value={username}
+                            onChangeText={setUsername}
+                            autoFocus
                         />
-                        <TouchableOpacity
-                            onPress={() => setModalVisible(false)}
-                            style={styles.closeButton}
-                        >
-                            <Text style={styles.closeText}>Abbrechen </Text>
+                        <TouchableOpacity onPress={saveUsername} style={styles.saveBtn}>
+                            <Text style={styles.saveText}>✔</Text>
                         </TouchableOpacity>
-
-                    </View>
-                </View>
-            </Modal>
+                    </>
+                ) : (
+                    <TouchableOpacity onPress={() => setEditingName(true)}>
+                        <Text style={styles.username}>{username} ✏️</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        marginLeft: 25,
-        textAlign: 'center',
-    },
-    avatarImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        borderWidth: 2,
-        borderColor: '#e5e7eb',
-        backgroundColor: '#fff',
-    },
-    modalOverlay: {
-        flex: 1,
-        justifyContent: 'center',
-        backgroundColor: '#000000aa',
-    },
-    modalContent: {
-        margin: 20,
-        backgroundColor: 'white',
-        borderRadius: 12,
-        padding: 20,
-        alignItems: 'center',
-    },
-    title: {
-        fontSize: 18,
-        marginBottom: 10,
-        fontWeight: '600',
-    },
-    figureButton: {
-        margin: 10,
-    },
-    figureImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#fff',
-    },
-    closeButton: {
-        marginTop: 15,
-        paddingVertical: 8,
-        paddingHorizontal: 20,
-        backgroundColor: '#ddd',
-        borderRadius: 8,
-    },
-    closeText: {
-        fontSize: 16,
-        color: '#333',
-    },
-    text: {
-        fontSize: 25,
-        fontWeight: 'bold',
-        marginBottom: 5,
-        marginTop: 20,
-        alignItems: 'center',
-    },
-    saveButton: {
-        marginTop: 15,
-        paddingVertical: 8,
-        paddingHorizontal: 20,
-        backgroundColor: '#5d239b9b',
-        borderRadius: 8,
-    },
-    saveText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
+    container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
+    center: { flex: 1, justifyContent: "center", alignItems: "center" },
+    avatar: { width: 120, height: 120, borderRadius: 60, marginBottom: 20, backgroundColor: "#ddd" },
+    nameContainer: { flexDirection: "row", alignItems: "center" },
+    username: { fontSize: 22, fontWeight: "bold" },
+    input: { borderBottomWidth: 1, borderColor: "#888", fontSize: 22, minWidth: 120 },
+    saveBtn: { marginLeft: 10 },
+    saveText: { fontSize: 22, color: "#2d7ea4" },
 });
