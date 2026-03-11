@@ -1,8 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AccountType, getCurrentAccount } from '../../lib/account';
-import { getSocket } from '../../lib/socket';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -31,17 +30,7 @@ export default function HomeScreen() {
     }, [])
   );
 
-  useEffect(() => {
-    // Nur ausführen, wenn Account geladen wurde
-    if (loading) return;
 
-    const socket = getSocket();
-
-    // Cleanup beim Unmount
-    return () => {
-      socket.off('game_start');
-    };
-  }, [loading]);
 
   if (loading) {
     return (
@@ -102,8 +91,15 @@ export default function HomeScreen() {
       <TouchableOpacity
         style={styles.listBig}
         onPress={() => {
-          const socket = getSocket();
-          router.push('/waiting');
+
+          router.push({
+            pathname: "/waiting",
+            params: {
+              name: account?.username,
+              avatar: account?.avatar
+            }
+          });
+
         }}
       >
         <Text style={styles.listBigTitle}>Spiele online</Text>

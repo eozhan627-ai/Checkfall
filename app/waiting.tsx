@@ -1,49 +1,90 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
+import { getCurrentAccount } from "../lib/account";
 import { getSocket } from "../lib/socket";
 
 export default function WaitingScreen() {
   const router = useRouter();
-  const [status, setStatus] = useState("Suche nach Gegner… ");
+  const [status, setStatus] = useState("Suche nach Gegner…");
 
   useEffect(() => {
     const socket = getSocket();
 
-    // Wenn Socket schon verbunden ist, direkt emitten
-    if (socket.connected) {
-      console.log("🟢 SOCKET ALREADY CONNECTED", socket.id);
-      socket.emit("find_match");
-    }
+    let account: any = null;
 
-    // Listener für connect
+    const startMatchmaking = async () => {
+      account = await getCurrentAccount();
+
+      if (!account) {
+        console.log("❌ Kein Account gefunden");
+        return;
+      }
+
+      console.log("🔎 Suche Gegner für:", account.name);
+
+      socket.emit("find_match", {
+        name: account.name,
+        avatar: account.avatar,
+      });
+    };
+
     const onConnect = () => {
       console.log("🟢 SOCKET CONNECTED", socket.id);
-      socket.emit("find_match");
+      startMatchmaking();
     };
-    socket.on("connect", onConnect);
 
-    // Listener für game_start
-    const onGameStart = (data: { roomId: string; white: string; black: string }) => {
-      console.log("🎮 Game start received", data);
-      setStatus("Gegner gefunden! Starte Spiel…  ");
+    const onGameStart = (data: {
+      roomId: string;
+      white: string;
+      black: string;
+      whiteName: string;
+      blackName: string;
+      whiteAvatar: string;
+      blackAvatar: string;
+    }) => {
+      console.log("🎮 Game start received:", data);
+
+      setStatus("Gegner gefunden! Starte Spiel…");
+
       setTimeout(() => {
-        router.push({ pathname: "/game", params: data });
+        router.replace({
+          pathname: "/game",
+          params: data,
+        });
       }, 500);
     };
-    socket.on("game_start", onGameStart);
 
-    // Cleanup
+    const onWaiting = () => {
+      console.log("⏳ Warte auf Gegner");
+      setStatus("Warte auf Gegner…");
+    };
+
+    if (socket.connected) {
+      startMatchmaking();
+    }
+
+    socket.on("connect", onConnect);
+    socket.on("game_start", onGameStart);
+    socket.on("waiting", onWaiting);
+
     return () => {
       socket.off("connect", onConnect);
       socket.off("game_start", onGameStart);
+      socket.off("waiting", onWaiting);
     };
   }, []);
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
       <ActivityIndicator size="large" />
-      <Text>{status}</Text>
+      <Text style={{ marginTop: 20 }}>{status}</Text>
     </View>
   );
 }
