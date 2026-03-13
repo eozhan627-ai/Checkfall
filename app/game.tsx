@@ -71,12 +71,12 @@ export default function GameScreen() {
     const [myAvatar, setMyAvatar] = useState<string>("");
     const [opponentName, setOpponentName] = useState<string>("");
     const [opponentAvatar, setOpponentAvatar] = useState<string>("");
-    const getAvatar = (avatar?: string) => {
-        if (avatar && avatar.length > 0) {
-            return { uri: `${avatar}?t=${Date.now()}` };
-        }
-        return require("../assets/images/platzhalter1.png");
-    };
+   const getAvatar = (avatar?: string, forceRefresh = false) => {
+  if (avatar && avatar.length > 0) {
+    return { uri: forceRefresh ? `${avatar}?t=${Date.now()}` : avatar };
+  }
+  return require("../assets/images/platzhalter1.png");
+};
     const scrollRef = useRef<ScrollView>(null);
 
     // =============================
@@ -90,16 +90,26 @@ export default function GameScreen() {
         const onConnect = async () => {
             const acc = await getCurrentAccount(); // die neuesten Account-Daten
             if (!acc) return;
+            console.log("Socket ID:", s.id);
+            console.log("White:", white);
+            console.log("Black:", black);
+
             const color = s.id === white ? "w" : s.id === black ? "b" : null;
             if (!color) return;
 
             setMyColor(color);
-            setMyName(color === "w" ? acc.username : (color === "b" ? acc.username : ""));
-            setMyAvatar(acc.avatar || "");
-            setOpponentName(color === "w" ? blackName : whiteName);
-            setOpponentAvatar(color === "w" ? blackAvatar : whiteAvatar);
-
-            console.log("ICH:", color === "w" ? acc.avatar : acc.avatar);
+            if (color === "w") {
+                setMyName(whiteName);
+                setMyAvatar(whiteAvatar || "");
+                setOpponentName(blackName);
+                setOpponentAvatar(blackAvatar || "");
+            } else {
+                setMyName(blackName);
+                setMyAvatar(blackAvatar || "");
+                setOpponentName(whiteName);
+                setOpponentAvatar(whiteAvatar || "");
+            }
+            console.log("ICH:", color === "w" ? whiteAvatar : blackAvatar);
             console.log("GEGNER:", color === "w" ? blackAvatar : whiteAvatar);
         };
 
@@ -195,6 +205,11 @@ export default function GameScreen() {
         if (g.isDraw()) Alert.alert("Remis");
     };
 
+    useEffect(() => {
+        if (!gameEnded) return; // Spiel läuft, nichts tun
+        // hier könnte man nach Spielende die Avatare wieder aktualisieren
+    }, [myAvatar, opponentAvatar]);
+
     // =============================
     // UI
     // =============================
@@ -226,11 +241,7 @@ export default function GameScreen() {
                             }}
                         >
                             <Image
-                                source={
-                                    opponentAvatar && opponentAvatar.startsWith("http")
-                                        ? { uri: opponentAvatar }
-                                        : require("../assets/images/platzhalter2.png")
-                                }
+                                source={getAvatar(opponentAvatar)}
                                 style={{
                                     width: 36, height: 36, backgroundColor: '#fff',
                                     borderRadius: 6,
@@ -242,7 +253,7 @@ export default function GameScreen() {
                                 resizeMode="contain"
                             />
                             <Text style={{ color: "#fff", fontSize: 16 }}>
-                                {opponentName || "Gegner"}
+                                {opponentName || "Gegner "}
                             </Text>
                         </Pressable>
 
@@ -405,7 +416,7 @@ const styles = StyleSheet.create({
         borderWidth: 3,
         borderColor: "rgba(0,0,0,0.35)",
     },
-    moveBar: { maxHeight: 40, marginBottom: 12 },
+    moveBar: { height: 40, marginBottom: 12 },
     moveBarContent: { paddingHorizontal: 12, alignItems: "center" },
     moveChip: {
         marginRight: 8,

@@ -1,7 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AccountType, getCurrentAccount } from '../../lib/account';
+import { getSocket} from '../../lib/socket';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -30,12 +31,22 @@ export default function HomeScreen() {
     }, [])
   );
 
+useEffect(() => {
+    // Nur ausführen, wenn Account geladen wurde
+    if (loading) return;
 
+    const socket = getSocket();
+
+    // Cleanup beim Unmount
+    return () => {
+      socket.off('game_start');
+    };
+  }, [loading]);
 
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Lade...</Text>
+        <Text>Lade... </Text>
       </View>
     );
   }
@@ -55,7 +66,7 @@ export default function HomeScreen() {
           onPress={() => router.push('/profile')}
         >
           <Image
-            source={account?.avatar ? { uri: account.avatar } : placeholder}
+            source={account?.avatar ? { uri: account.avatar + '?t=' + Date.now() } : placeholder}
             style={styles.avatar}
           />
         </TouchableOpacity>
@@ -103,7 +114,7 @@ export default function HomeScreen() {
         }}
       >
         <Text style={styles.listBigTitle}>Spiele online</Text>
-        <Text style={styles.listBigSub}>Finde einen echten Gegner</Text>
+        <Text style={styles.listBigSub}>Finde einen echten Gegner </Text>
       </TouchableOpacity>
     </View>
   );

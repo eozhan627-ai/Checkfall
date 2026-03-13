@@ -6,7 +6,7 @@ import { getSocket } from "../lib/socket";
 
 export default function WaitingScreen() {
   const router = useRouter();
-  const [status, setStatus] = useState("Suche nach Gegner…");
+  const [status, setStatus] = useState("Suche nach Gegner… ");
 
   useEffect(() => {
     const socket = getSocket();
@@ -24,7 +24,7 @@ export default function WaitingScreen() {
       console.log("🔎 Suche Gegner für:", account.name);
 
       socket.emit("find_match", {
-        name: account.name,
+        name: account.username,
         avatar: account.avatar,
       });
     };
@@ -45,19 +45,27 @@ export default function WaitingScreen() {
     }) => {
       console.log("🎮 Game start received:", data);
 
-      setStatus("Gegner gefunden! Starte Spiel…");
+      setStatus("Gegner gefunden! Starte Spiel…  ");
 
       setTimeout(() => {
         router.replace({
           pathname: "/game",
-          params: data,
+          params: {
+            roomId: data.roomId,
+            white: data.white,
+            black: data.black,
+            whiteName: data.whiteName,
+            blackName: data.blackName,
+            whiteAvatar: data.whiteAvatar,
+            blackAvatar: data.blackAvatar
+          }
         });
       }, 500);
     };
 
     const onWaiting = () => {
-      console.log("⏳ Warte auf Gegner");
-      setStatus("Warte auf Gegner…");
+      console.log("⏳ Warte auf Gegner ");
+      setStatus("Warte auf Gegner… ");
     };
 
     if (socket.connected) {
