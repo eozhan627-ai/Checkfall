@@ -71,12 +71,12 @@ export default function GameScreen() {
     const [myAvatar, setMyAvatar] = useState<string>("");
     const [opponentName, setOpponentName] = useState<string>("");
     const [opponentAvatar, setOpponentAvatar] = useState<string>("");
-   const getAvatar = (avatar?: string, forceRefresh = false) => {
-  if (avatar && avatar.length > 0) {
-    return { uri: forceRefresh ? `${avatar}?t=${Date.now()}` : avatar };
-  }
-  return require("../assets/images/platzhalter1.png");
-};
+    const getAvatar = (avatar?: string, forceRefresh = false) => {
+        if (avatar && avatar.length > 0) {
+            return { uri: forceRefresh ? `${avatar}?t=${Date.now()}` : avatar };
+        }
+        return require("../assets/images/platzhalter2.png");
+    };
     const scrollRef = useRef<ScrollView>(null);
 
     // =============================
@@ -330,7 +330,9 @@ export default function GameScreen() {
                                             style={[
                                                 styles.square,
                                                 {
-                                                    backgroundColor: isLastTo || isLastFrom ? "#2d7ea4" : isDark ? "#334155" : "#e5e7eb",
+                                                    backgroundColor: isLastTo || isLastFrom ? "#2d7ea4"   : isDark
+                                                                    ? "#769656"
+                                                                    : "#eeeed2",
                                                     borderWidth: selected === square ? 2 : 0,
                                                     borderColor: "#ac442c",
                                                 },
@@ -389,6 +391,8 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         flexWrap: "wrap",
         alignSelf: "center",
+        borderRadius: 5,
+        overflow: "hidden",
     },
     square: {
         width: SQUARE_SIZE,

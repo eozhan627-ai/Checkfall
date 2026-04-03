@@ -98,6 +98,9 @@ export default function Playbot() {
     const scrollRef = useRef<ScrollView>(null);
     const board = game.board();
 
+    const [checkmate, setCheckmate] = useState<string | null>(null);
+
+
     const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
 
     const displayBoard =
@@ -111,6 +114,15 @@ export default function Playbot() {
     }, [moveHistory]);
 
     const botMoveRef = useRef(false);
+    const eloToDepth = (elo: number) => {
+        switch (elo) {
+            case 100: return 5;
+            case 300: return 8;
+            case 500: return 12;
+            case 1000: return 15;
+            default: return 10;
+        }
+    }
 
     const [isBotThinking, setIsBotThinking] = useState(false);
 
@@ -145,7 +157,7 @@ export default function Playbot() {
         setLegalMoves([]);
         setPromotionMove(null);
 
-        checkCheckmate(newGame);
+        checkGameEnd(newGame);
     };
     const saveGame = async () => {
         const timestamp = Date.now();
@@ -174,20 +186,70 @@ export default function Playbot() {
         setMoveHistory([]);
         setLastMove(null);
     };
+    // currentGame: Chess
+    const getKingSquare = (color: "w" | "b") => {
+        const board = game.board(); // 2D Array mit Pieces oder null
+        for (let rank = 0; rank < 8; rank++) {
+            for (let file = 0; file < 8; file++) {
+                const piece = board[rank][file];
+                if (piece && piece.type === "k" && piece.color === color) {
+                    // Umrechnen in algebraische Notation: a1-h8
+                    const square = String.fromCharCode(97 + file) + (8 - rank);
+                    return square;
+                }
+            }
+        }
+        return null;
+    };
+    const checkGameEnd = (currentGame: Chess) => {
+        const showAlert = (title: string, message: string) => {
+            setTimeout(() => {
+                Alert.alert(title, message);
+            }, 800); // 0,8 Sekunden warten, damit der letzte Zug sichtbar ist
+        };
 
-    const checkCheckmate = (currentGame: Chess) => {
-        if (!currentGame.isCheckmate()) return;
 
-        const winner = currentGame.turn() === "w" ? "b" : "w";
-        const result = winner === humanColor ? "win" : "loss";
+        if (currentGame.isCheckmate()) {
+            const loser = currentGame.turn();
+            const winner = loser === "w" ? "b" : "w";
+            const result = winner === humanColor ? "win" : "loss";
 
-        const now = Date.now();
-        saveGameToHistory("bot", result, now);
+            // Königfeld ermitteln
+            const kingSquare = getKingSquare(loser); // chess.js liefert z.B. "e8"
+            setCheckmate(kingSquare);
+            saveGameToHistory("bot", result);
 
-        Alert.alert(
-            "Schachmatt",
-            `${winner === "w" ? "Weiß" : "Schwarz"} hat gewonnen`
-        );
+            showAlert(
+                "Schachmatt",
+                `${winner === "w" ? "Weiß" : "Schwarz"} hat gewonnen`
+            );
+            return true;
+        }
+        if (currentGame.isStalemate()) {
+            saveGameToHistory("bot", "draw");
+            showAlert("Patt", "Keine legalen Züge mehr – Unentschieden");
+            return true;
+        }
+
+        if (currentGame.isThreefoldRepetition()) {
+            saveGameToHistory("bot", "draw");
+            showAlert("Remis", "Dreifache Stellungswiederholung");
+            return true;
+        }
+
+        if (currentGame.isInsufficientMaterial()) {
+            saveGameToHistory("bot", "draw");
+            showAlert("Remis", "Zu wenig Material für ein Matt");
+            return true;
+        }
+
+        if (currentGame.isDraw()) {
+            saveGameToHistory("bot", "draw");
+            showAlert("Remis", "50-Züge-Regel oder allgemeines Remis");
+            return true;
+        }
+
+        return false;
     };
     async function saveGameToHistory(
         mode: "bot",
@@ -208,37 +270,45 @@ export default function Playbot() {
         await AsyncStorage.setItem(key, JSON.stringify(history));
     }
 
-    const makeBotMove = () => {
-        const moves = game.moves({ verbose: true });
-        if (moves.length === 0) return;
+    const makeBotMove = async () => {
+        try {
+            const res = await fetch("http://192.168.1.105:3000/bot-move", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    fen: game.fen(),
+                    elo: eloToDepth(botElo),
+                }),
+            });
 
-        let botMove;
+            const data = await res.json();
+            const bestMove = data.move;
 
+            const newGame = new Chess(game.fen());
 
+            const move = newGame.move({
+                from: bestMove.substring(0, 2),
+                to: bestMove.substring(2, 4),
+                promotion: "q",
+            });
 
-        if (botElo <= 500) {
-            // sehr zufällige Züge
-            botMove = moves[Math.floor(Math.random() * moves.length)];
-        } else {
-            // "bessere Züge": wähle einen Zug, der Material gewinnt
-            const goodMoves = moves.filter(m => m.captured);
-            botMove = goodMoves.length > 0 ? goodMoves[Math.floor(Math.random() * goodMoves.length)] : moves[Math.floor(Math.random() * moves.length)];
+            if (!move) return;
+
+            setGame(newGame);
+            setMoveHistory(prev => [...prev, move.san]);
+            setLastMove({ from: move.from, to: move.to });
+
+            checkGameEnd(newGame);
+
+        } catch (err) {
+            console.log("Server Error:", err);
         }
-
-        const newGame = new Chess(game.fen());
-        const move = newGame.move(botMove);
-        if (!move) return;
-
-        setGame(newGame);
-        setMoveHistory(prev => [...prev, move.san]);
-        setLastMove({ from: move.from, to: move.to });
-        setSelectedSquare(null);
-        setLegalMoves([]);
-        checkCheckmate(newGame);
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#000000' }} >
+        <View style={{ flex: 1, backgroundColor: '#111827' }} >
             {!gameStarted ? (
                 <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
                     <Text style={{ color: "#fff", fontSize: 20, marginBottom: 16 }}>Spiel starten gegen Bot  </Text>
@@ -389,20 +459,23 @@ export default function Playbot() {
                                                         setLastMove({ from: move.from, to: move.to });
                                                         setSelectedSquare(null);
                                                         setLegalMoves([]);
-                                                        checkCheckmate(newGame);
+                                                        checkGameEnd(newGame);
 
                                                     }
                                                 }}
                                                 style={[
                                                     styles.square,
                                                     {
-                                                        backgroundColor: isLastTo
-                                                            ? "#2d7ea4"       // Ziel-Feld (kräftig)
-                                                            : isLastFrom
-                                                                ? "#2d7ea4"      // Start-Feld (heller)
-                                                                : isDark
-                                                                    ? "#334155"
-                                                                    : "#e5e7eb",
+                                                        backgroundColor:
+                                                            square === checkmate
+                                                                ? "#ff3b30"
+                                                                : isLastTo
+                                                                    ? "#facc15"       // Ziel-Feld (kräftig)
+                                                                    : isLastFrom
+                                                                        ? "#fde68a"      // Start-Feld (heller)
+                                                                        : isDark
+                                                                            ? "#769656"
+                                                                            : "#eeeed2",
                                                         borderWidth: isSelected ? 2 : 0,
                                                         borderColor: isSelected ? "#ac442c" : "transparent",
                                                     },
@@ -413,12 +486,17 @@ export default function Playbot() {
                                                         source={pieces[pieceKey]}
                                                         style={[
                                                             styles.piece,
-
+                                                            {
+                                                                shadowColor: "#000",
+                                                                shadowOpacity: 0.6,
+                                                                shadowRadius: 4,
+                                                                shadowOffset: { width: 0, height: 2 },
+                                                            },
                                                             // Rotation des Boards (falls nötig)
                                                             rotateBoard ? { transform: [{ rotate: "0deg" }] } : {},
 
-                                                            // schwarze Bauern extra vergrößern und verschieben
-                                                            pieceKey === "bp" && {
+                                                             // schwarze Bauern extra vergrößern und verschieben
+                                                           pieceKey === "bp" && {
                                                                 transform: [
                                                                     { scale: 1.55 },
                                                                     { translateY: 3.25 },
@@ -532,6 +610,9 @@ const styles = StyleSheet.create({
         flexWrap: "wrap",
         alignSelf: "center",
         marginTop: 0,
+        borderRadius: 5,
+        overflow: "hidden",
+
     },
     square: {
         width: SQUARE_SIZE,
@@ -608,4 +689,4 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-});
+}); 

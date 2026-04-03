@@ -4,8 +4,8 @@ let socket: Socket | null = null;
 
 export const getSocket = (): Socket => {
     if (!socket) {
-        socket = io("http://192.168.178.26:3000", { transports: ["websocket"] });
-     
+        socket = io("http://192.168.1.105:3000", { transports: ["websocket"] });
+
 
         socket.on("connect", () => console.log("🟢 SOCKET CONNECTED", socket?.id));
         socket.on("disconnect", () => console.log("🔴 SOCKET DISCONNECTED"));

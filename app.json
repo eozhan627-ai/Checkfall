@@ -4,27 +4,27 @@
     "slug": "Checkfall",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/knight_black.png",
     "scheme": "checkfall",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "icon": "./assets/images/app-icon.png",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.checkfall",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.checkfall",
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Checkfall"
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/knight_black.png"
+      "favicon": "./assets/images/app-icon.png"
     },
     "plugins": [
       "expo-router",
@@ -51,6 +51,13 @@
       "eas": {
         "projectId": "ec981dac-3054-4a76-afb6-9110e13d2ca7"
       }
-    }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ec981dac-3054-4a76-afb6-9110e13d2ca7"
+    },
+    "owner": "eneskazim.oezhan"
   }
 }

@@ -1,8 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { AccountType, getCurrentAccount } from '../../lib/account';
-import { getSocket} from '../../lib/socket';
+import { getSocket } from '../../lib/socket';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function HomeScreen() {
     }, [])
   );
 
-useEffect(() => {
+  useEffect(() => {
     // Nur ausführen, wenn Account geladen wurde
     if (loading) return;
 
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   centerTitle: { flex: 1, alignItems: 'center' },
   title: { fontSize: 23, fontWeight: 'bold' },
   subtitle: { fontSize: 16, color: '#666', marginBottom: 20 },
-  profileBox: { width: 36, height: 36, borderRadius: 6, overflow: 'hidden', backgroundColor: '#222' },
+  profileBox: { width: 36, height: 36, borderRadius: 6, overflow: 'hidden', backgroundColor: '#ffffff', borderColor: '#000000', borderWidth: 1 },
   avatar: { width: 36, height: 36, borderRadius: 6 },
   lists: { paddingHorizontal: 16, marginTop: 20, gap: 8 },
   listSmall: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 },

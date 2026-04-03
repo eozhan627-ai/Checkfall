@@ -71,7 +71,21 @@ export default function Board() {
     const [humanColor, setHumanColor] = useState<'w' | 'b'>('w');
     const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
     const [undoneMoves, setUndoneMoves] = useState<any[]>([]);
+    const [checkmate, setCheckmate] = useState<string | null>(null);
+    const getKingSquare = (color: "w" | "b") => {
+        const board = game.board();
 
+        for (let rank = 0; rank < 8; rank++) {
+            for (let file = 0; file < 8; file++) {
+                const piece = board[rank][file];
+                if (piece && piece.type === "k" && piece.color === color) {
+                    return String.fromCharCode(97 + file) + (8 - rank);
+                }
+            }
+        }
+
+        return null;
+    };
     const undoMove = () => {
         if (moveIndex === 0) return; // nichts zum Rückgängigmachen
 
@@ -92,6 +106,7 @@ export default function Board() {
         // lastMove aktualisieren
         const last = newIndex > 0 ? moveStack.current[newIndex - 1] : null;
         setLastMove(last ? { from: last.from, to: last.to } : null);
+        checkGameEndLocal(newGame);
 
         setSelectedSquare(null);
         setLegalMoves([]);
@@ -137,6 +152,55 @@ export default function Board() {
             scrollRef.current.scrollToEnd({ animated: true });
         }
     }, [moveHistory]);
+    const checkGameEndLocal = (currentGame: Chess) => {
+        const showAlert = (title: string, message: string) => {
+            setTimeout(() => {
+                Alert.alert(title, message);
+            }, 800); // 0,8 Sekunden warten, damit der letzte Zug sichtbar ist
+        };
+
+        if (currentGame.isCheckmate()) {
+            const loser = currentGame.turn();
+            const winner = loser === "w" ? "b" : "w";
+            const result = winner === bottomColor ? "win" : "loss"; // bottomColor ist dein Spieler
+
+            const kingSquare = getKingSquare(loser);
+            setCheckmate(kingSquare);
+
+            saveGameToHistory("local", result);
+            showAlert(
+                "Schachmatt",
+                `${winner === "w" ? "Weiß" : "Schwarz"} hat gewonnen`
+            );
+            return true;
+        }
+
+        if (currentGame.isStalemate()) {
+            saveGameToHistory("local", "draw");
+            showAlert("Patt", "Keine legalen Züge mehr – Unentschieden");
+            return true;
+        }
+
+        if (currentGame.isThreefoldRepetition()) {
+            saveGameToHistory("local", "draw");
+            showAlert("Remis", "Dreifache Stellungswiederholung");
+            return true;
+        }
+
+        if (currentGame.isInsufficientMaterial()) {
+            saveGameToHistory("local", "draw");
+            showAlert("Remis", "Zu wenig Material für ein Matt");
+            return true;
+        }
+
+        if (currentGame.isDraw()) {
+            saveGameToHistory("local", "draw");
+            showAlert("Remis", "50-Züge-Regel oder allgemeines Remis");
+            return true;
+        }
+
+        return false;
+    };
 
     const resetGame = () => {
         const freshGame = new Chess();
@@ -227,20 +291,12 @@ export default function Board() {
 
 
 
-        if (newGame.isCheckmate()) {
-            const winnerColor = newGame.turn() === "w" ? "b" : "w";
-            const result = winnerColor === bottomColor ? "win" : "loss";
-
-            const now = Date.now();
-            saveGameToHistory("local", result, now);
-
-            Alert.alert("Schachmatt", `${winnerColor === "w" ? "Weiß" : "Schwarz"} hat gewonnen`);
-        }
+        checkGameEndLocal(newGame);
     };
 
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#111827' }} edges={['top', 'left', 'right']}>
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
                 <View style={{ width: BOARD_SIZE }}>
 
@@ -343,22 +399,22 @@ export default function Board() {
                                                         // Neuen Zug hinzufügen
                                                         moveStack.current.push(move);
                                                         setMoveIndex(moveStack.current.length);
-                                                        if (newGame.isCheckmate()) {
-                                                            const winner = newGame.turn() === "w" ? "Schwarz" : "Weiß";
-                                                            Alert.alert("Schachmatt", `${winner} hat gewonnen`);
-                                                        }
+                                                        checkGameEndLocal(newGame);
                                                     }
                                                 }}
                                                 style={[
                                                     styles.square,
                                                     {
-                                                        backgroundColor: isLastTo
-                                                            ? "#2d7ea4"       // Ziel-Feld (kräftig)
-                                                            : isLastFrom
-                                                                ? "#2d7ea4"      // Start-Feld (heller)
-                                                                : isDark
-                                                                    ? "#334155"
-                                                                    : "#e5e7eb",
+                                                        backgroundColor:
+                                                            square === checkmate
+                                                                ? "#ff3b30"
+                                                                : isLastTo
+                                                                    ? "#2d7ea4"       // Ziel-Feld (kräftig)
+                                                                    : isLastFrom
+                                                                        ? "#2d7ea4"      // Start-Feld (heller)
+                                                                        : isDark
+                                                                            ? "#769656"
+                                                                            : "#eeeed2",
                                                         borderWidth: isSelected ? 2 : 0,
                                                         borderColor: isSelected ? "#ac442c" : "transparent",
                                                     },
@@ -505,6 +561,8 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         flexWrap: "wrap",
         alignSelf: "center",
+        borderRadius: 5,
+        overflow: "hidden",
     },
     square: {
         width: SQUARE_SIZE,

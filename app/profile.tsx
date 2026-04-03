@@ -66,7 +66,7 @@ export default function Profile() {
             formData.append("userId", account.id);
 
             try {
-                const res = await fetch("http://192.168.178.26:3000/upload-avatar", {
+                const res = await fetch("http://192.168.1.105:3000/upload-avatar", {
                     method: "POST",
                     body: formData,
                     headers: { "Content-Type": "multipart/form-data" },

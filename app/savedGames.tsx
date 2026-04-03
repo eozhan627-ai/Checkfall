@@ -7,7 +7,7 @@ type SavedGame = {
     key: string;
     fen: string;
     history: any[];
-    bottomColor: 'w' | 'b';
+    bottomColor: 'w' | 'd';
     mode: 'local' | 'bot';
     timestamp: number;
 };
@@ -51,7 +51,7 @@ export default function SavedGames() {
     };
 
     return (
-        <ScrollView 
+        <ScrollView
             contentContainerStyle={{ padding: 16, }}>
             <Text
                 style={{
