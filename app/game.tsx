@@ -172,9 +172,24 @@ export default function GameScreen() {
         const unsubGameOver = onGameOver(
             data => {
                 setGameEnded(true);
-                if (data.type === "resign") Alert.alert("Spiel beendet", `${data.winner} gewinnt`);
-                if (data.type === "draw") Alert.alert("Remis", "Unentschieden");
-                router.replace("/");
+                if (data.type === "resign") {
+                    const result = (data as any).result;
+                    Alert.alert(
+                        "Spiel beendet",
+                        result === "won"
+                            ? "Dein Gegner hat aufgegeben. Du gewinnst!"
+                            : "Du hast aufgegeben. Du verlierst!"
+                    );
+                }
+
+                if (data.type === "draw") {
+                    Alert.alert("Remis", "Remis vereinbart!");
+
+
+                }
+                setTimeout(() => {
+                    router.replace("/");
+                }, 2000);
             },
             myName,
             myAvatar
@@ -330,9 +345,9 @@ export default function GameScreen() {
                                             style={[
                                                 styles.square,
                                                 {
-                                                    backgroundColor: isLastTo || isLastFrom ? "#2d7ea4"   : isDark
-                                                                    ? "#769656"
-                                                                    : "#eeeed2",
+                                                    backgroundColor: isLastTo || isLastFrom ? "#2d7ea4" : isDark
+                                                        ? "#769656"
+                                                        : "#eeeed2",
                                                     borderWidth: selected === square ? 2 : 0,
                                                     borderColor: "#ac442c",
                                                 },

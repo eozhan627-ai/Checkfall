@@ -58,7 +58,7 @@ export default function HomeScreen() {
 
         <View style={styles.centerTitle}>
           <Text style={styles.title}>Checkfall</Text>
-          <Text style={styles.subtitle}>Play.Learn.Improve.</Text>
+          <Text style={styles.subtitle}>Play.Learn.Improve </Text>
         </View>
 
         <TouchableOpacity

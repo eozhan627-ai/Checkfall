@@ -12,6 +12,7 @@ import {
     Text,
     View,
 } from "react-native";
+import { io, Socket } from "socket.io-client";
 
 const BOARD_SIZE = Dimensions.get("window").width - 32;
 const SQUARE_SIZE = BOARD_SIZE / 8;
@@ -52,34 +53,7 @@ const pieceToKey = (piece: any) => {
 };
 
 export default function Playbot() {
-    const params = useLocalSearchParams();
-    const [savedData, setSavedData] = useState<any | null>(null);
-
-    useEffect(() => {
-        if (!params.key) return; // nur laden, wenn key existiert
-        AsyncStorage.getItem(params.key as string).then((value) => {
-            if (value) {
-                const gameData = JSON.parse(value);
-                setSavedData(gameData);
-
-                // Spielzustand wiederherstellen
-                const loadedGame = new Chess(gameData.fen);
-                setGame(loadedGame);
-                setMoveHistory(gameData.history.map((m: any) => m.san));
-                setBottomColor(gameData.bottomColor);
-                setHumanColor(gameData.humanColor);
-                setBotColor(gameData.botColor);
-                setGameStarted(true);
-                setLastMove(null);
-
-                // Botzug direkt, falls Bot dran
-                if (loadedGame.turn() === gameData.botColor) {
-                    setTimeout(() => makeBotMove(), 800);
-                }
-            }
-        });
-    }, [params.key]);
-
+    const socket = useRef<Socket | null>(null);
     const [game, setGame] = useState(new Chess());
     const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<any[]>([]);
@@ -97,12 +71,18 @@ export default function Playbot() {
     const rotateBoard = bottomColor === "b";
     const scrollRef = useRef<ScrollView>(null);
     const board = game.board();
-
     const [checkmate, setCheckmate] = useState<string | null>(null);
-
-
     const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+    const params = useLocalSearchParams();
+    type SavedData = {
+        fen: string;
+        history: any[];
+        bottomColor: "w" | "b";
+        humanColor: "w" | "b";
+        botColor: "w" | "b";
+    };
 
+    const [savedData, setSavedData] = useState<SavedData | null>(null);
     const displayBoard =
         bottomColor === "w" ? board : [...board].reverse().map(row => [...row].reverse());
 
@@ -112,6 +92,13 @@ export default function Playbot() {
             scrollRef.current.scrollToEnd({ animated: true });
         }
     }, [moveHistory]);
+    useEffect(() => {
+        socket.current = io("https://checkfall-server-clean-1.onrender.com");
+
+        return () => {
+            socket.current?.disconnect();
+        };
+    }, []);
 
     const botMoveRef = useRef(false);
     const eloToDepth = (elo: number) => {
@@ -123,7 +110,6 @@ export default function Playbot() {
             default: return 10;
         }
     }
-
     const [isBotThinking, setIsBotThinking] = useState(false);
 
     useEffect(() => {
@@ -131,15 +117,12 @@ export default function Playbot() {
             if (game.turn() === botColor && !isBotThinking && game.isGameOver() === false) {
                 setIsBotThinking(true);
                 await new Promise(res => setTimeout(res, 800)); // Warte, Animation/Zeit
-                makeBotMove();
+
                 setIsBotThinking(false);
             }
         };
         makeBotMoveIfNeeded();
     }, [game, botColor]);
-
-
-
 
     const handlePromotion = (pieceType: string) => {
         if (!promotionMove) return;
@@ -268,44 +251,12 @@ export default function Playbot() {
         });
 
         await AsyncStorage.setItem(key, JSON.stringify(history));
+
+
+
     }
 
-    const makeBotMove = async () => {
-        try {
-            const res = await fetch("http://192.168.1.105:3000/bot-move", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    fen: game.fen(),
-                    elo: eloToDepth(botElo),
-                }),
-            });
 
-            const data = await res.json();
-            const bestMove = data.move;
-
-            const newGame = new Chess(game.fen());
-
-            const move = newGame.move({
-                from: bestMove.substring(0, 2),
-                to: bestMove.substring(2, 4),
-                promotion: "q",
-            });
-
-            if (!move) return;
-
-            setGame(newGame);
-            setMoveHistory(prev => [...prev, move.san]);
-            setLastMove({ from: move.from, to: move.to });
-
-            checkGameEnd(newGame);
-
-        } catch (err) {
-            console.log("Server Error:", err);
-        }
-    };
 
     return (
         <View style={{ flex: 1, backgroundColor: '#111827' }} >
@@ -495,8 +446,8 @@ export default function Playbot() {
                                                             // Rotation des Boards (falls nötig)
                                                             rotateBoard ? { transform: [{ rotate: "0deg" }] } : {},
 
-                                                             // schwarze Bauern extra vergrößern und verschieben
-                                                           pieceKey === "bp" && {
+                                                            // schwarze Bauern extra vergrößern und verschieben
+                                                            pieceKey === "bp" && {
                                                                 transform: [
                                                                     { scale: 1.55 },
                                                                     { translateY: 3.25 },

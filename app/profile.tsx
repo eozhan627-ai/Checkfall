@@ -36,9 +36,11 @@ export default function Profile() {
     }, [isForeignProfile]);
 
     // =============================
-    // Avatar ändern (nur eigenes Profil)
     const changeAvatar = async () => {
-        if (!account) return;
+        if (!account?.id) {
+            console.log("❌ Kein Account oder ID fehlt!", account);
+            return;
+        }
 
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
@@ -47,7 +49,7 @@ export default function Profile() {
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ImagePicker.MediaTypeOptions.Images, // ⚠ geändert
             allowsEditing: true,
             aspect: [1, 1],
             quality: 0.8,
@@ -55,18 +57,19 @@ export default function Profile() {
 
         if (!result.canceled) {
             const uri = result.assets[0].uri;
-            const fileExt = uri.split(".").pop(); // png oder jpeg
+            const fileExt = uri.split(".").pop();
 
             const formData = new FormData();
+            formData.append("userId", account.id);
             formData.append("avatar", {
                 uri,
                 type: `image/${fileExt === "jpg" ? "jpeg" : fileExt}`,
-                name: `avatar.${fileExt}`,
+                name: `avatar_${account.id}.${fileExt}`,
             } as any);
-            formData.append("userId", account.id);
+
 
             try {
-                const res = await fetch("http://192.168.1.105:3000/upload-avatar", {
+                const res = await fetch("https://checkfall-server-clean-1.onrender.com/upload-avatar", {
                     method: "POST",
                     body: formData,
                     headers: { "Content-Type": "multipart/form-data" },
@@ -74,21 +77,19 @@ export default function Profile() {
 
                 const data = await res.json();
                 console.log("NEUER AVATAR:", data.url);
+
                 const updated = await updateAccount(account.id, { avatar: data.url });
                 if (updated) {
                     console.log("ACCOUNT nach updateAccount:", updated.avatar);
-                    setAccount(updated);
+                    setAccount(updated); // nur einmal aufrufen
                 } else {
                     console.log("updateAccount hat null zurückgegeben!");
                 }
-                setAccount(updated);
-
             } catch (err) {
                 console.log("Upload Fehler:", err);
             }
         }
     };
-
     // =============================
     // Username speichern
     const saveUsername = async () => {

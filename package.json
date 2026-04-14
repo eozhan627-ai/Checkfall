@@ -22,6 +22,7 @@
     "expo": "~54.0.33",
     "expo-asset": "~12.0.12",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.20",
     "expo-font": "~14.0.11",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
@@ -49,8 +50,7 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "stockfish.js": "^10.0.2",
-    "uuid": "^13.0.0",
-    "expo-dev-client": "~6.0.20"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
