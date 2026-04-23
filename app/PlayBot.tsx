@@ -95,6 +95,20 @@ export default function Playbot() {
     useEffect(() => {
         socket.current = io("https://checkfall-server-clean-1.onrender.com");
 
+        socket.current.on("connect", () => {
+            console.log("✅ Connected:", socket.current?.id);
+        });
+
+        socket.current.on("opponent_move", (move) => {
+            console.log("🤖 BOT MOVE:", move);
+
+            const newGame = new Chess(game.fen());
+            newGame.move(move);
+
+            setGame(newGame);
+            setMoveHistory(prev => [...prev, move]);
+        });
+
         return () => {
             socket.current?.disconnect();
         };
@@ -411,6 +425,11 @@ export default function Playbot() {
                                                         setSelectedSquare(null);
                                                         setLegalMoves([]);
                                                         checkGameEnd(newGame);
+                                                        socket.current?.emit("player_move", {
+                                                            roomId: `bot_${socket.current.id}`,
+                                                            move: move.san,
+                                                            fen: newGame.fen(),
+                                                        });
 
                                                     }
                                                 }}
