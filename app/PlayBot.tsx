@@ -331,6 +331,14 @@ export default function Playbot() {
                             setBotColor(color === "w" ? "b" : "w");
                             setGameStarted(true);
 
+                            // 🔥 HIER HIN
+                            socket.current?.emit("find_bot_match", {
+                                name: "Player",
+                                avatar: "",
+                                level: botElo,
+                                startFEN: "startpos"
+                            });
+
 
                         }}
                         style={{ padding: 12, backgroundColor: "#f6f6f6", borderRadius: 8 }}
