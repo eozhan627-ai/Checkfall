@@ -14,11 +14,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getCurrentAccount } from "../lib/account";
 import {
-    answerDraw,
-    offerDraw,
     onDrawOffer,
-    onGameOver,
-    resignGame,
+    onGameOver
 } from "../lib/gameSocket";
 import { getSocket } from "../lib/socket";
 
@@ -160,14 +157,15 @@ export default function GameScreen() {
                     "Remis angeboten",
                     "Dein Gegner möchte Remis.",
                     [
-                        { text: "Ablehnen", onPress: () => answerDraw(roomId as string, false, myName, myAvatar) },
-                        { text: "Annehmen", onPress: () => answerDraw(roomId as string, true, myName, myAvatar) },
+                        { text: "Ablehnen", onPress: () => socket?.emit("answer_draw", { roomId, accept: false }), },
+                        { text: "Annehmen", onPress: () => socket?.emit("answer_draw", { roomId, accept: true }), },
                     ]
                 );
             },
             myName,
             myAvatar
         );
+
 
         const unsubGameOver = onGameOver(
             data => {
@@ -369,7 +367,7 @@ export default function GameScreen() {
                                 onPress={() =>
                                     Alert.alert("Aufgeben?", "Möchtest du wirklich aufgeben?", [
                                         { text: "Nein", style: "cancel" },
-                                        { text: "Ja", onPress: () => resignGame(roomId as string, myName, myAvatar) },
+                                        { text: "Ja", onPress: () => socket?.emit("resign_game") }
                                     ])
                                 }
                             >
@@ -379,7 +377,7 @@ export default function GameScreen() {
                             <Pressable
                                 disabled={gameEnded}
                                 onPress={() => {
-                                    offerDraw(roomId as string, myName, myAvatar);
+                                    socket?.emit("offer_draw", { roomId });
                                     Alert.alert("Remis angeboten");
                                 }}
                             >
