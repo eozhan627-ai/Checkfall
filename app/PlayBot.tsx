@@ -71,8 +71,9 @@ export default function Playbot() {
     const rotateBoard = bottomColor === "b";
     const scrollRef = useRef<ScrollView>(null);
     const board = game.board();
-    const [checkmate, setCheckmate] = useState<string | null>(null);
+    const [kingInCheck, setKingInCheck] = useState<string | null>(null);
     const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+    const [roomId, setRoomId] = useState<string | null>(null);
     const params = useLocalSearchParams();
     type SavedData = {
         fen: string;
@@ -81,7 +82,7 @@ export default function Playbot() {
         humanColor: "w" | "b";
         botColor: "w" | "b";
     };
-
+    const [gameOver, setGameOver] = useState(false);
     const [savedData, setSavedData] = useState<SavedData | null>(null);
     const displayBoard =
         bottomColor === "w" ? board : [...board].reverse().map(row => [...row].reverse());
@@ -93,27 +94,68 @@ export default function Playbot() {
         }
     }, [moveHistory]);
     useEffect(() => {
-        socket.current = io("https://checkfall-server-clean-1.onrender.com");
+        const s = io("https://checkfall-server-clean-1.onrender.com");
+        socket.current = s;
 
-        socket.current.on("connect", () => {
-            console.log("✅ Connected:", socket.current?.id);
+        const onOpponentMove = (botMove: string) => {
+            console.log("🔥 BOT MOVE RECEIVED:", botMove);
+
+            const moveObj = {
+                from: botMove.slice(0, 2),
+                to: botMove.slice(2, 4),
+                promotion: botMove[4] ?? undefined
+            };
+
+            setGame(prev => {
+                const newGame = new Chess(prev.fen());
+                const move = newGame.move(moveObj);
+
+                if (!move) {
+                    console.log("❌ INVALID BOT MOVE:", moveObj);
+                    return prev;
+                }
+
+                setMoveHistory(h => [...h, move.san]);
+                setLastMove({ from: move.from, to: move.to });
+
+
+                checkGameEnd(newGame);
+
+                return newGame;
+            });
+        };
+
+        s.on("connect", () => {
+            console.log("✅ Connected:", s.id);
         });
 
-        socket.current.on("opponent_move", (move) => {
-            console.log("🤖 BOT MOVE:", move);
+        s.on("game_start", (data) => {
+            console.log("🎮 GAME START:", data);
 
-            const newGame = new Chess(game.fen());
-            newGame.move(move);
+            setRoomId(data.roomId);
 
-            setGame(newGame);
-            setMoveHistory(prev => [...prev, move]);
+            const playerIsWhite = data.white !== "bot";
+
+            setHumanColor(playerIsWhite ? "w" : "b");
+            setBotColor(playerIsWhite ? "b" : "w");
+            setBottomColor(playerIsWhite ? "w" : "b");
+
+            setGame(new Chess());
+            setMoveHistory([]);
+            setLastMove(null);
+            setSelectedSquare(null);
+            setLegalMoves([]);
+            setKingInCheck(null);
+            setGameOver(false);
         });
+
+        s.on("opponent_move", onOpponentMove);
 
         return () => {
-            socket.current?.disconnect();
+            s.off("opponent_move", onOpponentMove);
+            s.disconnect();
         };
     }, []);
-
     const botMoveRef = useRef(false);
     const eloToDepth = (elo: number) => {
         switch (elo) {
@@ -126,17 +168,6 @@ export default function Playbot() {
     }
     const [isBotThinking, setIsBotThinking] = useState(false);
 
-    useEffect(() => {
-        const makeBotMoveIfNeeded = async () => {
-            if (game.turn() === botColor && !isBotThinking && game.isGameOver() === false) {
-                setIsBotThinking(true);
-                await new Promise(res => setTimeout(res, 800)); // Warte, Animation/Zeit
-
-                setIsBotThinking(false);
-            }
-        };
-        makeBotMoveIfNeeded();
-    }, [game, botColor]);
 
     const handlePromotion = (pieceType: string) => {
         if (!promotionMove) return;
@@ -182,10 +213,17 @@ export default function Playbot() {
         setPromotionMove(null);
         setMoveHistory([]);
         setLastMove(null);
+
+        setKingInCheck(null);
+        setGameOver(false);
+
     };
     // currentGame: Chess
-    const getKingSquare = (color: "w" | "b") => {
-        const board = game.board(); // 2D Array mit Pieces oder null
+    const getKingSquare = (
+        currentGame: Chess,
+        color: "w" | "b"
+    ) => {
+        const board = currentGame.board(); // 2D Array mit Pieces oder null
         for (let rank = 0; rank < 8; rank++) {
             for (let file = 0; file < 8; file++) {
                 const piece = board[rank][file];
@@ -198,28 +236,47 @@ export default function Playbot() {
         }
         return null;
     };
+
     const checkGameEnd = (currentGame: Chess) => {
+        if (currentGame.isCheck()) {
+            const checkedKing = getKingSquare(
+                currentGame,
+                currentGame.turn()
+            );
+            setKingInCheck(checkedKing);
+        } else {
+            setKingInCheck(null);
+        }
         const showAlert = (title: string, message: string) => {
             setTimeout(() => {
                 Alert.alert(title, message);
-            }, 800); // 0,8 Sekunden warten, damit der letzte Zug sichtbar ist
+            }, 900); // 0,8 Sekunden warten, damit der letzte Zug sichtbar ist
         };
 
 
         if (currentGame.isCheckmate()) {
+
+            setGameOver(true);
+
             const loser = currentGame.turn();
             const winner = loser === "w" ? "b" : "w";
-            const result = winner === humanColor ? "win" : "loss";
+            const result =
+                winner === humanColor ? "win"
+                    : winner === botColor ? "loss"
+                        : "draw";
 
             // Königfeld ermitteln
-            const kingSquare = getKingSquare(loser); // chess.js liefert z.B. "e8"
-            setCheckmate(kingSquare);
+            const kingSquare = getKingSquare(currentGame, loser); // chess.js liefert z.B. "e8"
+            setKingInCheck(kingSquare);
             saveGameToHistory("bot", result);
 
-            showAlert(
-                "Schachmatt",
-                `${winner === "w" ? "Weiß" : "Schwarz"} hat gewonnen`
-            );
+
+            setTimeout(() => {
+                Alert.alert(
+                    "Schachmatt",
+                    `${winner === "w" ? "Weiß" : "Schwarz"} hat gewonnen`
+                );
+            }, 900);
             return true;
         }
         if (currentGame.isStalemate()) {
@@ -433,10 +490,12 @@ export default function Playbot() {
                                                         setSelectedSquare(null);
                                                         setLegalMoves([]);
                                                         checkGameEnd(newGame);
+
+                                                        if (!roomId) return; // Sicherheitshalber
                                                         socket.current?.emit("player_move", {
-                                                            roomId: `bot_${socket.current.id}`,
-                                                            move: move.san,
-                                                            fen: newGame.fen(),
+                                                            roomId: roomId,
+                                                            move: move.from + move.to, // ✅ UCI Format
+                                                            fen: newGame.fen(), // Optional, falls der Server die aktuelle Stellung braucht
                                                         });
 
                                                     }
@@ -445,7 +504,7 @@ export default function Playbot() {
                                                     styles.square,
                                                     {
                                                         backgroundColor:
-                                                            square === checkmate
+                                                            square === kingInCheck
                                                                 ? "#ff3b30"
                                                                 : isLastTo
                                                                     ? "#facc15"       // Ziel-Feld (kräftig)
@@ -564,7 +623,31 @@ export default function Playbot() {
                                         "Dein aktueller Fortschritt geht verloren.",
                                         [
                                             { text: "Nein", style: "cancel" },
-                                            { text: "Ja", onPress: resetGame },
+                                            {
+                                                text: "Ja", onPress: async () => {
+
+                                                    // 1. Server informieren (wichtig!)
+                                                    if (roomId) {
+                                                        socket.current?.emit("resign_game", { roomId });
+                                                    }
+
+                                                    // 2. Lokal resetten
+                                                    setGame(new Chess());
+                                                    setSelectedSquare(null);
+                                                    setLegalMoves([]);
+                                                    setMoveHistory([]);
+                                                    setLastMove(null);
+                                                    setPromotionMove(null);
+                                                    setKingInCheck(null);
+                                                    setGameOver(false);
+
+                                                    // 3. Raum löschen
+                                                    setRoomId(null);
+
+                                                    // 4. zurück zum Startscreen
+                                                    setGameStarted(false);
+                                                }
+                                            },
                                         ]
                                     )
                                 }
