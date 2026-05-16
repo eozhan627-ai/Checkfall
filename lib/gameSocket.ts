@@ -31,7 +31,7 @@ export const onDrawOffer = (cb: () => void, myName: string, myAvatar: string): (
   };
 };
 
-export type GameOverData = { type: "resign" | "draw"; winner?: string };
+export type GameOverData = { type: "resign" | "draw" | "disconnect"; winner?: string };
 
 export const onGameOver = (cb: (data: GameOverData) => void, myName: string, myAvatar: string): (() => void) => {
   const socket = getSocket();

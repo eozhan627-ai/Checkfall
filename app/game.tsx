@@ -149,7 +149,7 @@ export default function GameScreen() {
     // Remis & GameOver Listener
     // =============================
     useEffect(() => {
-        if (!socket || !myName || !myAvatar) return;
+        if (!socket || !myName) return;
 
         const unsubDraw = onDrawOffer(
             () => {
@@ -179,7 +179,12 @@ export default function GameScreen() {
                             : "Du hast aufgegeben. Du verlierst!"
                     );
                 }
-
+                if (data.type === "disconnect") {
+                    Alert.alert(
+                        "Spiel beendet",
+                        "Dein Gegner hat das Spiel verlassen. Du gewinnst automatisch!"
+                    );
+                }
                 if (data.type === "draw") {
                     Alert.alert("Remis", "Remis vereinbart!");
 

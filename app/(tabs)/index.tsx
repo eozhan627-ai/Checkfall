@@ -1,6 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Image,
+  ImageBackground,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { AccountType, getCurrentAccount } from '../../lib/account';
 import { getSocket } from '../../lib/socket';
 
@@ -9,6 +16,7 @@ export default function HomeScreen() {
   const [account, setAccount] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
   const placeholder = require("../../assets/images/knight_black.png"); // Platzhalter-Avatar
+  const backgroundImage = require("../../assets/images/background.png"); // Hintergrundbild
 
   useFocusEffect(
     React.useCallback(() => {
@@ -52,7 +60,10 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ImageBackground
+      source={backgroundImage}
+      style={styles.container}
+      resizeMode="cover">
       <View style={styles.header}>
         <View style={styles.side} />
 
@@ -116,26 +127,26 @@ export default function HomeScreen() {
         <Text style={styles.listBigTitle}>Spiele online</Text>
         <Text style={styles.listBigSub}>Finde einen echten Gegner </Text>
       </TouchableOpacity>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f0f0' },
+  container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 30 },
   side: { width: 36 },
   centerTitle: { flex: 1, alignItems: 'center' },
-  title: { fontSize: 23, fontWeight: 'bold' },
-  subtitle: { fontSize: 16, color: '#666', marginBottom: 20 },
+  title: { fontSize: 23, fontWeight: 'bold', color: '#fff' },
+  subtitle: { fontSize: 16, color: '#d4d4d4', marginBottom: 20 },
   profileBox: { width: 36, height: 36, borderRadius: 6, overflow: 'hidden', backgroundColor: '#ffffff', borderColor: '#000000', borderWidth: 1 },
   avatar: { width: 36, height: 36, borderRadius: 6 },
   lists: { paddingHorizontal: 16, marginTop: 20, gap: 8 },
-  listSmall: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 },
-  listMedium: { backgroundColor: '#fff', borderRadius: 14, paddingTop: 15, padding: 18, marginBottom: 12 },
-  listMiddle: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12 },
-  listBig: { backgroundColor: '#222', borderRadius: 16, padding: 22, marginHorizontal: 16, marginTop: 'auto', marginBottom: 12 },
-  listTitle: { fontSize: 18, fontWeight: '600', color: '#111' },
-  listSub: { fontSize: 14, color: '#666', marginTop: 4 },
+  listSmall: { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 12, padding: 14, marginBottom: 12 },
+  listMedium: { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 14, paddingTop: 15, padding: 18, marginBottom: 12 },
+  listMiddle: { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 14, padding: 16, marginBottom: 12 },
+  listBig: { backgroundColor: 'rgba(34, 34, 34, 0.8)', borderRadius: 16, padding: 22, marginHorizontal: 16, marginTop: 'auto', marginBottom: 12 },
+  listTitle: { fontSize: 18, fontWeight: '600', color: '#fff' },
+  listSub: { fontSize: 14, color: '#fff', marginTop: 4 },
   listBigTitle: { fontSize: 22, fontWeight: '700', color: '#fff' },
   listBigSub: { fontSize: 15, color: '#ccc', marginTop: 6 },
 });
