@@ -5,6 +5,7 @@ import {
     Alert,
     Dimensions,
     Image,
+    ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -18,6 +19,7 @@ import {
     onGameOver
 } from "../lib/gameSocket";
 import { getSocket } from "../lib/socket";
+
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const BOARD_SIZE = Dimensions.get("window").width - 32;
@@ -75,6 +77,7 @@ export default function GameScreen() {
         return require("../assets/images/platzhalter2.png");
     };
     const scrollRef = useRef<ScrollView>(null);
+    const backgroundImage = require("../assets/images/onlinebackground.png");
 
     // =============================
     // Socket initialisieren
@@ -232,171 +235,176 @@ export default function GameScreen() {
     // UI
     // =============================
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
-            {!socket || !myColor ? (
-                <View style={styles.center}>
-                    <Text>Warte auf Verbindung...</Text>
-                </View>
-            ) : (
-                <View style={styles.wrapper}>
-                    <View style={{ width: BOARD_SIZE }}>
-                        {/* Gegner */}
-                        <Pressable
-                            onPress={() =>
-                                router.push({
-                                    pathname: "/profile",
-                                    params: {
-                                        userId: myColor === "w" ? black : white,
-                                        name: opponentName,
-                                        avatar: opponentAvatar,
-                                    },
-                                })
-                            }
-                            style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                marginBottom: 10,
-                            }}
-                        >
-                            <Image
-                                source={getAvatar(opponentAvatar)}
-                                style={{
-                                    width: 36, height: 36, backgroundColor: '#fff',
-                                    borderRadius: 6,
-                                    marginRight: 10,
-                                    borderWidth: 2,
-                                    borderColor: "#fff",
-                                    overflow: 'hidden',
-                                }}
-                                resizeMode="contain"
-                            />
-                            <Text style={{ color: "#fff", fontSize: 16 }}>
-                                {opponentName || "Gegner "}
-                            </Text>
-                        </Pressable>
+        <ImageBackground source={backgroundImage}
+            style={{ flex: 1 }}
+            resizeMode="cover" >
 
-                        {/* Zugleiste */}
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.moveBar}
-                            contentContainerStyle={styles.moveBarContent}
-                            ref={scrollRef}
-                        >
-                            {moveHistory.reduce((rows: any[], move, index) => {
-                                if (index % 2 === 0) {
-                                    rows.push({ moveNumber: index / 2 + 1, white: move, black: "" });
-                                } else {
-                                    rows[rows.length - 1].black = move;
-                                }
-                                return rows;
-                            }, []).map((row, index) => (
-                                <Text key={index} style={styles.moveChip}>
-                                    {row.moveNumber}. {row.white} {row.black}
-                                </Text>
-                            ))}
-                        </ScrollView>
-
-                        {/* BOARD */}
-                        <View style={styles.board}>
-                            {displayBoard.map((row, displayRow) => {
-                                const realRow = myColor === "w" ? displayRow : 7 - displayRow;
-
-                                return row.map((piece, col) => {
-                                    const square = toSquare(realRow, col);
-                                    const isDark = (realRow + col) % 2 === 1;
-
-                                    const legal = legalMoves.find(m => m.to === square);
-                                    const isCapture = !!legal?.captured;
-
-                                    const isLastFrom = lastMove?.from === square;
-                                    const isLastTo = lastMove?.to === square;
-                                    const pieceKey = pieceToKey(piece);
-
-                                    return (
-                                        <Pressable
-                                            key={square}
-                                            disabled={gameEnded}
-                                            onPress={() => {
-                                                if (game.turn() !== myColor) return;
-
-                                                if (piece && !legal) {
-                                                    setSelected(square);
-                                                    setLegalMoves(game.moves({ square: square as any, verbose: true }));
-                                                    return;
-                                                }
-
-                                                if (selected && legal) {
-                                                    const newGame = new Chess(game.fen());
-                                                    const move = newGame.move({ from: selected, to: square });
-                                                    if (!move) return;
-
-                                                    setGame(newGame);
-                                                    setMoveHistory(h => [...h, move.san]);
-                                                    setLastMove({ from: move.from, to: move.to });
-                                                    setSelected(null);
-                                                    setLegalMoves([]);
-
-                                                    checkGameState(newGame);
-
-                                                    socket?.emit("player_move", {
-                                                        roomId,
-                                                        move: { from: move.from, to: move.to },
-                                                    });
-                                                }
-                                            }}
-                                            style={[
-                                                styles.square,
-                                                {
-                                                    backgroundColor: isLastTo || isLastFrom ? "#2d7ea4" : isDark
-                                                        ? "#769656"
-                                                        : "#eeeed2",
-                                                    borderWidth: selected === square ? 2 : 0,
-                                                    borderColor: "#ac442c",
-                                                },
-                                            ]}
-                                        >
-                                            {pieceKey && <Image source={pieces[pieceKey]} style={styles.piece} />}
-                                            {legal && !isCapture && <View style={styles.moveDot} />}
-                                            {legal && isCapture && <View style={styles.captureRing} />}
-                                        </Pressable>
-                                    );
-                                });
-                            })}
-                        </View>
-
-                        {/* Bottom */}
-                        <View style={styles.bottomBar}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
+                {!socket || !myColor ? (
+                    <View style={styles.center}>
+                        <Text>Warte auf Verbindung...</Text>
+                    </View>
+                ) : (
+                    <View style={styles.wrapper}>
+                        <View style={{ width: BOARD_SIZE }}>
+                            {/* Gegner */}
                             <Pressable
-                                disabled={gameEnded}
                                 onPress={() =>
-                                    Alert.alert("Aufgeben?", "Möchtest du wirklich aufgeben?", [
-                                        { text: "Nein", style: "cancel" },
-                                        { text: "Ja", onPress: () => socket?.emit("resign_game") }
-                                    ])
+                                    router.push({
+                                        pathname: "/profile",
+                                        params: {
+                                            userId: myColor === "w" ? black : white,
+                                            name: opponentName,
+                                            avatar: opponentAvatar,
+                                        },
+                                    })
                                 }
-                            >
-                                <Text style={styles.bottomBtn}>Aufgeben </Text>
-                            </Pressable>
-
-                            <Pressable
-                                disabled={gameEnded}
-                                onPress={() => {
-                                    socket?.emit("offer_draw", { roomId });
-                                    Alert.alert("Remis angeboten");
+                                style={{
+                                    flexDirection: "row",
+                                    alignItems: "center",
+                                    marginBottom: 10,
                                 }}
                             >
-                                <Text style={styles.bottomBtn}>Remis </Text>
+                                <Image
+                                    source={getAvatar(opponentAvatar)}
+                                    style={{
+                                        width: 36, height: 36, backgroundColor: '#fff',
+                                        borderRadius: 6,
+                                        marginRight: 10,
+                                        borderWidth: 2,
+                                        borderColor: "#fff",
+                                        overflow: 'hidden',
+                                    }}
+                                    resizeMode="contain"
+                                />
+                                <Text style={{ color: "#fff", fontSize: 16 }}>
+                                    {opponentName || "Gegner "}
+                                </Text>
                             </Pressable>
 
-                            <Pressable onPress={() => Alert.alert("Chat kommt später")}>
-                                <Text style={styles.bottomBtn}>Chat </Text>
-                            </Pressable>
+                            {/* Zugleiste */}
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.moveBar}
+                                contentContainerStyle={styles.moveBarContent}
+                                ref={scrollRef}
+                            >
+                                {moveHistory.reduce((rows: any[], move, index) => {
+                                    if (index % 2 === 0) {
+                                        rows.push({ moveNumber: index / 2 + 1, white: move, black: "" });
+                                    } else {
+                                        rows[rows.length - 1].black = move;
+                                    }
+                                    return rows;
+                                }, []).map((row, index) => (
+                                    <Text key={index} style={styles.moveChip}>
+                                        {row.moveNumber}. {row.white} {row.black}
+                                    </Text>
+                                ))}
+                            </ScrollView>
+
+                            {/* BOARD */}
+                            <View style={styles.board}>
+                                {displayBoard.map((row, displayRow) => {
+                                    const realRow = myColor === "w" ? displayRow : 7 - displayRow;
+
+                                    return row.map((piece, col) => {
+                                        const square = toSquare(realRow, col);
+                                        const isDark = (realRow + col) % 2 === 1;
+
+                                        const legal = legalMoves.find(m => m.to === square);
+                                        const isCapture = !!legal?.captured;
+
+                                        const isLastFrom = lastMove?.from === square;
+                                        const isLastTo = lastMove?.to === square;
+                                        const pieceKey = pieceToKey(piece);
+
+                                        return (
+                                            <Pressable
+                                                key={square}
+                                                disabled={gameEnded}
+                                                onPress={() => {
+                                                    if (game.turn() !== myColor) return;
+
+                                                    if (piece && !legal) {
+                                                        setSelected(square);
+                                                        setLegalMoves(game.moves({ square: square as any, verbose: true }));
+                                                        return;
+                                                    }
+
+                                                    if (selected && legal) {
+                                                        const newGame = new Chess(game.fen());
+                                                        const move = newGame.move({ from: selected, to: square });
+                                                        if (!move) return;
+
+                                                        setGame(newGame);
+                                                        setMoveHistory(h => [...h, move.san]);
+                                                        setLastMove({ from: move.from, to: move.to });
+                                                        setSelected(null);
+                                                        setLegalMoves([]);
+
+                                                        checkGameState(newGame);
+
+                                                        socket?.emit("player_move", {
+                                                            roomId,
+                                                            move: { from: move.from, to: move.to },
+                                                        });
+                                                    }
+                                                }}
+                                                style={[
+                                                    styles.square,
+                                                    {
+                                                        backgroundColor: isLastTo || isLastFrom ? "#2d7ea4" : isDark
+                                                            ? "#769656"
+                                                            : "#eeeed2",
+                                                        borderWidth: selected === square ? 2 : 0,
+                                                        borderColor: "#ac442c",
+                                                    },
+                                                ]}
+                                            >
+                                                {pieceKey && <Image source={pieces[pieceKey]} style={styles.piece} />}
+                                                {legal && !isCapture && <View style={styles.moveDot} />}
+                                                {legal && isCapture && <View style={styles.captureRing} />}
+                                            </Pressable>
+                                        );
+                                    });
+                                })}
+                            </View>
+
+                            {/* Bottom */}
+                            <View style={styles.bottomBar}>
+                                <Pressable
+                                    disabled={gameEnded}
+                                    onPress={() =>
+                                        Alert.alert("Aufgeben?", "Möchtest du wirklich aufgeben?", [
+                                            { text: "Nein", style: "cancel" },
+                                            { text: "Ja", onPress: () => socket?.emit("resign_game") }
+                                        ])
+                                    }
+                                >
+                                    <Text style={styles.bottomBtn}>Aufgeben </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    disabled={gameEnded}
+                                    onPress={() => {
+                                        socket?.emit("offer_draw", { roomId });
+                                        Alert.alert("Remis angeboten");
+                                    }}
+                                >
+                                    <Text style={styles.bottomBtn}>Remis </Text>
+                                </Pressable>
+
+                                <Pressable onPress={() => Alert.alert("Chat kommt später")}>
+                                    <Text style={styles.bottomBtn}>Chat </Text>
+                                </Pressable>
+                            </View>
                         </View>
                     </View>
-                </View>
-            )}
-        </SafeAreaView>
+                )}
+            </SafeAreaView>
+        </ImageBackground>
     );
 }
 

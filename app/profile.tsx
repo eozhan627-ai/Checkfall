@@ -1,7 +1,16 @@
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+    Alert,
+    Image,
+    ImageBackground,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from "react-native";
 import { AccountType, getCurrentAccount, updateAccount } from "../lib/account";
 
 export default function Profile() {
@@ -11,6 +20,7 @@ export default function Profile() {
     const [loading, setLoading] = useState(true);
 
     const placeholder = require("../assets/images/knight_black.png");
+    const backgroundImage = require("../assets/images/background.png");
 
     const params = useLocalSearchParams();
     const externalName = params.name as string | undefined;
@@ -116,7 +126,10 @@ export default function Profile() {
             : null;
 
     return (
-        <View style={styles.container}>
+        <ImageBackground
+         source={backgroundImage}
+         style={styles.container}
+         resizeMode="cover">
             <TouchableOpacity onPress={!isForeignProfile ? changeAvatar : undefined}>
                 <Image
                     source={displayedAvatar ? { uri: displayedAvatar } : placeholder}
@@ -146,12 +159,12 @@ export default function Profile() {
                     </TouchableOpacity>
                 )}
             </View>
-        </View>
+        </ImageBackground>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
+    container: { flex: 1, alignItems: "center", padding: 20, paddingTop: 60 },
     center: { flex: 1, justifyContent: "center", alignItems: "center" },
     avatar: { width: 120, height: 120, borderRadius: 60, marginBottom: 20, backgroundColor: "#ddd" },
     nameContainer: { flexDirection: "row", alignItems: "center" },
