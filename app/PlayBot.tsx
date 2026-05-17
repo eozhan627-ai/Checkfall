@@ -6,6 +6,7 @@ import {
     Alert,
     Dimensions,
     Image,
+    ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -73,6 +74,9 @@ export default function Playbot() {
     const board = game.board();
     const [kingInCheck, setKingInCheck] = useState<string | null>(null);
     const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+
+    const backgroundImage = require("../assets/images/onlinebackground.png"); // Hintergrundbild
+
     const [roomId, setRoomId] = useState<string | null>(null);
     const params = useLocalSearchParams();
     type SavedData = {
@@ -86,6 +90,7 @@ export default function Playbot() {
     const [savedData, setSavedData] = useState<SavedData | null>(null);
     const displayBoard =
         bottomColor === "w" ? board : [...board].reverse().map(row => [...row].reverse());
+
 
 
     useEffect(() => {
@@ -330,23 +335,52 @@ export default function Playbot() {
 
 
     return (
-        <View style={{ flex: 1, backgroundColor: '#111827' }} >
+        <ImageBackground source={backgroundImage}
+            style={{ flex: 1 }}
+            resizeMode="cover" >
             {!gameStarted ? (
-                <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
+                <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
                     <Text style={{ color: "#fff", fontSize: 20, marginBottom: 16 }}>Spiel starten gegen Bot  </Text>
-                    <View style={{ flexDirection: "row", marginBottom: 16 }}>
+                    <View
+                        style={{
+                            flexDirection: "row",
+                            justifyContent: "center",
+                            marginBottom: 18,
+                            gap: 10,
+                        }}
+                    >
                         {["w", "b", "random"].map((c) => (
                             <Pressable
                                 key={c}
                                 onPress={() => setPlayerColor(c as any)}
                                 style={{
-                                    marginHorizontal: 6,
-                                    padding: 10,
-                                    borderRadius: 6,
-                                    backgroundColor: playerColor === c ? "#f6f6f6" : "#555",
+                                    paddingVertical: 12,
+                                    paddingHorizontal: 18,
+                                    borderRadius: 10,
+                                    backgroundColor:
+                                        playerColor === c
+                                            ? "rgba(255,215,0,0.18)"
+                                            : "rgba(255,255,255,0.08)",
+                                    borderWidth: 1,
+                                    borderColor:
+                                        playerColor === c
+                                            ? "#FFD700"
+                                            : "rgba(255,255,255,0.15)",
                                 }}
                             >
-                                <Text>{c === "w" ? "Weiß " : c === "b" ? "Schwarz " : "Zufällig "}</Text>
+                                <Text
+                                    style={{
+                                        color: "#fff",
+                                        fontSize: 15,
+                                        fontWeight: "600",
+                                    }}
+                                >
+                                    {c === "w"
+                                        ? "Weiß"
+                                        : c === "b"
+                                            ? "Schwarz"
+                                            : "Zufällig"}
+                                </Text>
                             </Pressable>
                         ))}
                     </View>
@@ -356,13 +390,36 @@ export default function Playbot() {
                                 key={level}
                                 onPress={() => setBotElo(level)}
                                 style={{
-                                    margin: 4,
-                                    padding: 8,
-                                    borderRadius: 6,
-                                    backgroundColor: botElo === level ? "#f6f6f6" : "#555",
+                                    margin: 6,
+                                    paddingVertical: 12,
+                                    paddingHorizontal: 18,
+                                    borderRadius: 12,
+                                    backgroundColor:
+                                        botElo === level
+                                            ? "rgba(255,215,0,0.18)"
+                                            : "rgba(255,255,255,0.08)",
+                                    borderWidth: 1.2,
+                                    borderColor:
+                                        botElo === level
+                                            ? "#FFD700"
+                                            : "rgba(255,255,255,0.15)",
                                 }}
                             >
-                                <Text style={{ fontSize: 12 }}>{level}</Text>
+                                <Text
+                                    style={{
+                                        color: "#fff",
+                                        fontSize: 14,
+                                        fontWeight: botElo === level ? "700" : "500",
+                                    }}
+                                >
+                                    {level === 100
+                                        ? "Beginner • 100"
+                                        : level === 300
+                                            ? "Casual • 300"
+                                            : level === 500
+                                                ? "Strong • 500"
+                                                : "Expert • 1000"}
+                                </Text>
                             </Pressable>
                         ))}
                     </View>
@@ -393,14 +450,33 @@ export default function Playbot() {
                                 name: "Player",
                                 avatar: "",
                                 level: botElo,
+                                playerColor: playerColor === "random" ? null : playerColor,
                                 startFEN: "startpos"
                             });
 
 
                         }}
-                        style={{ padding: 12, backgroundColor: "#f6f6f6", borderRadius: 8 }}
+                        style={{
+                            marginTop: 12,
+                            paddingVertical: 14,
+                            paddingHorizontal: 28,
+                            borderRadius: 10,
+                            backgroundColor: "rgba(255,215,0,0.18)",
+                            borderWidth: 1,
+                            borderColor: "#FFD700",
+                            shadowColor: "#000",
+                            shadowOpacity: 0.25,
+                            shadowRadius: 6,
+                            shadowOffset: { width: 0, height: 3 },
+                        }}
                     >
-                        <Text>Spiel starten </Text>
+                        <Text style={{
+                            color: "#fff",
+                            fontSize: 16,
+                            fontWeight: "700",
+                        }}>
+                            Spiel starten
+                        </Text>
                     </Pressable>
                 </View>
             ) : (
@@ -660,7 +736,7 @@ export default function Playbot() {
                 </View>
             )
             }
-        </View >
+        </ImageBackground>
     );
 }
 const styles = StyleSheet.create({

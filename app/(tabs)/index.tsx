@@ -69,7 +69,7 @@ export default function HomeScreen() {
 
         <View style={styles.centerTitle}>
           <Text style={styles.title}>Checkfall</Text>
-          <Text style={styles.subtitle}>Play.Learn.Improve </Text>
+          <Text style={styles.subtitle}>Play.Learn.Improve. </Text>
         </View>
 
         <TouchableOpacity
@@ -87,7 +87,7 @@ export default function HomeScreen() {
       <View style={styles.lists}>
         <TouchableOpacity style={styles.listSmall} onPress={() => router.push('/ComingSoon')}>
           <Text style={styles.listTitle}>Daily Puzzle</Text>
-          <Text style={styles.listSub}>Löse ein Puzzle</Text>
+          <Text style={styles.listSub}>Lös ein Puzzle</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.listMedium} onPress={() => router.push('/PlayBot')}>

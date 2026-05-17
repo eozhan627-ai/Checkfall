@@ -10,7 +10,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    View,
+    View
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -54,6 +54,7 @@ export default function Board() {
         ? JSON.parse(params.savedData as string)
         : null;
     const [game, setGame] = useState(() => new Chess());
+    const backgroundImage = require("../assets/images/background.png"); // Hintergrundbild
 
     const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<any[]>([]);
