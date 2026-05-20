@@ -6,6 +6,7 @@ import {
     Alert,
     Dimensions,
     Image,
+    ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -54,7 +55,7 @@ export default function Board() {
         ? JSON.parse(params.savedData as string)
         : null;
     const [game, setGame] = useState(() => new Chess());
-    const backgroundImage = require("../assets/images/background.png"); // Hintergrundbild
+    const backgroundImage = require("../assets/images/onlinebackground.png"); // Hintergrundbild
 
     const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<any[]>([]);
@@ -296,9 +297,24 @@ export default function Board() {
     };
 
 
-    return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#111827' }} edges={['top', 'left', 'right']}>
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+   return (
+    <ImageBackground
+        source={backgroundImage}
+        style={{ flex: 1,  }}
+        resizeMode="cover"
+    >
+        <SafeAreaView
+            style={{ flex: 1, backgroundColor: 'transparent' }}
+            edges={['top', 'left', 'right']}
+        >
+            <View
+                style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: 'transparent',
+                }}
+            >
                 <View style={{ width: BOARD_SIZE }}>
 
                     {/* Zugleiste oben */}
@@ -552,6 +568,7 @@ export default function Board() {
                 </View>
             </View>
         </SafeAreaView>
+        </ImageBackground>
     );
 }
 

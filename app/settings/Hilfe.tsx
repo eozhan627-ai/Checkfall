@@ -16,8 +16,8 @@ export default function Hilfe() {
             {/* 🔹 Spielen */}
             <Text style={styles.sectionTitle}>Spielen</Text>
             <Text style={styles.text}>
-                • Du kannst lokal gegen dich selbst oder einen Bot spielen.
-                {"\n"}• Online-Spiele sind aktuell noch nicht verfügbar.
+                • Du kannst lokal gegen einen anderen Spieler oder einen Bot spielen.
+                {"\n"}• Online-Spiele sind ebenfalls verfügbar.
             </Text>
 
 

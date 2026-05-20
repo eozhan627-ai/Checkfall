@@ -1,10 +1,15 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function MoreScreen() {
+    const backgroundImage = require('../../assets/images/menubackground.png');
     return (
-        <View style={styles.container}>
+        <ImageBackground
+            source={backgroundImage}
+            style={styles.container}
+            resizeMode="cover"
+        >
             <View style={styles.lists}>
                 <TouchableOpacity
                     style={styles.list}
@@ -42,42 +47,40 @@ export default function MoreScreen() {
 
             </View>
 
-        </View>
+        </ImageBackground>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f0f0f0',
+
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingTop: 30,
-    },
+
 
     lists: {
         paddingHorizontal: 16,
-        marginTop: 20,
+        marginTop: 45,
         gap: 12,
+
     },
 
     listTitle: {
         fontSize: 18,
         fontWeight: '600',
-        color: '#111',
+        color: '#fff',
     },
     list: {
-        backgroundColor: '#fff',
+        backgroundColor: 'rgba(255,255,255,0.08)',
         borderRadius: 14,
-        paddingTop: 15,
         padding: 18,
         marginBottom: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
     },
     title: {
         fontSize: 23,
         fontWeight: 'bold',
+
     },
 }); 

@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     footer: {
         marginTop: 20,
         fontSize: 14,
-        color: "#555",
+     
     },
 
 });
