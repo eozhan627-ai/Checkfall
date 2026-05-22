@@ -22,8 +22,7 @@ export async function saveAccount(data: { username: string; guest: boolean }): P
     await AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 
     // direkt als aktueller Account setzen
-    await AsyncStorage.setItem(CURRENT_KEY, newAccount.id);
-
+    await AsyncStorage.setItem(CURRENT_KEY, JSON.stringify(newAccount.id));
     return newAccount;
 }
 
@@ -38,17 +37,20 @@ export async function getAccountById(id: string): Promise<AccountType | null> {
 }
 
 export async function getCurrentAccount(): Promise<AccountType | null> {
-    const currentId = await AsyncStorage.getItem(CURRENT_KEY);
-    if (!currentId) return null;
-    return getAccountById(currentId);
+    const stored = await AsyncStorage.getItem(CURRENT_KEY);
+    if (!stored) return null;
+    return JSON.parse(stored);
 }
-
-export async function updateAccount(id: string, data: Partial<{ username: string,  avatar?:string }>) {
+export async function updateAccount(id: string, data: Partial<{ username: string, avatar?: string }>) {
     const accounts = await getAccounts();
     const idx = accounts.findIndex(a => a.id === id);
     if (idx === -1) return null;
 
-    accounts[idx] = { ...accounts[idx], ...data };
+    const updated = { ...accounts[idx], ...data };
+    accounts[idx] = updated;
+
     await AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-    return accounts[idx];
+    await AsyncStorage.setItem(CURRENT_KEY, JSON.stringify(updated));
+
+    return updated;
 }

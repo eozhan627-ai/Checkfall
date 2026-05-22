@@ -297,277 +297,277 @@ export default function Board() {
     };
 
 
-   return (
-    <ImageBackground
-        source={backgroundImage}
-        style={{ flex: 1,  }}
-        resizeMode="cover"
-    >
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: 'transparent' }}
-            edges={['top', 'left', 'right']}
+    return (
+        <ImageBackground
+            source={backgroundImage}
+            style={{ flex: 1, }}
+            resizeMode="cover"
         >
-            <View
-                style={{
-                    flex: 1,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: 'transparent',
-                }}
+            <SafeAreaView
+                style={{ flex: 1, backgroundColor: 'transparent' }}
+                edges={['top', 'left', 'right']}
             >
-                <View style={{ width: BOARD_SIZE }}>
+                <View
+                    style={{
+                        flex: 1,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'transparent',
+                    }}
+                >
+                    <View style={{ width: BOARD_SIZE }}>
 
-                    {/* Zugleiste oben */}
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.moveBar}
-                        contentContainerStyle={styles.moveBarContent}
-                        ref={scrollRef}
-                    >
-                        {moveHistory.reduce((rows: any[], move, index) => {
-                            if (index % 2 === 0) {
-                                rows.push({ moveNumber: index / 2 + 1, white: move, black: "" });
-                            } else {
-                                rows[rows.length - 1].black = move;
-                            }
-                            return rows;
-                        }, []).map((row, index) => (
-                            <Text key={index} style={styles.moveChip}>
-                                {row.moveNumber}. {row.white} {row.black}
-                            </Text>
-                        ))}
-                    </ScrollView>
-
-                    {/* Promotion-Bar */}
-                    {promotionMove && (
-                        <View style={styles.promotionBar}>
-                            {[
-                                { label: "Q", value: "q" },
-                                { label: "R", value: "r" },
-                                { label: "N", value: "n" },
-                                { label: "B", value: "b" },
-                            ].map(p => (
-                                <Pressable
-                                    key={p.value}
-                                    style={styles.promotionBtn}
-                                    onPress={() => handlePromotion(p.value)}
-                                >
-                                    <Text>{p.label}</Text>
-                                </Pressable>
+                        {/* Zugleiste oben */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.moveBar}
+                            contentContainerStyle={styles.moveBarContent}
+                            ref={scrollRef}
+                        >
+                            {moveHistory.reduce((rows: any[], move, index) => {
+                                if (index % 2 === 0) {
+                                    rows.push({ moveNumber: index / 2 + 1, white: move, black: "" });
+                                } else {
+                                    rows[rows.length - 1].black = move;
+                                }
+                                return rows;
+                            }, []).map((row, index) => (
+                                <Text key={index} style={styles.moveChip}>
+                                    {row.moveNumber}. {row.white} {row.black}
+                                </Text>
                             ))}
-                        </View>
-                    )}
+                        </ScrollView>
 
-                    <View style={styles.board}>
-                        {displayBoard.map((row, displayRowIndex) => {
-                            const actualRowIndex = bottomColor === "w" ? displayRowIndex : 7 - displayRowIndex;
+                        {/* Promotion-Bar */}
+                        {promotionMove && (
+                            <View style={styles.promotionBar}>
+                                {[
+                                    { label: "Q", value: "q" },
+                                    { label: "R", value: "r" },
+                                    { label: "N", value: "n" },
+                                    { label: "B", value: "b" },
+                                ].map(p => (
+                                    <Pressable
+                                        key={p.value}
+                                        style={styles.promotionBtn}
+                                        onPress={() => handlePromotion(p.value)}
+                                    >
+                                        <Text>{p.label}</Text>
+                                    </Pressable>
+                                ))}
+                            </View>
+                        )}
 
-                            return (
-                                <React.Fragment key={displayRowIndex}>
-                                    {row.map((piece, colIndex) => {
-                                        const isBottomRank = bottomColor === "w" ? actualRowIndex === 7 : actualRowIndex === 0;
-                                        const isLeftFile = bottomColor === "w" ? colIndex === 0 : colIndex === 7;
+                        <View style={styles.board}>
+                            {displayBoard.map((row, displayRowIndex) => {
+                                const actualRowIndex = bottomColor === "w" ? displayRowIndex : 7 - displayRowIndex;
 
-                                        const fileLabel = FILES[colIndex];
-                                        const rankLabel = bottomColor === "w"
-                                            ? RANKS[actualRowIndex]
-                                            : (8 - actualRowIndex).toString();
+                                return (
+                                    <React.Fragment key={displayRowIndex}>
+                                        {row.map((piece, colIndex) => {
+                                            const isBottomRank = bottomColor === "w" ? actualRowIndex === 7 : actualRowIndex === 0;
+                                            const isLeftFile = bottomColor === "w" ? colIndex === 0 : colIndex === 7;
 
-                                        const square = toChessSquare(actualRowIndex, colIndex);
-                                        const isDark = (actualRowIndex + colIndex) % 2 === 1;
-                                        const isSelected = selectedSquare === square;
-                                        const legalMove = legalMoves.find(m => m.to === square);
-                                        const isLegalMove = !!legalMove;
-                                        const isCapture = !!legalMove?.captured;
-                                        const pieceKey = pieceToKey(piece);
-                                        const isLastFrom = lastMove?.from === square;
-                                        const isLastTo = lastMove?.to === square;
+                                            const fileLabel = FILES[colIndex];
+                                            const rankLabel = bottomColor === "w"
+                                                ? RANKS[actualRowIndex]
+                                                : (8 - actualRowIndex).toString();
 
-                                        return (
-                                            <Pressable
-                                                key={square}
-                                                onPress={() => {
-                                                    if (piece && !isLegalMove) {
-                                                        setSelectedSquare(square);
-                                                        setLegalMoves(game.moves({ square: square as any, verbose: true }));
-                                                        return;
-                                                    }
+                                            const square = toChessSquare(actualRowIndex, colIndex);
+                                            const isDark = (actualRowIndex + colIndex) % 2 === 1;
+                                            const isSelected = selectedSquare === square;
+                                            const legalMove = legalMoves.find(m => m.to === square);
+                                            const isLegalMove = !!legalMove;
+                                            const isCapture = !!legalMove?.captured;
+                                            const pieceKey = pieceToKey(piece);
+                                            const isLastFrom = lastMove?.from === square;
+                                            const isLastTo = lastMove?.to === square;
 
-                                                    if (selectedSquare && isLegalMove) {
-                                                        if (legalMove.piece === "p" && (square[1] === "8" || square[1] === "1")) {
-                                                            setPromotionMove({ from: selectedSquare, to: square });
+                                            return (
+                                                <Pressable
+                                                    key={square}
+                                                    onPress={() => {
+                                                        if (piece && !isLegalMove) {
+                                                            setSelectedSquare(square);
+                                                            setLegalMoves(game.moves({ square: square as any, verbose: true }));
                                                             return;
                                                         }
 
-                                                        const newGame = new Chess(game.fen());
-                                                        const move = newGame.move({ from: selectedSquare as any, to: square as any });
-                                                        if (!move) return;
+                                                        if (selectedSquare && isLegalMove) {
+                                                            if (legalMove.piece === "p" && (square[1] === "8" || square[1] === "1")) {
+                                                                setPromotionMove({ from: selectedSquare, to: square });
+                                                                return;
+                                                            }
 
-                                                        setGame(newGame);
-                                                        setMoveHistory(prev => [...prev, move.san]);
-                                                        setLastMove({ from: move.from, to: move.to })
-                                                        setSelectedSquare(null);
-                                                        setLegalMoves([]);
-                                                        setBottomColor(c => (c === "w" ? "b" : "w"));
-                                                        // Alte undoneMoves löschen, falls man nach Undo einen neuen Zug macht
-                                                        moveStack.current = moveStack.current.slice(0, moveIndex);
+                                                            const newGame = new Chess(game.fen());
+                                                            const move = newGame.move({ from: selectedSquare as any, to: square as any });
+                                                            if (!move) return;
 
-                                                        // Neuen Zug hinzufügen
-                                                        moveStack.current.push(move);
-                                                        setMoveIndex(moveStack.current.length);
-                                                        checkGameEndLocal(newGame);
-                                                    }
-                                                }}
-                                                style={[
-                                                    styles.square,
-                                                    {
-                                                        backgroundColor:
-                                                            square === checkmate
-                                                                ? "#ff3b30"
-                                                                : isLastTo
-                                                                    ? "#2d7ea4"       // Ziel-Feld (kräftig)
-                                                                    : isLastFrom
-                                                                        ? "#2d7ea4"      // Start-Feld (heller)
-                                                                        : isDark
-                                                                            ? "#769656"
-                                                                            : "#eeeed2",
-                                                        borderWidth: isSelected ? 2 : 0,
-                                                        borderColor: isSelected ? "#ac442c" : "transparent",
-                                                    },
-                                                ]}
-                                            >
-                                                {pieceKey && (
-                                                    <Image
-                                                        source={pieces[pieceKey]}
-                                                        style={[
-                                                            styles.piece,
+                                                            setGame(newGame);
+                                                            setMoveHistory(prev => [...prev, move.san]);
+                                                            setLastMove({ from: move.from, to: move.to })
+                                                            setSelectedSquare(null);
+                                                            setLegalMoves([]);
+                                                            setBottomColor(c => (c === "w" ? "b" : "w"));
+                                                            // Alte undoneMoves löschen, falls man nach Undo einen neuen Zug macht
+                                                            moveStack.current = moveStack.current.slice(0, moveIndex);
 
-                                                            // schwarze Bauern extra vergrößern
-                                                            pieceKey === "bp" && {
-                                                                transform: [{ scale: 1.4 }, { translateY: 3.25 }, { translateX: -1 }]
-                                                            },
-
-                                                            // alle anderen schwarzen Figuren normal vergrößern
-                                                            pieceKey?.startsWith("b") && pieceKey !== "bp" && {
-                                                                transform: [{ scale: 1.12 }],
-                                                            },
-
-                                                            // weiße Läufer, Dame und König vergrößern
-                                                            (pieceKey === "wb" || pieceKey === "wq" || pieceKey === "wk") && {
-                                                                transform: [{ scale: 1.12 }],
-                                                            },
-                                                            pieceKey === "wp" && {
-                                                                transform: [{ scale: 0.9 },]
-                                                            },
-
-
-                                                        ]}
-                                                    />
-                                                )}
-                                                {isLegalMove && !isCapture && <View style={styles.moveDot} />}
-                                                {isLegalMove && isCapture && <View style={styles.captureRing} />}
-
-                                                {/* Zahlen links */}
-                                                {colIndex === 0 && (
-                                                    <Text style={[
-                                                        styles.coord, {
-                                                            left: 2,
-                                                            top: bottomColor === 'w' ? undefined : 2, bottom: bottomColor === 'w' ? 2 : undefined
+                                                            // Neuen Zug hinzufügen
+                                                            moveStack.current.push(move);
+                                                            setMoveIndex(moveStack.current.length);
+                                                            checkGameEndLocal(newGame);
+                                                        }
+                                                    }}
+                                                    style={[
+                                                        styles.square,
+                                                        {
+                                                            backgroundColor:
+                                                                square === checkmate
+                                                                    ? "#ff3b30"
+                                                                    : isLastTo
+                                                                        ? "#2d7ea4"       // Ziel-Feld (kräftig)
+                                                                        : isLastFrom
+                                                                            ? "#2d7ea4"      // Start-Feld (heller)
+                                                                            : isDark
+                                                                                ? "#769656"
+                                                                                : "#d8cdb4",
+                                                            borderWidth: isSelected ? 2 : 0,
+                                                            borderColor: isSelected ? "#ac442c" : "transparent",
                                                         },
-                                                        { color: isDark ? "#e5e7eb" : "#334155" }]}>
-                                                        {rankLabel}
-                                                    </Text>
-                                                )}
+                                                    ]}
+                                                >
+                                                    {pieceKey && (
+                                                        <Image
+                                                            source={pieces[pieceKey]}
+                                                            style={[
+                                                                styles.piece,
 
-                                                {/* Buchstaben unten */}
-                                                {displayRowIndex === 7 && (
-                                                    <Text style={[
-                                                        styles.coord, { right: 2, bottom: 2 },
-                                                        { color: isDark ? "#e5e7eb" : "#334155" }]}>
-                                                        {fileLabel}
-                                                    </Text>
-                                                )}
-                                            </Pressable>
-                                        );
-                                    })}
-                                </React.Fragment>
-                            );
-                        })}
-                    </View>
+                                                                // schwarze Bauern extra vergrößern
+                                                                pieceKey === "bp" && {
+                                                                    transform: [{ scale: 1.4 }, { translateY: 3.25 }, { translateX: -1 }]
+                                                                },
 
-                    {/* Bottom-Bar */}
-                    <View style={styles.bottomBar}>
-                        {/* Zurück zur Startseite */}
-                        <Pressable
-                            onPress={() =>
-                                Alert.alert("Zurück zur Startseite?", "", [
-                                    { text: "Nein", style: "cancel" },
-                                    { text: "Ja", onPress: () => router.push('/') }, // zurück zur Startseite
-                                ])
-                            }
-                        >
-                            <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Zurück </Text>
-                        </Pressable>
+                                                                // alle anderen schwarzen Figuren normal vergrößern
+                                                                pieceKey?.startsWith("b") && pieceKey !== "bp" && {
+                                                                    transform: [{ scale: 1.12 }],
+                                                                },
 
-                        {/* Speichern */}
-                        <Pressable
-                            onPress={async () => {
-                                try {
-                                    await saveGame(); // bestehende Funktion verwenden
-                                    Alert.alert("Spiel gespeichert", "Dein Spiel wurde gespeichert. Du kannst es in gespeicherte Spiele aufrufen.");
-                                } catch (e) {
-                                    console.log("Fehler beim Speichern:", e);
+                                                                // weiße Läufer, Dame und König vergrößern
+                                                                (pieceKey === "wb" || pieceKey === "wq" || pieceKey === "wk") && {
+                                                                    transform: [{ scale: 1.12 }],
+                                                                },
+                                                                pieceKey === "wp" && {
+                                                                    transform: [{ scale: 0.9 },]
+                                                                },
+
+
+                                                            ]}
+                                                        />
+                                                    )}
+                                                    {isLegalMove && !isCapture && <View style={styles.moveDot} />}
+                                                    {isLegalMove && isCapture && <View style={styles.captureRing} />}
+
+                                                    {/* Zahlen links */}
+                                                    {colIndex === 0 && (
+                                                        <Text style={[
+                                                            styles.coord, {
+                                                                left: 2,
+                                                                top: bottomColor === 'w' ? undefined : 2, bottom: bottomColor === 'w' ? 2 : undefined
+                                                            },
+                                                            { color: isDark ? "#e5e7eb" : "#334155" }]}>
+                                                            {rankLabel}
+                                                        </Text>
+                                                    )}
+
+                                                    {/* Buchstaben unten */}
+                                                    {displayRowIndex === 7 && (
+                                                        <Text style={[
+                                                            styles.coord, { right: 2, bottom: 2 },
+                                                            { color: isDark ? "#e5e7eb" : "#334155" }]}>
+                                                            {fileLabel}
+                                                        </Text>
+                                                    )}
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </View>
+
+                        {/* Bottom-Bar */}
+                        <View style={styles.bottomBar}>
+                            {/* Zurück zur Startseite */}
+                            <Pressable
+                                onPress={() =>
+                                    Alert.alert("Zurück zur Startseite?", "", [
+                                        { text: "Nein", style: "cancel" },
+                                        { text: "Ja", onPress: () => router.push('/') }, // zurück zur Startseite
+                                    ])
                                 }
+                            >
+                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Zurück </Text>
+                            </Pressable>
+
+                            {/* Speichern */}
+                            <Pressable
+                                onPress={async () => {
+                                    try {
+                                        await saveGame(); // bestehende Funktion verwenden
+                                        Alert.alert("Spiel gespeichert", "Dein Spiel wurde gespeichert. Du kannst es in gespeicherte Spiele aufrufen.");
+                                    } catch (e) {
+                                        console.log("Fehler beim Speichern:", e);
+                                    }
+                                }}
+                            >
+                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Speichern </Text>
+                            </Pressable>
+
+                            {/* Neustarten */}
+                            <Pressable
+                                onPress={() =>
+                                    Alert.alert("Partie neustarten?", "Dein Fortschritt geht verloren.", [
+                                        { text: "Nein", style: "cancel" },
+                                        {
+                                            text: "Ja",
+                                            onPress: async () => {
+                                                // Lokales Spiel als "abgebrochen" speichern
+                                                await saveGameToHistory("local", "aborted");
+
+                                                resetGame(); // Spiel zurücksetzen
+                                                setBottomColor("w"); // Weiß immer unten
+                                                setHumanColor("w"); // Mensch immer Weiß
+                                                setLastMove(null);
+                                            },
+                                        },
+                                    ])
+                                }
+                            >
+                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Neustarten </Text>
+                            </Pressable>
+
+                        </View>
+                        {/* UNDO / REDO */}
+                        <View
+                            style={{
+                                marginTop: 20,
+                                flexDirection: "row",
+                                justifyContent: "center",
+                                gap: 32,
                             }}
                         >
-                            <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Speichern </Text>
-                        </Pressable>
+                            <Pressable onPress={undoMove}>
+                                <Text style={{ fontSize: 17, color: "#f6f6f6" }}>⬅️ Letzter Zug  </Text>
+                            </Pressable>
 
-                        {/* Neustarten */}
-                        <Pressable
-                            onPress={() =>
-                                Alert.alert("Partie neustarten?", "Dein Fortschritt geht verloren.", [
-                                    { text: "Nein", style: "cancel" },
-                                    {
-                                        text: "Ja",
-                                        onPress: async () => {
-                                            // Lokales Spiel als "abgebrochen" speichern
-                                            await saveGameToHistory("local", "aborted");
-
-                                            resetGame(); // Spiel zurücksetzen
-                                            setBottomColor("w"); // Weiß immer unten
-                                            setHumanColor("w"); // Mensch immer Weiß
-                                            setLastMove(null);
-                                        },
-                                    },
-                                ])
-                            }
-                        >
-                            <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Neustarten </Text>
-                        </Pressable>
-
-                    </View>
-                    {/* UNDO / REDO */}
-                    <View
-                        style={{
-                            marginTop: 20,
-                            flexDirection: "row",
-                            justifyContent: "center",
-                            gap: 32,
-                        }}
-                    >
-                        <Pressable onPress={undoMove}>
-                            <Text style={{ fontSize: 17, color: "#f6f6f6" }}>⬅️ Letzter Zug  </Text>
-                        </Pressable>
-
-                        <Pressable onPress={redoMove}>
-                            <Text style={{ fontSize: 17, color: "#f6f6f6" }}> Vorwärts ➡️</Text>
-                        </Pressable>
+                            <Pressable onPress={redoMove}>
+                                <Text style={{ fontSize: 17, color: "#f6f6f6" }}> Vorwärts ➡️</Text>
+                            </Pressable>
+                        </View>
                     </View>
                 </View>
-            </View>
-        </SafeAreaView>
+            </SafeAreaView>
         </ImageBackground>
     );
 }
@@ -592,6 +592,7 @@ const styles = StyleSheet.create({
         width: SQUARE_SIZE * 0.9,
         height: SQUARE_SIZE * 0.9,
         resizeMode: "contain",
+
     },
     moveDot: {
         position: "absolute",

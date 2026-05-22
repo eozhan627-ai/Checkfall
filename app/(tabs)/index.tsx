@@ -77,7 +77,11 @@ export default function HomeScreen() {
           onPress={() => router.push('/profile')}
         >
           <Image
-            source={account?.avatar ? { uri: account.avatar + '?t=' + Date.now() } : placeholder}
+            source={
+              account?.avatar && account.avatar.length > 5
+                ? { uri: account.avatar }
+                : placeholder
+            }
             style={styles.avatar}
           />
         </TouchableOpacity>
