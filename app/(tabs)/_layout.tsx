@@ -39,6 +39,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="social"
+        options={{
+
+          title: 'Social',
+          tabBarIcon: () => null,
+        }}
+      />
+      <Tabs.Screen
         name="more"
         options={{
           title: 'More',

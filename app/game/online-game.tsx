@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Chess } from "chess.js";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -13,12 +14,12 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getCurrentAccount } from "../lib/account";
+import { getCurrentAccount } from "../../lib/account";
 import {
     onDrawOffer,
     onGameOver
-} from "../lib/gameSocket";
-import { getSocket } from "../lib/socket";
+} from "../../lib/gameSocket";
+import { getSocket } from "../../lib/socket";
 
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
@@ -26,18 +27,18 @@ const BOARD_SIZE = Dimensions.get("window").width - 32;
 const SQUARE_SIZE = BOARD_SIZE / 8;
 
 const pieces: Record<string, any> = {
-    wp: require("../assets/images/pawn_white.png"),
-    wr: require("../assets/images/rook_white.png"),
-    wn: require("../assets/images/knight_white.png"),
-    wb: require("../assets/images/bishop_white.png"),
-    wq: require("../assets/images/queen_white.png"),
-    wk: require("../assets/images/king_white.png"),
-    bp: require("../assets/images/pawn_black.png"),
-    br: require("../assets/images/rook_black.png"),
-    bn: require("../assets/images/knight_black.png"),
-    bb: require("../assets/images/bishop_black.png"),
-    bq: require("../assets/images/queen_black.png"),
-    bk: require("../assets/images/king_black.png"),
+    wp: require("../../assets/images/pawn_white.png"),
+    wr: require("../../assets/images/rook_white.png"),
+    wn: require("../../assets/images/knight_white.png"),
+    wb: require("../../assets/images/bishop_white.png"),
+    wq: require("../../assets/images/queen_white.png"),
+    wk: require("../../assets/images/king_white.png"),
+    bp: require("../../assets/images/pawn_black.png"),
+    br: require("../../assets/images/rook_black.png"),
+    bn: require("../../assets/images/knight_black.png"),
+    bb: require("../../assets/images/bishop_black.png"),
+    bq: require("../../assets/images/queen_black.png"),
+    bk: require("../../assets/images/king_black.png"),
 };
 
 const toSquare = (row: number, col: number) => `${FILES[col]}${8 - row}`;
@@ -74,10 +75,10 @@ export default function GameScreen() {
         if (avatar && avatar.length > 0) {
             return { uri: forceRefresh ? `${avatar}?t=${Date.now()}` : avatar };
         }
-        return require("../assets/images/platzhalter2.png");
+        return require("../../assets/images/platzhalter2.png");
     };
     const scrollRef = useRef<ScrollView>(null);
-    const backgroundImage = require("../assets/images/onlinebackground.png");
+    const backgroundImage = require("../../assets/images/onlinebackground.png");
 
     // =============================
     // Socket initialisieren
@@ -230,6 +231,28 @@ export default function GameScreen() {
         if (!gameEnded) return; // Spiel läuft, nichts tun
         // hier könnte man nach Spielende die Avatare wieder aktualisieren
     }, [myAvatar, opponentAvatar]);
+
+    async function saveGameToHistory(
+        mode: "online",
+        result: "win" | "loss" | "draw" | "aborted",
+        timestamp?: number
+    ) {
+        const key = "game_history";
+        const stored = await AsyncStorage.getItem(key);
+        const history = stored ? JSON.parse(stored) : [];
+
+        history.unshift({
+            id: Date.now().toString(),
+            mode,
+            result,
+            timestamp: timestamp ?? Date.now(),
+        });
+
+        await AsyncStorage.setItem(key, JSON.stringify(history));
+
+
+
+    }
 
     // =============================
     // UI

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text } from 'react-native';
+import { Alert, ImageBackground, Pressable, ScrollView, Text, View } from 'react-native';
 
 type SavedGame = {
     key: string;
@@ -15,7 +15,7 @@ type SavedGame = {
 export default function SavedGames() {
     const [games, setGames] = useState<SavedGame[]>([]);
     const router = useRouter();
-
+    const backgroundImage = require("../assets/images/background.png"); // Hintergrundbild
     const loadGames = async () => {
         const keys = await AsyncStorage.getAllKeys();
         const savedKeys = keys.filter(k => k.startsWith('@saved_game_'));
@@ -51,76 +51,122 @@ export default function SavedGames() {
     };
 
     return (
-        <ScrollView
-            contentContainerStyle={{ padding: 16, }}>
-            <Text
-                style={{
-                    color: "#000",
-                    fontSize: 22,
-                    fontWeight: "600",
-                    marginBottom: 16,
-                    alignSelf: 'flex-start',
-                    marginTop: 15,
-                }}
-            >
-                Gespeicherte Spiele
-            </Text>
-            {games.length === 0 ? (
+        <ImageBackground source={backgroundImage} style={{ flex: 1 }}>
+            <ScrollView
+                contentContainerStyle={{ padding: 16, }}>
                 <Text
                     style={{
-                        color: "#9ca3af",
-                        textAlign: "center",
-                        marginTop: 40,
-                        fontSize: 14,
+                        color: "#fff",
+                        fontSize: 22,
+                        fontWeight: "600",
+                        marginBottom: 16,
+                        alignSelf: 'flex-start',
+                        marginTop: 15,
                     }}
                 >
-                    Keine gespeicherten Spiele
+                    Gespeicherte Spiele
                 </Text>
-            ) : (
-                games.map(game => (
-                    <Pressable
-                        key={game.key}
+                {games.length === 0 ? (
+                    <Text
                         style={{
-                            padding: 12,
-                            marginBottom: 8,
-                            backgroundColor: '#e5e7eb',
-                            borderRadius: 8,
+                            color: "#9ca3af",
+                            textAlign: "center",
+                            marginTop: 40,
+                            fontSize: 14,
                         }}
-                        onPress={() => {
-                            if (game.mode === "bot") {
-                                router.push({
-                                    pathname: "/PlayBot",
-                                    params: { key: game.key }, // nur key, nicht das ganze JSON
-                                });
-                            } else {
-                                router.push({
-                                    pathname: "/Board",
-                                    params: { savedData: JSON.stringify(game) },
-                                });
-                            }
-                        }}
-                        onLongPress={() =>
-                            Alert.alert(
-                                "Spiel löschen?",
-                                "",
-                                [
-                                    { text: "Abbrechen", style: "cancel" },
-                                    {
-                                        text: "Löschen",
-                                        style: "destructive",
-                                        onPress: () => deleteGame(game.key),
-                                    },
-                                ]
-                            )
-                        }
                     >
-                        <Text>
-                            {game.mode === "bot" ? "🤖 Bot-Spiel" : "👥 Lokal"} –{" "}
-                            {new Date(game.timestamp).toLocaleString()}
-                        </Text>
-                    </Pressable>
-                ))
-            )}
-        </ScrollView>
+                        Keine gespeicherten Spiele
+                    </Text>
+                ) : (
+                    games.map(game => (
+                        <View
+                            key={game.key}
+                            style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+
+                                backgroundColor: "rgba(255,255,255,0.08)",
+
+                                borderRadius: 14,
+                                padding: 16,
+                                marginBottom: 12,
+                            }}
+                        >
+                            {/* LINKER BEREICH */}
+                            <Pressable
+                                style={{ flex: 1 }}
+                                onPress={() => {
+                                    if (game.mode === "bot") {
+                                        router.push({
+                                            pathname: "./bot-game",
+                                            params: { key: game.key },
+                                        });
+                                    } else {
+                                        router.push({
+                                            pathname: "./Board",
+                                            params: {
+                                                savedData: JSON.stringify(game),
+                                            },
+                                        });
+                                    }
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: "600",
+                                        color: "#fff",
+                                    }}
+                                >
+                                    {game.mode === "bot"
+                                        ? "🤖 Bot-Spiel"
+                                        : "👥 Lokales Spiel"}
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        color: "#d4d4d4",
+                                        marginTop: 4,
+                                    }}
+                                >
+                                    {new Date(game.timestamp).toLocaleString()}
+                                </Text>
+                            </Pressable>
+
+                            {/* PAPIERKORB */}
+                            <Pressable
+                                onPress={() =>
+                                    Alert.alert(
+                                        "Spiel löschen?",
+                                        "Diese Aktion kann nicht rückgängig gemacht werden.",
+                                        [
+                                            {
+                                                text: "Abbrechen",
+                                                style: "cancel",
+                                            },
+                                            {
+                                                text: "Löschen",
+                                                style: "destructive",
+                                                onPress: () => deleteGame(game.key),
+                                            },
+                                        ]
+                                    )
+                                }
+                                style={{
+                                    marginLeft: 12,
+                                    padding: 8,
+                                }}
+                            >
+                                <Text style={{ fontSize: 22 }}>
+                                    🗑️
+                                </Text>
+                            </Pressable>
+                        </View>
+                    ))
+                )}
+            </ScrollView>
+        </ImageBackground>
     );
 }

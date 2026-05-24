@@ -1,10 +1,12 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
     Alert,
     Image,
     ImageBackground,
+    Pressable,
     StyleSheet,
     Text,
     TextInput,
@@ -28,7 +30,11 @@ export default function Profile() {
     const externalUserId = params.userId as string | undefined;
 
     const isForeignProfile = !!externalUserId;
+    async function logout() {
+        await AsyncStorage.removeItem("@current_account");
 
+        router.replace("/auth/login");
+    }
     useEffect(() => {
         if (isForeignProfile) {
             setLoading(false);
@@ -127,9 +133,9 @@ export default function Profile() {
 
     return (
         <ImageBackground
-         source={backgroundImage}
-         style={styles.container}
-         resizeMode="cover">
+            source={backgroundImage}
+            style={styles.container}
+            resizeMode="cover">
             <TouchableOpacity onPress={!isForeignProfile ? changeAvatar : undefined}>
                 <Image
                     source={displayedAvatar ? { uri: displayedAvatar } : placeholder}
@@ -158,6 +164,9 @@ export default function Profile() {
                         <Text style={styles.username}>{username} ✏️</Text>
                     </TouchableOpacity>
                 )}
+                <Pressable style={styles.logoutBtn} onPress={logout}>
+                    <Text style={styles.logoutText}>Logout </Text>
+                </Pressable>
             </View>
         </ImageBackground>
     );
@@ -172,4 +181,16 @@ const styles = StyleSheet.create({
     input: { borderBottomWidth: 1, borderColor: "#888", fontSize: 22, minWidth: 120 },
     saveBtn: { marginLeft: 10 },
     saveText: { fontSize: 22, color: "#2d7ea4" },
+    logoutBtn: {
+        marginLeft: 20,
+        paddingVertical: 6,
+        borderColor: "#fff",
+        borderWidth: 1,
+        marginTop: 10,
+        paddingTop: 4,
+    },
+    logoutText: {
+        color: "#fff",
+
+    },
 });

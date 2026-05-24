@@ -21,18 +21,18 @@ const BOARD_SIZE = Dimensions.get("window").width - 32;
 const SQUARE_SIZE = BOARD_SIZE / 8;
 
 const pieces: Record<string, any> = {
-    wp: require("../assets/images/pawn_white.png"),
-    wr: require("../assets/images/rook_white.png"),
-    wn: require("../assets/images/knight_white.png"),
-    wb: require("../assets/images/bishop_white.png"),
-    wq: require("../assets/images/queen_white.png"),
-    wk: require("../assets/images/king_white.png"),
-    bp: require("../assets/images/pawn_black.png"),
-    br: require("../assets/images/rook_black.png"),
-    bn: require("../assets/images/knight_black.png"),
-    bb: require("../assets/images/bishop_black.png"),
-    bq: require("../assets/images/queen_black.png"),
-    bk: require("../assets/images/king_black.png"),
+    wp: require("../../assets/images/pawn_white.png"),
+    wr: require("../../assets/images/rook_white.png"),
+    wn: require("../../assets/images/knight_white.png"),
+    wb: require("../../assets/images/bishop_white.png"),
+    wq: require("../../assets/images/queen_white.png"),
+    wk: require("../../assets/images/king_white.png"),
+    bp: require("../../assets/images/pawn_black.png"),
+    br: require("../../assets/images/rook_black.png"),
+    bn: require("../../assets/images/knight_black.png"),
+    bb: require("../../assets/images/bishop_black.png"),
+    bq: require("../../assets/images/queen_black.png"),
+    bk: require("../../assets/images/king_black.png"),
 };
 
 const toChessSquare = (row: number, col: number) => {
@@ -55,7 +55,7 @@ export default function Board() {
         ? JSON.parse(params.savedData as string)
         : null;
     const [game, setGame] = useState(() => new Chess());
-    const backgroundImage = require("../assets/images/onlinebackground.png"); // Hintergrundbild
+    const backgroundImage = require("../../assets/images/onlinebackground.png"); // Hintergrundbild
 
     const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<any[]>([]);

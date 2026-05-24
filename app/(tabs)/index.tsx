@@ -26,7 +26,7 @@ export default function HomeScreen() {
         const acc = await getCurrentAccount();
 
         if (!acc) {
-          router.replace('/login');
+          router.replace('/auth/login');
         } else if (active) {
           setAccount(acc);
           setLoading(false);
@@ -89,17 +89,17 @@ export default function HomeScreen() {
 
       {/* LEISTEN */}
       <View style={styles.lists}>
-        <TouchableOpacity style={styles.listSmall} onPress={() => router.push('/ComingSoon')}>
+        <TouchableOpacity style={styles.listSmall} onPress={() => router.push('/puzzle/dailyPuzzle')}>
           <Text style={styles.listTitle}>Daily Puzzle</Text>
           <Text style={styles.listSub}>Lös ein Puzzle</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.listMedium} onPress={() => router.push('/PlayBot')}>
+        <TouchableOpacity style={styles.listMedium} onPress={() => router.push('/game/bot-game')}>
           <Text style={styles.listTitle}>Spiele gegen einen Bot</Text>
           <Text style={styles.listSub}>Computergesteuerter Gegner</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.listMiddle} onPress={() => router.push('/indexLG')}>
+        <TouchableOpacity style={styles.listMiddle} onPress={() => router.push('./indexLG')}>
           <Text style={styles.listTitle}>Spiele lokal</Text>
           <Text style={styles.listSub}>Auf diesem Gerät spielen</Text>
         </TouchableOpacity>
@@ -119,7 +119,7 @@ export default function HomeScreen() {
         onPress={() => {
 
           router.push({
-            pathname: "/waiting",
+            pathname: "/game/waiting",
             params: {
               name: account?.username,
               avatar: account?.avatar

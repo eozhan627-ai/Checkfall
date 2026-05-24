@@ -1,5 +1,5 @@
 import { StyleSheet, View } from "react-native";
-import Board from "./Board";
+import Board from "./game/board";
 import LayoutLG from "./layoutLG";
 
 export default function IndexLG() {

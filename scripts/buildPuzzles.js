@@ -2,7 +2,7 @@ const fs = require("fs");
 const csv = require("csv-parser");
 
 const results = [];
-const MAX = 500;
+const MAX = 50000;
 
 fs.createReadStream("assets/lichess_db_puzzle.csv")
     .pipe(csv())

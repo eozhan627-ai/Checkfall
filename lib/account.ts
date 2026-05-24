@@ -12,6 +12,9 @@ export type AccountType = {
 const ACCOUNTS_KEY = "@accounts";
 const CURRENT_KEY = "@current_account";
 
+export async function resetStorage() {
+    await AsyncStorage.clear();
+}
 export async function saveAccount(data: { username: string; guest: boolean }): Promise<AccountType> {
     const id = uuidv4();
     const newAccount: AccountType = { id, ...data };
@@ -34,12 +37,17 @@ export async function getAccounts(): Promise<AccountType[]> {
 export async function getAccountById(id: string): Promise<AccountType | null> {
     const accounts = await getAccounts();
     return accounts.find(a => a.id === id) || null;
-}
+} export async function getCurrentAccount(): Promise<AccountType | null> {
+    try {
+        const currentId = await AsyncStorage.getItem(CURRENT_KEY);
+        if (!currentId) return null;
 
-export async function getCurrentAccount(): Promise<AccountType | null> {
-    const stored = await AsyncStorage.getItem(CURRENT_KEY);
-    if (!stored) return null;
-    return JSON.parse(stored);
+        return await getAccountById(currentId);
+    } catch (e) {
+        console.log("Corrupt account");
+        await AsyncStorage.removeItem(CURRENT_KEY);
+        return null;
+    }
 }
 export async function updateAccount(id: string, data: Partial<{ username: string, avatar?: string }>) {
     const accounts = await getAccounts();
@@ -50,7 +58,7 @@ export async function updateAccount(id: string, data: Partial<{ username: string
     accounts[idx] = updated;
 
     await AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
-    await AsyncStorage.setItem(CURRENT_KEY, JSON.stringify(updated));
+    await AsyncStorage.setItem(CURRENT_KEY, updated.id);
 
     return updated;
 }

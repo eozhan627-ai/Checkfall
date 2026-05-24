@@ -1,8 +1,14 @@
 [
-    {
-        "id": "00008",
-        "fen": "r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K b - - 0 24",
-        "moves": "f2g3 e6e7 b2b1 b3c1 b1c1 h6c1",
-        "rating": 1877
-    }
+  {
+    "id": "1",
+    "fen": "r1bqkb1r/pppp1Qpp/2n2n2/4p3/8/8/PPPP1PPP/RNB1KBNR b KQkq - 0 4",
+    "moves": ["g8f7"],
+    "rating": 600
+  },
+  {
+    "id": "2",
+    "fen": "6k1/5ppp/8/8/8/8/5PPP/6K1 w - - 0 1",
+    "moves": ["g2g3"],
+    "rating": 200
+  }
 ]

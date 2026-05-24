@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
+  ImageBackground,
   Pressable,
   StyleSheet,
   Text,
@@ -13,7 +14,7 @@ const STORAGE_KEY = "game_history";
 
 type GameHistoryItem = {
   id: string;
-  mode: "bot" | "local";
+  mode: "bot" | "local" | "online";
   date: string;
   result: "win" | "loss" | "draw" | "aborted";
   timestamp: number;
@@ -21,6 +22,7 @@ type GameHistoryItem = {
 
 export default function GameHistory() {
   const [history, setHistory] = useState<GameHistoryItem[]>([]);
+  const backgroundImage = require("../assets/images/background.png"); // Hintergrundbild
 
   useEffect(() => {
     loadHistory();
@@ -74,46 +76,90 @@ export default function GameHistory() {
         return "Abgebrochen";
     }
   }
-
   function renderItem({ item }: { item: GameHistoryItem }) {
-    const date = new Date(item.timestamp); // aus gespeicherter Zeit
-    const formatted = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+    const date = new Date(item.timestamp);
+
+    const formatted =
+      `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 
     return (
-      <Pressable
-        style={styles.item}
-        onLongPress={() => confirmDelete(item.id)}
-      >
-        <Text style={styles.mode}>
-          {item.mode === "bot" ? "🤖 Spiel gegen Bot" : "👥 Lokales Spiel"}
-        </Text>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
 
-        <Text style={styles.meta}>
-          {formatted} · {translateResult(item.result)}
-        </Text>
-      </Pressable>
+          backgroundColor: "rgba(255,255,255,0.08)",
+
+          borderRadius: 14,
+          padding: 16,
+          marginBottom: 12,
+        }}
+      >
+        {/* LINKER TEIL */}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "600",
+              color: "#fff",
+            }}
+          >
+            {item.mode === "bot"
+              ? "🤖 Bot-Spiel"
+              : item.mode === "online"
+                ? "🌍 Online-Spiel"
+                : "👥 Lokales Spiel"}
+          </Text>
+
+          <Text
+            style={{
+              fontSize: 14,
+              color: "#d4d4d4",
+              marginTop: 4,
+            }}
+          >
+            {formatted} · {translateResult(item.result)}
+          </Text>
+        </View>
+
+        {/* PAPIERKORB */}
+        <Pressable
+          onPress={() => confirmDelete(item.id)}
+          style={{
+            marginLeft: 12,
+            padding: 8,
+          }}
+        >
+          <Text style={{ fontSize: 22 }}>
+            🗑️
+          </Text>
+        </Pressable>
+      </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Spielverlauf</Text>
-      <Text style={styles.subtitle}>
-        Deine gespielten Spiele auf diesem Gerät
-      </Text>
-
-      {history.length === 0 ? (
-        <Text style={styles.empty}>
-          Noch keine Spiele gespielt.
+    <ImageBackground source={backgroundImage} style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Spielverlauf</Text>
+        <Text style={styles.subtitle}>
+          Deine gespielten Spiele auf diesem Gerät
         </Text>
-      ) : (
-        <FlatList
-          data={history}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-        />
-      )}
-    </View>
+
+        {history.length === 0 ? (
+          <Text style={styles.empty}>
+            Noch keine Spiele gespielt.
+          </Text>
+        ) : (
+          <FlatList
+            data={history}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+          />
+        )}
+      </View>
+    </ImageBackground>
   );
 }
 
@@ -121,17 +167,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: "#f0f0f0",
+    
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 4,
     marginTop: 12,
+    color: "#fff",
   },
   subtitle: {
     fontSize: 14,
-    color: "#555",
+    color: "#fff",
     marginBottom: 16,
   },
   item: {

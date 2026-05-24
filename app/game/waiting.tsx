@@ -131,7 +131,7 @@ const BoardBackground = () => {
 
       {/* knight */}
       <Animated.Image
-        source={require("../assets/images/knight_white.png")}
+        source={require("../../assets/images/knight_white.png")}
         style={{
           width: 90,
           height: 90,
