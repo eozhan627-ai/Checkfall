@@ -4,92 +4,88 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 export default function AGBDatenschutzPage() {
     return (
         <ScrollView style={styles.container}>
-            <Text style={styles.title}>AGB & Datenschutzerklärung</Text>
+            <Text style={styles.title}>AGB & Privacy Policy</Text>
 
             {/* AGB */}
-            <Text style={styles.sectionTitle}>Allgemeine Geschäftsbedingungen (AGB)</Text>
+            <Text style={styles.sectionTitle}>Terms and Conditions (AGB)</Text>
 
             <Text style={styles.text}>
-                1. Geltungsbereich{"\n"}
-                Diese Allgemeinen Geschäftsbedingungen gelten für die Nutzung der App
-                „Checkfall“. Mit der Nutzung der App erklärst du dich mit diesen AGB
-                einverstanden.
+                1. Scope of Application{"\n"}
+                These General Terms and Conditions apply to the use of the app
+                „Checkfall“. By using the app, you agree to these AGB. If you do not agree, please do not use the app.
             </Text>
 
             <Text style={styles.text}>
-                2. Nutzung der App{"\n"}
-                Checkfall dient dem Spielen und Lernen von Schach. Die Nutzung erfolgt
-                freiwillig und auf eigene Verantwortung. Ein Anspruch auf bestimmte
-                Funktionen oder Verfügbarkeit besteht nicht.
+                2. Usage of the App{"\n"}
+                Checkfall is designed for playing and learning chess. The use of the app
+                is voluntary and at your own risk. There is no claim for specific
+                features or availability.
             </Text>
 
             <Text style={styles.text}>
-                3. Haftung{"\n"}
-                Der Anbieter haftet nur für Schäden, die durch vorsätzliches oder grob
-                fahrlässiges Verhalten verursacht wurden. Für Datenverluste,
-                Spielstände oder technische Störungen wird keine Haftung übernommen.
+                3. Liability{"\n"}
+                The provider is only liable for damages caused by intentional or gross
+                negligence. No liability is assumed for data loss,
+                game states or technical issues.
             </Text>
 
             <Text style={styles.text}>
-                4. Änderungen der AGB{"\n"}
-                Der Anbieter behält sich vor, diese AGB jederzeit zu ändern. Änderungen
-                werden innerhalb der App veröffentlicht.
+                4. Change of AGB{"\n"}
+                The provider reserves the right to change these AGB at any time. Changes
+                will be published within the app.
             </Text>
 
             <Text style={styles.text}>
-                5. Kontakt{"\n"}
-                Bei Fragen zur App oder zu diesen AGB kontaktiere uns bitte unter:{"\n"}
+                5. Contact {"\n"}
+                For questions about the app or these AGB, please contact us at:{"\n"}
                 checkfall744@gmail.com
             </Text>
 
             {/* Datenschutzerklärung */}
-            <Text style={styles.sectionTitle}>Datenschutzerklärung</Text>
+            <Text style={styles.sectionTitle}>Privacy Policy</Text>
 
             <Text style={styles.text}>
-                1. Verantwortlicher{"\n"}
-                Verantwortlich für die Datenverarbeitung ist:{"\n"}
-                Enes Kazim Özhan{"\n"}
+                1. Controller{"\n"}
+                The controller for data processing is:{"\n"}
+                Enes Kazim Özhan{"\n"}  
                 Projekt: Checkfall{"\n"}
                 E-Mail: checkfall744@gmail.com
             </Text>
 
             <Text style={styles.text}>
-                2. Erhebung und Verarbeitung von Daten{"\n"}
-                Die App Checkfall kann ohne Registrierung genutzt werden. Es werden
-                keine personenbezogenen Daten wie Name, Adresse oder Zahlungsdaten
-                erhoben.
+                2. Data Collection and Processing{"\n"}
+                The Checkfall app can be used without registration. No personal data such as name, address or payment information is collected.
             </Text>
 
             <Text style={styles.text}>
-                3. Lokale Daten{"\n"}
-                Spielstände, Einstellungen oder Fortschritte werden ausschließlich
-                lokal auf dem Endgerät gespeichert. Diese Daten verlassen das Gerät
-                nicht und werden nicht an Server übertragen.
+                3. Local Data{"\n"}
+                Game states, settings or progress are stored exclusively
+                locally on the end device. These data do not leave the device
+                and are not transmitted to servers.
             </Text>
 
             <Text style={styles.text}>
-                4. Zweck der Verarbeitung{"\n"}
-                Die Verarbeitung erfolgt ausschließlich zur Bereitstellung der
+                4. Purpose of Data Processing{"\n"}
+                The processing is carried out exclusively for the provision of the
+
                 App-Funktionen und zur Sicherstellung eines reibungslosen Betriebs.
             </Text>
 
             <Text style={styles.text}>
-                5. Weitergabe an Dritte{"\n"}
-                Es findet keine Weitergabe von Daten an Dritte statt. Es werden keine
-                Analyse-, Tracking- oder Werbedienste eingesetzt.
+                5. Data Sharing{"\n"}
+                There is no sharing of data with third parties. No analytics, tracking, or advertising services are used.
             </Text>
 
             <Text style={styles.text}>
-                6. Rechte der Nutzer{"\n"}
-                Nutzer haben das Recht auf Auskunft, Berichtigung oder Löschung ihrer
-                Daten. Anfragen können jederzeit per E-Mail gestellt werden.
+                6. Rights of Users{"\n"}
+                Users have the right to request information, correction, or deletion of their
+                data. Requests can be submitted at any time via email.  
             </Text>
 
             <Text style={styles.text}>
-                7. Änderungen der Datenschutzerklärung{"\n"}
-                Diese Datenschutzerklärung kann bei Weiterentwicklung der App
-                angepasst werden. Die aktuelle Version ist jederzeit in der App
-                abrufbar.
+                7. Changes to the Privacy Policy{"\n"}
+                This Privacy Policy may be adjusted as the app evolves.
+                The current version is always available within the app.
             </Text>
 
             <View style={styles.bottomSpacer} />

@@ -35,7 +35,7 @@ export default function GameHistory() {
         setHistory(JSON.parse(data));
       }
     } catch (e) {
-      console.log("Fehler beim Laden des Spielverlaufs", e);
+      console.log("Error loading game history", e);
     }
   }
 
@@ -45,18 +45,18 @@ export default function GameHistory() {
       setHistory(updated);
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     } catch (e) {
-      console.log("Fehler beim Löschen", e);
+      console.log("Error deleting game", e);
     }
   }
 
   function confirmDelete(id: string) {
     Alert.alert(
-      "Spiel löschen",
-      "Möchtest du dieses Spiel wirklich löschen?",
+      "Delete Game",
+      "Are you sure you want to delete this game?",
       [
-        { text: "Abbrechen", style: "cancel" },
+        { text: "Cancel ", style: "cancel" },
         {
-          text: "Löschen",
+          text: "Delete",
           style: "destructive",
           onPress: () => deleteGame(id),
         },
@@ -67,13 +67,13 @@ export default function GameHistory() {
   function translateResult(result: GameHistoryItem["result"]) {
     switch (result) {
       case "win":
-        return "Sieg";
+        return "Win";
       case "loss":
-        return "Niederlage";
+        return "Loss";
       case "draw":
-        return "Remis";
+        return "Draw";
       case "aborted":
-        return "Abgebrochen";
+        return "Aborted";
     }
   }
   function renderItem({ item }: { item: GameHistoryItem }) {
@@ -106,10 +106,10 @@ export default function GameHistory() {
             }}
           >
             {item.mode === "bot"
-              ? "🤖 Bot-Spiel"
+              ? "🤖 Bot-game"
               : item.mode === "online"
-                ? "🌍 Online-Spiel"
-                : "👥 Lokales Spiel"}
+                ? "🌍 Online-game"
+                : "👥 Local-game"}
           </Text>
 
           <Text
@@ -142,14 +142,14 @@ export default function GameHistory() {
   return (
     <ImageBackground source={backgroundImage} style={{ flex: 1 }}>
       <View style={styles.container}>
-        <Text style={styles.title}>Spielverlauf</Text>
+        <Text style={styles.title}>Game History</Text>
         <Text style={styles.subtitle}>
-          Deine gespielten Spiele auf diesem Gerät
+          Your played games on this device
         </Text>
 
         {history.length === 0 ? (
           <Text style={styles.empty}>
-            Noch keine Spiele gespielt.
+            No games played yet.
           </Text>
         ) : (
           <FlatList
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    
+
   },
   title: {
     fontSize: 24,

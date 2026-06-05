@@ -1,7 +1,9 @@
+import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Alert,
+    Animated,
     ImageBackground,
     Pressable,
     StyleSheet,
@@ -9,7 +11,6 @@ import {
     TextInput,
     View,
 } from "react-native";
-
 import { getCurrentAccount, saveAccount } from "../../lib/account";
 
 export default function LoginPage() {
@@ -20,196 +21,219 @@ export default function LoginPage() {
 
     const backgroundImage = require("../../assets/images/loginbackground.png");
 
+    // Animations
+    const appear = useRef(new Animated.Value(0)).current;
+    const float = useRef(new Animated.Value(0)).current;
+
     useEffect(() => {
         (async () => {
             const acc = await getCurrentAccount();
-
-            if (acc) {
-                router.replace("/");
-            } else {
-                setLoading(false);
-            }
+            if (acc) router.replace("/");
+            else setLoading(false);
         })();
+    }, []);
+
+    useEffect(() => {
+        // entrance animation
+        Animated.timing(appear, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+        }).start(() => {
+            // floating loop AFTER appear
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(float, {
+                        toValue: 1,
+                        duration: 2200,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(float, {
+                        toValue: 0,
+                        duration: 2200,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+        });
     }, []);
 
     async function handleCreateAccount() {
         if (!username.trim()) {
-            Alert.alert(
-                "Fehler",
-                "Bitte gib einen Benutzernamen ein."
-            );
+            Alert.alert("Error", "Enter username");
             return;
         }
 
-        await saveAccount({
-            username,
-            guest: false,
-        });
-
+        await saveAccount({ username, guest: false });
         router.replace("/");
     }
 
     async function handleGuest() {
-        await saveAccount({
-            username: "Gast",
-            guest: true,
-        });
-
+        await saveAccount({ username: "Guest", guest: true });
         router.replace("/");
     }
 
     if (loading) {
         return (
-            <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>
-                    Lade...
-                </Text>
+            <View style={styles.loading}>
+                <Text style={{ color: "#fff" }}>Loading...</Text>
             </View>
         );
     }
 
+    const translateY = float.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -6], // VERY subtle float
+    });
+
+    const scale = appear.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.96, 1],
+    });
+
+    const opacity = appear;
+
     return (
-        <ImageBackground
-            source={backgroundImage}
-            style={styles.container}
-            resizeMode="cover"
-        >
+        <ImageBackground source={backgroundImage} style={styles.bg}>
             <View style={styles.overlay} />
 
-            <View style={styles.card}>
-                <Text style={styles.logo}>
-                    Willkommen bei Checkfall
-                </Text>
+            <View style={styles.root}>
+                <View style={styles.right}>
+                    <Animated.View
+                        style={{
+                            transform: [{ translateY }, { scale }],
+                            opacity,
+                            width: "100%",
+                            alignItems: "center",
+                        }}
+                    >
+                        <BlurView intensity={35} tint="dark" style={styles.card}>
+                            <Text style={styles.title}>
+                                Welcome to Checkfall
+                            </Text>
 
-                <Text style={styles.subtitle}>
-                    Play. Learn. Improve.
-                </Text>
+                            <Text style={styles.subtitle}>
+                                Play. Learn. Improve.
+                            </Text>
 
-                <TextInput
-                    style={styles.input}
-                    placeholder="Benutzername"
-                    placeholderTextColor="#999"
-                    value={username}
-                    onChangeText={setUsername}
-                />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Create a username"
+                                placeholderTextColor="#888"
+                                value={username}
+                                onChangeText={setUsername}
+                            />
 
-                <Pressable
-                    style={styles.primaryButton}
-                    onPress={handleCreateAccount}
-                >
-                    <Text style={styles.primaryButtonText}>
-                        Account erstellen
-                    </Text>
-                </Pressable>
+                            <Pressable
+                                style={styles.primary}
+                                onPress={handleCreateAccount}
+                            >
+                                <Text style={styles.primaryText}>
+                                    Create Account
+                                </Text>
+                            </Pressable>
 
-                <Pressable
-                    style={styles.secondaryButton}
-                    onPress={handleGuest}
-                >
-                    <Text style={styles.secondaryButtonText}>
-                        Als Gast spielen
-                    </Text>
-                </Pressable>
+                            <Pressable
+                                style={styles.secondary}
+                                onPress={handleGuest}
+                            >
+                                <Text style={styles.secondaryText}>
+                                    Continue as guest
+                                </Text>
+                            </Pressable>
+                        </BlurView>
+                    </Animated.View>
+                </View>
             </View>
         </ImageBackground>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    bg: {
         flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
+        width: "100%",
+        height: "100%",
     },
 
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(0,0,0,0.45)",
+        backgroundColor: "rgba(0,0,0,0.55)",
     },
 
-    loadingContainer: {
+    root: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "#0d0d0d",
     },
 
-    loadingText: {
-        color: "#fff",
-        fontSize: 18,
+    right: {
+        width: "100%",
+        alignItems: "center",
+        justifyContent: "center",
     },
 
     card: {
-        width: "88%",
-        backgroundColor: "rgba(255,255,255,0.08)",
-        borderRadius: 24,
-
+        width: "90%",
+        maxWidth: 380,
+        borderRadius: 20,
         padding: 24,
-
+        overflow: "hidden",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.12)",
+        borderColor: "rgba(255,255,255,0.15)",
     },
 
-    logo: {
-        fontSize: 34,
-        fontWeight: "700",
+    title: {
+        fontSize: 24,
+        fontWeight: "800",
         color: "#fff",
         textAlign: "center",
     },
 
     subtitle: {
-        fontSize: 15,
-        color: "#d4d4d4",
+        fontSize: 14,
+        color: "#ccc",
         textAlign: "center",
-        marginTop: 6,
-        marginBottom: 28,
+        marginBottom: 20,
     },
 
     input: {
         backgroundColor: "rgba(255,255,255,0.06)",
-        borderRadius: 14,
-
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-
+        padding: 14,
+        borderRadius: 12,
         color: "#fff",
-        fontSize: 16,
-
-        marginBottom: 16,
-
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
+        marginBottom: 14,
     },
 
-    primaryButton: {
+    primary: {
         backgroundColor: "#d4af37",
-
-        paddingVertical: 15,
-        borderRadius: 14,
-
+        padding: 14,
+        borderRadius: 12,
         alignItems: "center",
-
-        marginBottom: 12,
+        marginBottom: 10,
     },
 
-    primaryButtonText: {
-        color: "#111",
+    primaryText: {
         fontWeight: "700",
-        fontSize: 16,
+        color: "#111",
     },
 
-    secondaryButton: {
+    secondary: {
         backgroundColor: "rgba(255,255,255,0.08)",
-
-        paddingVertical: 15,
-        borderRadius: 14,
-
+        padding: 14,
+        borderRadius: 12,
         alignItems: "center",
     },
 
-    secondaryButtonText: {
+    secondaryText: {
         color: "#fff",
         fontWeight: "600",
-        fontSize: 15,
+    },
+
+    loading: {
+        flex: 1,
+        backgroundColor: "#000",
+        justifyContent: "center",
+        alignItems: "center",
     },
 });

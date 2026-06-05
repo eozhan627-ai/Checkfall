@@ -6,7 +6,7 @@ import { getSocket } from "./socket";
 export const resignGame = (roomId: string, myName: string, myAvatar: string) => {
   const socket = getSocket();
   console.log("➡️ resign sent", roomId);
-  socket.emit("resign", { roomId });
+  socket.emit("resign_game", { roomId });
 };
 
 export const offerDraw = (roomId: string, myName: string, myAvatar: string) => {

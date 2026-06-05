@@ -278,33 +278,33 @@ export default function Playbot() {
 
             setTimeout(() => {
                 Alert.alert(
-                    "Schachmatt",
-                    `${winner === "w" ? "Weiß" : "Schwarz"} hat gewonnen`
+                    "Checkmate",
+                    `${winner === "w" ? "White" : "Black"} has won the game!`
                 );
             }, 900);
             return true;
         }
         if (currentGame.isStalemate()) {
             saveGameToHistory("bot", "draw");
-            showAlert("Patt", "Keine legalen Züge mehr – Unentschieden");
+            showAlert("Stalemate", "No legal moves left – Draw");
             return true;
         }
 
         if (currentGame.isThreefoldRepetition()) {
             saveGameToHistory("bot", "draw");
-            showAlert("Remis", "Dreifache Stellungswiederholung");
+            showAlert("Remis", "Threefold Repetition");
             return true;
         }
 
         if (currentGame.isInsufficientMaterial()) {
             saveGameToHistory("bot", "draw");
-            showAlert("Remis", "Zu wenig Material für ein Matt");
+            showAlert("Remis", "Insufficient Material for Checkmate");
             return true;
         }
 
         if (currentGame.isDraw()) {
             saveGameToHistory("bot", "draw");
-            showAlert("Remis", "50-Züge-Regel oder allgemeines Remis");
+            showAlert("Remis", "50-Move Rule or General Draw");
             return true;
         }
 
@@ -340,7 +340,7 @@ export default function Playbot() {
             resizeMode="cover" >
             {!gameStarted ? (
                 <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                    <Text style={{ color: "#fff", fontSize: 20, marginBottom: 16 }}>Spiel starten gegen Bot  </Text>
+                    <Text style={{ color: "#fff", fontSize: 20, marginBottom: 16 }}>Start bot game  </Text>
                     <View
                         style={{
                             flexDirection: "row",
@@ -376,10 +376,10 @@ export default function Playbot() {
                                     }}
                                 >
                                     {c === "w"
-                                        ? "Weiß"
+                                        ? "white"
                                         : c === "b"
-                                            ? "Schwarz"
-                                            : "Zufällig"}
+                                            ? "black"
+                                            : "random"}
                                 </Text>
                             </Pressable>
                         ))}
@@ -475,7 +475,7 @@ export default function Playbot() {
                             fontSize: 16,
                             fontWeight: "700",
                         }}>
-                            Spiel starten
+                            Start game
                         </Text>
                     </Pressable>
                 </View>
@@ -665,10 +665,10 @@ export default function Playbot() {
                         <View style={styles.bottomBar}>
                             <Pressable
                                 onPress={() =>
-                                    Alert.alert("Partie verlassen?", "Dein aktueller Fortschritt geht verloren.", [
-                                        { text: "Abbrechen", style: "cancel" },
+                                    Alert.alert("Leave game?", "Your progress will be lost.", [
+                                        { text: "Cancel", style: "cancel" },
                                         {
-                                            text: "Ja",
+                                            text: "Yes",
                                             onPress: async () => {
                                                 const now = Date.now();
                                                 await saveGameToHistory("bot", "aborted", now);
@@ -678,7 +678,7 @@ export default function Playbot() {
                                     ])
                                 }
                             >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Zurück </Text>
+                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Back </Text>
                             </Pressable>
                             <Pressable
                                 onPress={async () => {
@@ -689,18 +689,18 @@ export default function Playbot() {
                                     );
                                 }}
                             >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Speichern </Text>
+                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Save </Text>
                             </Pressable>
 
                             <Pressable
                                 onPress={() =>
                                     Alert.alert(
-                                        "Partie neustarten?",
-                                        "Dein aktueller Fortschritt geht verloren.",
+                                        "Restart game?",
+                                        "Your progress will be lost.",
                                         [
-                                            { text: "Nein", style: "cancel" },
+                                            { text: "No", style: "cancel" },
                                             {
-                                                text: "Ja", onPress: async () => {
+                                                text: "Yes", onPress: async () => {
 
                                                     // 1. Server informieren (wichtig!)
                                                     if (roomId) {
@@ -728,7 +728,7 @@ export default function Playbot() {
                                     )
                                 }
                             >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Neustarten </Text>
+                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Restart </Text>
                             </Pressable>
 
                         </View>

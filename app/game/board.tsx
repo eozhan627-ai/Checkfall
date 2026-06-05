@@ -171,27 +171,27 @@ export default function Board() {
 
             saveGameToHistory("local", result);
             showAlert(
-                "Schachmatt",
-                `${winner === "w" ? "Weiß" : "Schwarz"} hat gewonnen`
+                "Checkmate",
+                `${winner === "w" ? "White" : "Black"} has won`
             );
             return true;
         }
 
         if (currentGame.isStalemate()) {
             saveGameToHistory("local", "draw");
-            showAlert("Patt", "Keine legalen Züge mehr – Unentschieden");
+            showAlert("Stalemate", "No legal moves left – Draw");
             return true;
         }
 
         if (currentGame.isThreefoldRepetition()) {
             saveGameToHistory("local", "draw");
-            showAlert("Remis", "Dreifache Stellungswiederholung");
+            showAlert("Remis", "Triple repetition – Draw");
             return true;
         }
 
         if (currentGame.isInsufficientMaterial()) {
             saveGameToHistory("local", "draw");
-            showAlert("Remis", "Zu wenig Material für ein Matt");
+            showAlert("Remis", "Insufficient material for checkmate");
             return true;
         }
 
@@ -239,12 +239,12 @@ export default function Board() {
             await saveGameToHistory("local", "aborted", timestamp); // abgebrochenes Spiel, falls noch nicht fertig gespielt
 
             Alert.alert(
-                "Spiel gespeichert",
-                "Du kannst es unter „Gespeicherte Spiele“ fortsetzen."
+                "Game saved",
+                "You can continue it under „Saved Games“."
             );
         } catch (e) {
             console.log("SaveGame Error", e);
-            Alert.alert("Fehler", "Spiel konnte nicht gespeichert werden.");
+            Alert.alert("Error", "The game could not be saved.");
         }
     };
     async function saveGameToHistory(mode: "bot" | "local", result: "win" | "loss" | "draw" | "aborted",
@@ -501,9 +501,9 @@ export default function Board() {
                             {/* Zurück zur Startseite */}
                             <Pressable
                                 onPress={() =>
-                                    Alert.alert("Zurück zur Startseite?", "", [
-                                        { text: "Nein", style: "cancel" },
-                                        { text: "Ja", onPress: () => router.push('/') }, // zurück zur Startseite
+                                    Alert.alert("Back to home?", "", [
+                                        { text: "No", style: "cancel" },
+                                        { text: "Yes", onPress: () => router.push('/') }, // zurück zur Startseite
                                     ])
                                 }
                             >
@@ -515,22 +515,22 @@ export default function Board() {
                                 onPress={async () => {
                                     try {
                                         await saveGame(); // bestehende Funktion verwenden
-                                        Alert.alert("Spiel gespeichert", "Dein Spiel wurde gespeichert. Du kannst es in gespeicherte Spiele aufrufen.");
+                                        Alert.alert("Game saved", "Your game has been saved. You can continue it under „Saved Games“.");
                                     } catch (e) {
-                                        console.log("Fehler beim Speichern:", e);
+                                        console.log("Error saving game:", e);
                                     }
                                 }}
                             >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Speichern </Text>
+                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Save </Text>
                             </Pressable>
 
                             {/* Neustarten */}
                             <Pressable
                                 onPress={() =>
-                                    Alert.alert("Partie neustarten?", "Dein Fortschritt geht verloren.", [
-                                        { text: "Nein", style: "cancel" },
+                                    Alert.alert("Restart game?", "Your progress will be lost.", [
+                                        { text: "No", style: "cancel" },
                                         {
-                                            text: "Ja",
+                                            text: "Yes",
                                             onPress: async () => {
                                                 // Lokales Spiel als "abgebrochen" speichern
                                                 await saveGameToHistory("local", "aborted");
@@ -544,7 +544,7 @@ export default function Board() {
                                     ])
                                 }
                             >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Neustarten </Text>
+                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Restart </Text>
                             </Pressable>
 
                         </View>
@@ -558,11 +558,11 @@ export default function Board() {
                             }}
                         >
                             <Pressable onPress={undoMove}>
-                                <Text style={{ fontSize: 17, color: "#f6f6f6" }}>⬅️ Letzter Zug  </Text>
+                                <Text style={{ fontSize: 17, color: "#f6f6f6" }}>⬅️ Last Move  </Text>
                             </Pressable>
 
                             <Pressable onPress={redoMove}>
-                                <Text style={{ fontSize: 17, color: "#f6f6f6" }}> Vorwärts ➡️</Text>
+                                <Text style={{ fontSize: 17, color: "#f6f6f6" }}> Forward ➡️</Text>
                             </Pressable>
                         </View>
                     </View>

@@ -60,7 +60,7 @@ export default function Profile() {
 
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
-            Alert.alert("Berechtigung benötigt", "Bitte erlaube den Zugriff auf die Galerie.");
+            Alert.alert("Allow Access", "Please allow access to the photo library.");
             return;
         }
 
@@ -116,10 +116,10 @@ export default function Profile() {
         Alert.alert("Gespeichert");
     };
 
-    if (loading) return <View style={styles.center}><Text>Lade Profil...</Text></View>;
+    if (loading) return <View style={styles.center}><Text>Loading profile...</Text></View>;
 
     if (!isForeignProfile && !account)
-        return <View style={styles.center}><Text>Kein Account gefunden</Text></View>;
+        return <View style={styles.center}><Text>No account found</Text></View>;
 
     // =============================
     // Entscheide welches Avatar angezeigt wird

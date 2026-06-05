@@ -4,7 +4,7 @@ import { ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity } from 
 
 export default function SocialScreen() {
     const router = useRouter();
-    const backgroundImage = require("../../../assets/images/clanbackground.png"); // Hintergrundbild
+    const backgroundImage = require("../../assets/images/clanbackground.png"); // Hintergrundbild
 
     return (
         <ImageBackground source={backgroundImage} style={styles.container}>
@@ -12,7 +12,7 @@ export default function SocialScreen() {
 
                 <Text style={styles.title}>Social</Text>
                 <Text style={styles.subtitle}>
-                    Freunde, Clans und soziale Features
+                    Friends, Clans and social features
                 </Text>
 
                 {/* FRIENDS */}
@@ -20,8 +20,8 @@ export default function SocialScreen() {
                     style={styles.card}
                     onPress={() => router.push("/friends")}
                 >
-                    <Text style={styles.cardTitle}>👥 Freunde</Text>
-                    <Text style={styles.cardSub}>Anfragen & Freundesliste</Text>
+                    <Text style={styles.cardTitle}>👥 Friends</Text>
+                    <Text style={styles.cardSub}>Requests & Friend List</Text>
                 </TouchableOpacity>
 
                 {/* CLANS */}
@@ -30,7 +30,7 @@ export default function SocialScreen() {
                     onPress={() => router.push("/clans")}
                 >
                     <Text style={styles.cardTitle}>🏰 Clans</Text>
-                    <Text style={styles.cardSub}>Tritt einem Clan bei oder erstelle einen</Text>
+                    <Text style={styles.cardSub}>Join a clan or create one</Text>
                 </TouchableOpacity>
 
                 {/* FUTURE FEATURE */}
@@ -38,7 +38,7 @@ export default function SocialScreen() {
                     style={styles.card}
                     onPress={() => console.log("later")}
                 >
-                    <Text style={styles.cardTitle}>💬 Nachrichten</Text>
+                    <Text style={styles.cardTitle}>💬 Messages</Text>
                     <Text style={styles.cardSub}>Coming soon</Text>
                 </TouchableOpacity>
 

@@ -64,7 +64,7 @@ export default function SavedGames() {
                         marginTop: 15,
                     }}
                 >
-                    Gespeicherte Spiele
+                    Saved games
                 </Text>
                 {games.length === 0 ? (
                     <Text
@@ -75,7 +75,7 @@ export default function SavedGames() {
                             fontSize: 14,
                         }}
                     >
-                        Keine gespeicherten Spiele
+                        No saved games yet.
                     </Text>
                 ) : (
                     games.map(game => (
@@ -120,8 +120,8 @@ export default function SavedGames() {
                                     }}
                                 >
                                     {game.mode === "bot"
-                                        ? "🤖 Bot-Spiel"
-                                        : "👥 Lokales Spiel"}
+                                        ? "🤖 bot-game"
+                                        : "👥 Local-game"}
                                 </Text>
 
                                 <Text
@@ -139,15 +139,15 @@ export default function SavedGames() {
                             <Pressable
                                 onPress={() =>
                                     Alert.alert(
-                                        "Spiel löschen?",
-                                        "Diese Aktion kann nicht rückgängig gemacht werden.",
+                                        "Delete Game?",
+                                        "This action cannot be undone.",
                                         [
                                             {
-                                                text: "Abbrechen",
+                                                text: "Cancel",
                                                 style: "cancel",
                                             },
                                             {
-                                                text: "Löschen",
+                                                text: "Delete",
                                                 style: "destructive",
                                                 onPress: () => deleteGame(game.key),
                                             },

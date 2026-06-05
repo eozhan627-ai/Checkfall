@@ -6,7 +6,8 @@ export default function ComingSoonPage() {
         <View style={styles.container}>
             <Text style={styles.title}>Coming Soon 🚀</Text>
             <Text style={styles.subtitle}>
-                Diese Funktion wird bald verfügbar sein.  </Text>
+                This section is under construction. We're working hard to bring you new puzzles and challenges to improve your chess skills. Stay tuned for updates!
+            </Text>
         </View>
     );
 }

@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   ImageBackground,
@@ -9,14 +9,14 @@ import {
   View
 } from 'react-native';
 import { AccountType, getCurrentAccount } from '../../lib/account';
-import { getSocket } from '../../lib/socket';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [account, setAccount] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
-  const placeholder = require("../../assets/images/knight_black.png"); // Platzhalter-Avatar
-  const backgroundImage = require("../../assets/images/background.png"); // Hintergrundbild
+
+  const placeholder = require("../../assets/images/knight_black.png");
+  const backgroundImage = require("../../assets/images/background.png");
 
   useFocusEffect(
     React.useCallback(() => {
@@ -39,118 +39,206 @@ export default function HomeScreen() {
     }, [])
   );
 
-  useEffect(() => {
-    // Nur ausführen, wenn Account geladen wurde
-    if (loading) return;
-
-    const socket = getSocket();
-
-    // Cleanup beim Unmount
-    return () => {
-      socket.off('game_start');
-    };
-  }, [loading]);
-
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Lade... </Text>
+      <View style={styles.center}>
+        <Text style={{ color: "#fff" }}>Lade...</Text>
       </View>
     );
   }
 
   return (
-    <ImageBackground
-      source={backgroundImage}
-      style={styles.container}
-      resizeMode="cover">
-      <View style={styles.header}>
-        <View style={styles.side} />
+    <ImageBackground source={backgroundImage} style={styles.container} resizeMode="cover">
 
-        <View style={styles.centerTitle}>
-          <Text style={styles.title}>Checkfall</Text>
-          <Text style={styles.subtitle}>Play.Learn.Improve. </Text>
+      {/* CENTER WRAPPER (IMPORTANT FOR DESKTOP) */}
+      <View style={styles.centerWrapper}>
+
+        {/* HEADER */}
+        <View style={styles.header}>
+          <View style={{ width: 36 }} />
+
+          <View style={styles.titleBox}>
+            <Text style={styles.title}>Checkfall</Text>
+            <Text style={styles.subtitle}>Play · Learn · Improve  </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.profileBox}
+            onPress={() => router.push('/profile')}
+          >
+            <Image
+              source={
+                account?.avatar
+                  ? { uri: account.avatar }
+                  : placeholder
+              }
+              style={styles.avatar}
+            />
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.profileBox}
-          onPress={() => router.push('/profile')}
-        >
-          <Image
-            source={
-              account?.avatar && account.avatar.length > 5
-                ? { uri: account.avatar }
-                : placeholder
+        {/* CONTENT */}
+        <View style={styles.content}>
+
+          <TouchableOpacity style={styles.tile} onPress={() => router.push('/puzzle/dailyPuzzle')}>
+            <Text style={styles.titleText}>Daily Puzzle</Text>
+            <Text style={styles.subText}>Solve a puzzle</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.tile} onPress={() => router.push('/game/bot-game')}>
+            <Text style={styles.titleText}>Play vs Bot</Text>
+            <Text style={styles.subText}>AI opponent</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.tile} onPress={() => router.push('./indexLG')}>
+            <Text style={styles.titleText}>Local Game</Text>
+            <Text style={styles.subText}>Same device</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.tile} onPress={() => router.push('/savedGames')}>
+            <Text style={styles.titleText}>Saved Games</Text>
+            <Text style={styles.subText}>Review matches</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.tile} onPress={() => router.push('/Spielverlauf')}>
+            <Text style={styles.titleText}>History</Text>
+            <Text style={styles.subText}>Match history</Text>
+          </TouchableOpacity>
+
+        </View>
+
+        {/* FOOTER CTA */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.playOnline}
+            onPress={() =>
+              router.push({
+                pathname: "/game/waiting",
+                params: {
+                  name: account?.username,
+                  avatar: account?.avatar
+                }
+              })
             }
-            style={styles.avatar}
-          />
-        </TouchableOpacity>
+          >
+            <Text style={styles.playOnlineTitle}>Play Online</Text>
+            <Text style={styles.playOnlineSub}>Find real opponents</Text>
+          </TouchableOpacity>
+        </View>
+
       </View>
-
-      {/* LEISTEN */}
-      <View style={styles.lists}>
-        <TouchableOpacity style={styles.listSmall} onPress={() => router.push('/puzzle/dailyPuzzle')}>
-          <Text style={styles.listTitle}>Daily Puzzle</Text>
-          <Text style={styles.listSub}>Lös ein Puzzle</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.listMedium} onPress={() => router.push('/game/bot-game')}>
-          <Text style={styles.listTitle}>Spiele gegen einen Bot</Text>
-          <Text style={styles.listSub}>Computergesteuerter Gegner</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.listMiddle} onPress={() => router.push('./indexLG')}>
-          <Text style={styles.listTitle}>Spiele lokal</Text>
-          <Text style={styles.listSub}>Auf diesem Gerät spielen</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.listMedium} onPress={() => router.push('/savedGames')}>
-          <Text style={styles.listTitle}>Gespeicherte Spiele</Text>
-          <Text style={styles.listSub}>Aufrufen</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.listMedium} onPress={() => router.push('/Spielverlauf')}>
-          <Text style={styles.listTitle}>Spielverlauf</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.listBig}
-        onPress={() => {
-
-          router.push({
-            pathname: "/game/waiting",
-            params: {
-              name: account?.username,
-              avatar: account?.avatar
-            }
-          });
-
-        }}
-      >
-        <Text style={styles.listBigTitle}>Spiele online</Text>
-        <Text style={styles.listBigSub}>Finde einen echten Gegner </Text>
-      </TouchableOpacity>
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 30 },
-  side: { width: 36 },
-  centerTitle: { flex: 1, alignItems: 'center' },
-  title: { fontSize: 23, fontWeight: 'bold', color: '#fff' },
-  subtitle: { fontSize: 16, color: '#d4d4d4', marginBottom: 20 },
-  profileBox: { width: 36, height: 36, borderRadius: 6, overflow: 'hidden', backgroundColor: '#ffffff', borderColor: '#000000', borderWidth: 1 },
-  avatar: { width: 36, height: 36, borderRadius: 6 },
-  lists: { paddingHorizontal: 16, marginTop: 20, gap: 8 },
-  listSmall: { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 12, padding: 14, marginBottom: 12 },
-  listMedium: { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 14, paddingTop: 15, padding: 18, marginBottom: 12 },
-  listMiddle: { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderRadius: 14, padding: 16, marginBottom: 12 },
-  listBig: { backgroundColor: 'rgba(34, 34, 34, 0.8)', borderRadius: 16, padding: 22, marginHorizontal: 16, marginTop: 'auto', marginBottom: 12 },
-  listTitle: { fontSize: 18, fontWeight: '600', color: '#fff' },
-  listSub: { fontSize: 14, color: '#fff', marginTop: 4 },
-  listBigTitle: { fontSize: 22, fontWeight: '700', color: '#fff' },
-  listBigSub: { fontSize: 15, color: '#ccc', marginTop: 6 },
+  container: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center"
+  },
+
+  centerWrapper: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+
+  header: {
+    width: "100%",
+    maxWidth: 520,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
+
+  titleBox: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff"
+  },
+
+  subtitle: {
+    fontSize: 14,
+    color: "#ccc",
+    marginTop: 2,
+  },
+
+  profileBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+
+  avatar: {
+    width: 36,
+    height: 36,
+  },
+
+  content: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 520,
+    justifyContent: "flex-start",
+    gap: 12,
+    marginTop: 10,
+  },
+
+  tile: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 14,
+    padding: 16,
+    width: "100%",
+  },
+
+  titleText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff"
+  },
+
+  subText: {
+    fontSize: 13,
+    color: "#ccc",
+    marginTop: 4,
+  },
+
+  footer: {
+    width: "100%",
+    maxWidth: 520,
+    paddingBottom: 12,
+  },
+
+  playOnline: {
+    backgroundColor: "rgba(30,30,30,0.85)",
+    borderRadius: 16,
+    padding: 18,
+  },
+
+  playOnlineTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff"
+  },
+
+  playOnlineSub: {
+    fontSize: 13,
+    color: "#ccc",
+    marginTop: 4,
+  }
 });

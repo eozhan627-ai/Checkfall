@@ -25,7 +25,7 @@ export async function saveAccount(data: { username: string; guest: boolean }): P
     await AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 
     // direkt als aktueller Account setzen
-    await AsyncStorage.setItem(CURRENT_KEY, JSON.stringify(newAccount.id));
+    await AsyncStorage.setItem(CURRENT_KEY, newAccount.id);
     return newAccount;
 }
 
@@ -37,7 +37,8 @@ export async function getAccounts(): Promise<AccountType[]> {
 export async function getAccountById(id: string): Promise<AccountType | null> {
     const accounts = await getAccounts();
     return accounts.find(a => a.id === id) || null;
-} export async function getCurrentAccount(): Promise<AccountType | null> {
+}
+export async function getCurrentAccount(): Promise<AccountType | null> {
     try {
         const currentId = await AsyncStorage.getItem(CURRENT_KEY);
         if (!currentId) return null;

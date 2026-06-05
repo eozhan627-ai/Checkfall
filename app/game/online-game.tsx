@@ -9,6 +9,7 @@ import {
     ImageBackground,
     Pressable,
     ScrollView,
+
     StyleSheet,
     Text,
     View,
@@ -20,10 +21,18 @@ import {
     onGameOver
 } from "../../lib/gameSocket";
 import { getSocket } from "../../lib/socket";
+import Board from "./components/Board";
+import { useChessInput } from "./hooks/useChessInput";
+// board.tsx currently exports a component without declared props types
+// cast to any to avoid TSX prop type error when passing props
+const BoardAny: any = Board;
 
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
-const BOARD_SIZE = Dimensions.get("window").width - 32;
+const BOARD_SIZE = Math.min(
+    Dimensions.get("window").width * 0.9,
+    520
+);
 const SQUARE_SIZE = BOARD_SIZE / 8;
 
 const pieces: Record<string, any> = {
@@ -50,8 +59,7 @@ export default function GameScreen() {
 
     const [socket, setSocket] = useState<ReturnType<typeof getSocket> | null>(null);
     const [game, setGame] = useState(new Chess());
-    const [selected, setSelected] = useState<string | null>(null);
-    const [legalMoves, setLegalMoves] = useState<any[]>([]);
+
     const [moveHistory, setMoveHistory] = useState<string[]>([]);
     const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
     const [gameEnded, setGameEnded] = useState(false);
@@ -79,7 +87,13 @@ export default function GameScreen() {
     };
     const scrollRef = useRef<ScrollView>(null);
     const backgroundImage = require("../../assets/images/onlinebackground.png");
-
+    const input = useChessInput({
+        game,
+        setGame,
+        socket,
+        roomId,
+        myColor,
+    });
     // =============================
     // Socket initialisieren
     // =============================
@@ -96,7 +110,13 @@ export default function GameScreen() {
             console.log("Black:", black);
 
             const color = s.id === white ? "w" : s.id === black ? "b" : null;
-            if (!color) return;
+            console.log("Socket", s.id);
+            console.log("White Socket:", white);
+            console.log("Black Socket:", black);
+            if (!color) {
+                console.log("NO COLOR -> BUG STATE");
+                return;
+            }
 
             setMyColor(color);
             if (color === "w") {
@@ -121,8 +141,27 @@ export default function GameScreen() {
             s.off("connect", onConnect);
         };
     }, [white, black, whiteName, blackName, whiteAvatar, blackAvatar]);
+    const displayBoard =
+        myColor === "w"
+            ? game.board()
+            : [...game.board()]
+                .reverse()
+                .map(row => [...row].reverse());
+    const handleMove = (from: string, to: string) => {
+        const newGame = new Chess(game.fen());
+        const move = newGame.move({ from, to });
 
-    const displayBoard = myColor === "w" ? game.board() : [...game.board()].reverse();
+        if (!move) return;
+
+        setGame(newGame);
+        setMoveHistory(h => [...h, move.san]);
+        setLastMove({ from: move.from, to: move.to });
+
+        socket?.emit("player_move", {
+            roomId,
+            move: { from, to },
+        });
+    };
 
     // =============================
     // Gegnerzug Listener
@@ -131,6 +170,7 @@ export default function GameScreen() {
         if (!socket) return;
 
         const handleOpponentMove = ({ from, to }: any) => {
+            console.log("OPPONENT MOVE RECEIVED", from, to);
             setGame(prev => {
                 const newGame = new Chess(prev.fen());
                 const move = newGame.move({ from, to });
@@ -144,6 +184,8 @@ export default function GameScreen() {
         };
 
         socket.on("opponent_move", handleOpponentMove);
+        console.log("Move received");
+        console.log("Turn before", new Chess(game.fen()).turn());
         return () => {
             socket.off("opponent_move", handleOpponentMove);
         };
@@ -208,6 +250,26 @@ export default function GameScreen() {
         };
     }, [socket, roomId, router, myName, myAvatar]);
 
+    let checkSquare = null;
+
+    if (game.inCheck()) {
+        const board = game.board();
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = board[r][c];
+
+                if (
+                    piece &&
+                    piece.type === "k" &&
+                    piece.color === game.turn()
+                ) {
+                    checkSquare = `${FILES[c]}${8 - r}`;
+                }
+            }
+        }
+    }
+
     // =============================
     // Scroll zu letztem Zug
     // =============================
@@ -215,6 +277,17 @@ export default function GameScreen() {
         scrollRef.current?.scrollToEnd({ animated: true });
     }, [moveHistory]);
 
+    useEffect(() => {
+    const history = game.history({ verbose: true });
+    if (history.length === 0) return;
+
+    const last = history[history.length - 1];
+
+    setLastMove({
+        from: last.from,
+        to: last.to,
+    });
+}, [game]);
     // =============================
     // Prüfe Spielzustand
     // =============================
@@ -265,11 +338,11 @@ export default function GameScreen() {
             <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }}>
                 {!socket || !myColor ? (
                     <View style={styles.center}>
-                        <Text>Warte auf Verbindung...</Text>
+                        <Text>Warte auf Verbindung...   </Text>
                     </View>
                 ) : (
                     <View style={styles.wrapper}>
-                        <View style={{ width: BOARD_SIZE }}>
+                        <View style={{ width: BOARD_SIZE, marginTop: 100 }}>
                             {/* Gegner */}
                             <Pressable
                                 onPress={() =>
@@ -327,74 +400,18 @@ export default function GameScreen() {
                                 ))}
                             </ScrollView>
 
-                            {/* BOARD */}
-                            <View style={styles.board}>
-                                {displayBoard.map((row, displayRow) => {
-                                    const realRow = myColor === "w" ? displayRow : 7 - displayRow;
-
-                                    return row.map((piece, col) => {
-                                        const square = toSquare(realRow, col);
-                                        const isDark = (realRow + col) % 2 === 1;
-
-                                        const legal = legalMoves.find(m => m.to === square);
-                                        const isCapture = !!legal?.captured;
-
-                                        const isLastFrom = lastMove?.from === square;
-                                        const isLastTo = lastMove?.to === square;
-                                        const pieceKey = pieceToKey(piece);
-
-                                        return (
-                                            <Pressable
-                                                key={square}
-                                                disabled={gameEnded}
-                                                onPress={() => {
-                                                    if (game.turn() !== myColor) return;
-
-                                                    if (piece && !legal) {
-                                                        setSelected(square);
-                                                        setLegalMoves(game.moves({ square: square as any, verbose: true }));
-                                                        return;
-                                                    }
-
-                                                    if (selected && legal) {
-                                                        const newGame = new Chess(game.fen());
-                                                        const move = newGame.move({ from: selected, to: square });
-                                                        if (!move) return;
-
-                                                        setGame(newGame);
-                                                        setMoveHistory(h => [...h, move.san]);
-                                                        setLastMove({ from: move.from, to: move.to });
-                                                        setSelected(null);
-                                                        setLegalMoves([]);
-
-                                                        checkGameState(newGame);
-
-                                                        socket?.emit("player_move", {
-                                                            roomId,
-                                                            move: { from: move.from, to: move.to },
-                                                        });
-                                                    }
-                                                }}
-                                                style={[
-                                                    styles.square,
-                                                    {
-                                                        backgroundColor: isLastTo || isLastFrom ? "#2d7ea4" : isDark
-                                                            ? "#769656"
-                                                            : "#eeeed2",
-                                                        borderWidth: selected === square ? 2 : 0,
-                                                        borderColor: "#ac442c",
-                                                    },
-                                                ]}
-                                            >
-                                                {pieceKey && <Image source={pieces[pieceKey]} style={styles.piece} />}
-                                                {legal && !isCapture && <View style={styles.moveDot} />}
-                                                {legal && isCapture && <View style={styles.captureRing} />}
-                                            </Pressable>
-                                        );
-                                    });
-                                })}
-                            </View>
-
+                            {/* Schachbrett */}
+                            <BoardAny
+                                board={displayBoard}
+                                selectedSquare={input.selectedSquare}
+                                legalMoves={input.legalMoves}
+                                lastMove={lastMove}
+                                checkSquare={checkSquare}
+                                pieceToKey={pieceToKey}
+                                pieces={pieces}
+                                onPressSquare={input.onPressSquare}
+                                myColor={myColor}
+                            />
                             {/* Bottom */}
                             <View style={styles.bottomBar}>
                                 <Pressable
@@ -432,7 +449,7 @@ export default function GameScreen() {
 }
 
 const styles = StyleSheet.create({
-    wrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
+    wrapper: { flex: 0.8, justifyContent: "center", alignItems: "center" },
     center: { flex: 1, justifyContent: "center", alignItems: "center" },
     board: {
         width: BOARD_SIZE,
