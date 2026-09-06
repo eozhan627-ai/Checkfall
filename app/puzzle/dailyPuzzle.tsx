@@ -1,7 +1,6 @@
 import { Chess } from "chess.js";
 import { useState } from "react";
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-
 import { getDailyPuzzle } from "../../lib/dailyPuzzle";
 import PuzzleBoard from "../components/PuzzleBoard";
 
@@ -29,7 +28,7 @@ export default function DailyPuzzle() {
     const [moveIndex, setMoveIndex] = useState(0);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [hintStep, setHintStep] = useState<0 | 1 | 2>(0);
-
+    const playerColor = game.turn();
     const board = game.board();
     const backgroundImage = require("../../assets/images/onlinebackground.png"); // Hintergrundbild
     function selectPiece(square: string) {
@@ -154,12 +153,11 @@ export default function DailyPuzzle() {
                 <Text style={styles.subtitle}>Rating: {puzzle.rating}</Text>
 
                 <PuzzleBoard
-                    board={board}
+                    board={game.board()}
                     selectedSquare={selected}
                     legalSquares={legalMoves}
                     onSquarePress={onSquarePress}
-                    playerColor={game.turn()}
-
+                    playerColor={playerColor}
                 />
 
                 <Text style={styles.progress}>

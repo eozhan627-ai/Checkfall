@@ -1,6 +1,6 @@
-# Checkfall
+# POVCheck
 
-Checkfall is a modern chess app built with React Native and Expo.
+POVCheck is a modern chess app built with React Native and Expo.
 
 ## Current Features
 - Local chess games

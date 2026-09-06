@@ -4,7 +4,7 @@ import { ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity } from 
 
 export default function SocialScreen() {
     const router = useRouter();
-    const backgroundImage = require("../../assets/images/clanbackground.png"); // Hintergrundbild
+    const backgroundImage = require("../../assets/images/loginbackground.png"); // Hintergrundbild
 
     return (
         <ImageBackground source={backgroundImage} style={styles.container}>

@@ -1,24 +1,19 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Chess } from "chess.js";
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
     Alert,
-    Dimensions,
-    Image,
     ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
-    View
+    View,
 } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
-const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"];
-const BOARD_SIZE = Dimensions.get("window").width - 32;
-const SQUARE_SIZE = BOARD_SIZE / 8;
+import Board from "./components/Board";
 
 const pieces: Record<string, any> = {
     wp: require("../../assets/images/pawn_white.png"),
@@ -27,6 +22,7 @@ const pieces: Record<string, any> = {
     wb: require("../../assets/images/bishop_white.png"),
     wq: require("../../assets/images/queen_white.png"),
     wk: require("../../assets/images/king_white.png"),
+
     bp: require("../../assets/images/pawn_black.png"),
     br: require("../../assets/images/rook_black.png"),
     bn: require("../../assets/images/knight_black.png"),
@@ -35,634 +31,1521 @@ const pieces: Record<string, any> = {
     bk: require("../../assets/images/king_black.png"),
 };
 
-const toChessSquare = (row: number, col: number) => {
-    const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
-    return `${files[col]}${8 - row}`;
-};
-
 const pieceToKey = (piece: any) => {
     if (!piece) return null;
     return `${piece.color}${piece.type}`;
 };
 
+type MoveData = {
+    from: string;
+    to: string;
+    promotion?: string;
+};
 
+type SavedGameData = {
+    fen: string;
+    history: MoveData[];
+    bottomColor?: "w" | "b";
+    mode?: "local";
+    timestamp?: number;
+};
 
-export default function Board() {
-    const moveStack = useRef<any[]>([]);
-    const [moveIndex, setMoveIndex] = useState(0);
+export default function LocalGame() {
     const params = useLocalSearchParams();
-    const savedData = params.savedData
+
+    const savedData: SavedGameData | null = params.savedData
         ? JSON.parse(params.savedData as string)
         : null;
-    const [game, setGame] = useState(() => new Chess());
-    const backgroundImage = require("../../assets/images/onlinebackground.png"); // Hintergrundbild
 
-    const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
-    const [legalMoves, setLegalMoves] = useState<any[]>([]);
-    const [moveHistory, setMoveHistory] = useState<string[]>([]);
-    const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null);
-    const [bottomColor, setBottomColor] = useState<'w' | 'b'>('w');
+    // =========================================================
+    // GAME
+    // =========================================================
 
-    const isBlackBottom = bottomColor === 'b';
+    const [game, setGame] = useState<Chess>(() => new Chess());
 
-    const board = game.board();
-    const displayBoard = bottomColor === "w" ? board : [...board].reverse();
-    const [rotateBoard, setRotateBoard] = useState(false);
+    // =========================================================
+    // BOARD STATE
+    // =========================================================
 
-    const scrollRef = useRef<ScrollView>(null);
-    const [humanColor, setHumanColor] = useState<'w' | 'b'>('w');
-    const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
-    const [undoneMoves, setUndoneMoves] = useState<any[]>([]);
-    const [checkmate, setCheckmate] = useState<string | null>(null);
-    const getKingSquare = (color: "w" | "b") => {
-        const board = game.board();
+    const [selectedSquare, setSelectedSquare] =
+        useState<string | null>(null);
+
+    const [legalMoves, setLegalMoves] =
+        useState<any[]>([]);
+
+    const [lastMove, setLastMove] =
+        useState<{
+            from: string;
+            to: string;
+        } | null>(null);
+
+    const [checkmateSquare, setCheckmateSquare] =
+        useState<string | null>(null);
+
+    // =========================================================
+    // MOVE HISTORY
+    // =========================================================
+
+    const [moveHistory, setMoveHistory] =
+        useState<string[]>([]);
+
+    const moveStack =
+        useRef<MoveData[]>([]);
+
+    const [moveIndex, setMoveIndex] =
+        useState(0);
+
+    // =========================================================
+    // GAME FINISHED
+    // =========================================================
+
+    const gameFinished =
+        useRef(false);
+
+    // =========================================================
+    // MOVE BAR
+    // =========================================================
+
+    const scrollRef =
+        useRef<ScrollView>(null);
+
+    // =========================================================
+    // BACKGROUND
+    // =========================================================
+
+    const backgroundImage =
+        require("../../assets/images/onlinebackground.png");
+
+    // =========================================================
+    // BOARD / PERSPECTIVE
+    // =========================================================
+
+    /*
+     * Im Local Game dreht sich das Brett nach jedem Zug.
+     *
+     * Weiß am Zug  -> Weiß unten
+     * Schwarz am Zug -> Schwarz unten
+     *
+     * Board bekommt deshalb ein bereits entsprechend
+     * ausgerichtetes board + myColor.
+     */
+
+    const currentColor: "w" | "b" =
+        game.turn();
+
+    const myColor: "w" | "b" =
+        currentColor;
+
+    const rawBoard =
+        game.board();
+
+    const board =
+        myColor === "w"
+            ? rawBoard
+            : [...rawBoard]
+                .reverse()
+                .map((row) => [...row].reverse());
+
+    // =========================================================
+    // KING SQUARE
+    // =========================================================
+
+    const getKingSquare = (
+        currentGame: Chess,
+        color: "w" | "b"
+    ) => {
+        const currentBoard =
+            currentGame.board();
 
         for (let rank = 0; rank < 8; rank++) {
             for (let file = 0; file < 8; file++) {
-                const piece = board[rank][file];
-                if (piece && piece.type === "k" && piece.color === color) {
-                    return String.fromCharCode(97 + file) + (8 - rank);
+                const piece =
+                    currentBoard[rank][file];
+
+                if (
+                    piece &&
+                    piece.type === "k" &&
+                    piece.color === color
+                ) {
+                    return (
+                        String.fromCharCode(97 + file) +
+                        (8 - rank)
+                    );
                 }
             }
         }
 
         return null;
     };
-    const undoMove = () => {
-        if (moveIndex === 0) return; // nichts zum Rückgängigmachen
 
-        const newIndex = moveIndex - 1;
-        const newGame = new Chess();
+    // =========================================================
+    // GAME HISTORY
+    // =========================================================
 
-        // alle Züge bis newIndex anwenden
-        for (let i = 0; i < newIndex; i++) {
-            newGame.move(moveStack.current[i]);
+    const saveGameToHistory = async (
+        mode: "local",
+        result:
+            | "win"
+            | "loss"
+            | "draw"
+            | "aborted",
+        timestamp?: number
+    ) => {
+        try {
+            const key = "game_history";
+
+            const stored =
+                await AsyncStorage.getItem(key);
+
+            const history =
+                stored
+                    ? JSON.parse(stored)
+                    : [];
+
+            const time =
+                timestamp ?? Date.now();
+
+            history.unshift({
+                id: Date.now().toString(),
+                mode,
+                result,
+                timestamp: time,
+                date:
+                    new Date(time).toLocaleString(),
+            });
+
+            await AsyncStorage.setItem(
+                key,
+                JSON.stringify(history)
+            );
+        } catch (error) {
+            console.log(
+                "Fehler beim Speichern des Spielverlaufs:",
+                error
+            );
         }
-
-        setGame(newGame);
-        setMoveIndex(newIndex);
-
-        // moveHistory sauber anpassen
-        setMoveHistory(newGame.history({ verbose: false }));
-
-        // lastMove aktualisieren
-        const last = newIndex > 0 ? moveStack.current[newIndex - 1] : null;
-        setLastMove(last ? { from: last.from, to: last.to } : null);
-        checkGameEndLocal(newGame);
-
-        setSelectedSquare(null);
-        setLegalMoves([]);
-        setBottomColor(newGame.turn());
     };
 
-    const redoMove = () => {
-        if (moveIndex >= moveStack.current.length) return; // nichts zum Vorwärtsgehen
+    // =========================================================
+    // CHECK GAME END
+    // =========================================================
 
-        const newIndex = moveIndex + 1;
-        const newGame = new Chess();
-
-        // alle Züge bis newIndex anwenden
-        for (let i = 0; i < newIndex; i++) {
-            newGame.move(moveStack.current[i]);
+    const checkGameEndLocal = (
+        currentGame: Chess
+    ) => {
+        if (gameFinished.current) {
+            return true;
         }
 
-        setGame(newGame);
-        setMoveIndex(newIndex);
-
-        // moveHistory aktualisieren
-        setMoveHistory(newGame.history({ verbose: false }));
-
-        // lastMove auf den gerade wiederhergestellten Zug setzen
-        const last = moveStack.current[newIndex - 1];
-        setLastMove({ from: last.from, to: last.to });
-
-        setSelectedSquare(null);
-        setLegalMoves([]);
-        setBottomColor(newGame.turn());
-    };
-    useEffect(() => {
-        if (!savedData) return;
-
-        const loaded = new Chess(savedData.fen);
-        setGame(loaded);
-        setMoveHistory(savedData.history.map((m: any) => m.san));
-        setBottomColor(savedData.bottomColor);
-    }, []);
-    // scrollt immer zum letzten Zug
-    useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollToEnd({ animated: true });
-        }
-    }, [moveHistory]);
-    const checkGameEndLocal = (currentGame: Chess) => {
-        const showAlert = (title: string, message: string) => {
-            setTimeout(() => {
-                Alert.alert(title, message);
-            }, 800); // 0,8 Sekunden warten, damit der letzte Zug sichtbar ist
-        };
+        // -------------------------
+        // CHECKMATE
+        // -------------------------
 
         if (currentGame.isCheckmate()) {
-            const loser = currentGame.turn();
-            const winner = loser === "w" ? "b" : "w";
-            const result = winner === bottomColor ? "win" : "loss"; // bottomColor ist dein Spieler
+            gameFinished.current = true;
 
-            const kingSquare = getKingSquare(loser);
-            setCheckmate(kingSquare);
+            const loser =
+                currentGame.turn();
 
-            saveGameToHistory("local", result);
-            showAlert(
-                "Checkmate",
-                `${winner === "w" ? "White" : "Black"} has won`
+            const winner =
+                loser === "w"
+                    ? "b"
+                    : "w";
+
+            const kingSquare =
+                getKingSquare(
+                    currentGame,
+                    loser
+                );
+
+            setCheckmateSquare(
+                kingSquare
             );
+
+            /*
+             * Local ist kein "Human vs Bot".
+             * Für die lokale Statistik bleibt Weiß
+             * weiterhin die Referenz für win/loss.
+             */
+
+            const result =
+                winner === "w"
+                    ? "win"
+                    : "loss";
+
+            saveGameToHistory(
+                "local",
+                result
+            );
+
+            setTimeout(() => {
+                Alert.alert(
+                    "Checkmate",
+                    winner === "w"
+                        ? "White has won"
+                        : "Black has won"
+                );
+            }, 800);
+
             return true;
         }
+
+        // -------------------------
+        // STALEMATE
+        // -------------------------
 
         if (currentGame.isStalemate()) {
-            saveGameToHistory("local", "draw");
-            showAlert("Stalemate", "No legal moves left – Draw");
+            gameFinished.current = true;
+
+            saveGameToHistory(
+                "local",
+                "draw"
+            );
+
+            setTimeout(() => {
+                Alert.alert(
+                    "Stalemate",
+                    "No legal moves left – Draw"
+                );
+            }, 800);
+
             return true;
         }
 
-        if (currentGame.isThreefoldRepetition()) {
-            saveGameToHistory("local", "draw");
-            showAlert("Remis", "Triple repetition – Draw");
+        // -------------------------
+        // THREEFOLD
+        // -------------------------
+
+        if (
+            currentGame.isThreefoldRepetition()
+        ) {
+            gameFinished.current = true;
+
+            saveGameToHistory(
+                "local",
+                "draw"
+            );
+
+            setTimeout(() => {
+                Alert.alert(
+                    "Remis",
+                    "Triple repetition – Draw"
+                );
+            }, 800);
+
             return true;
         }
 
-        if (currentGame.isInsufficientMaterial()) {
-            saveGameToHistory("local", "draw");
-            showAlert("Remis", "Insufficient material for checkmate");
+        // -------------------------
+        // INSUFFICIENT MATERIAL
+        // -------------------------
+
+        if (
+            currentGame.isInsufficientMaterial()
+        ) {
+            gameFinished.current = true;
+
+            saveGameToHistory(
+                "local",
+                "draw"
+            );
+
+            setTimeout(() => {
+                Alert.alert(
+                    "Remis",
+                    "Insufficient material for checkmate"
+                );
+            }, 800);
+
             return true;
         }
+
+        // -------------------------
+        // GENERAL DRAW
+        // -------------------------
 
         if (currentGame.isDraw()) {
-            saveGameToHistory("local", "draw");
-            showAlert("Remis", "50-Züge-Regel oder allgemeines Remis");
+            gameFinished.current = true;
+
+            saveGameToHistory(
+                "local",
+                "draw"
+            );
+
+            setTimeout(() => {
+                Alert.alert(
+                    "Remis",
+                    "50-Züge-Regel oder allgemeines Remis"
+                );
+            }, 800);
+
             return true;
         }
 
         return false;
     };
 
-    const resetGame = () => {
-        const freshGame = new Chess();
+    // =========================================================
+    // LOAD SAVED GAME
+    // =========================================================
 
-        setGame(freshGame);
+    useEffect(() => {
+        if (!savedData) {
+            return;
+        }
+
+        try {
+            const loadedGame =
+                new Chess(
+                    savedData.fen
+                );
+
+            const history =
+                savedData.history ?? [];
+
+            setGame(
+                loadedGame
+            );
+
+            setMoveHistory(
+                loadedGame.history()
+            );
+
+            moveStack.current =
+                history.map(
+                    (move: any) => ({
+                        from: move.from,
+                        to: move.to,
+                        promotion:
+                            move.promotion,
+                    })
+                );
+
+            setMoveIndex(
+                moveStack.current.length
+            );
+
+            const verboseHistory =
+                loadedGame.history({
+                    verbose: true,
+                });
+
+            if (
+                verboseHistory.length > 0
+            ) {
+                const last =
+                    verboseHistory[
+                        verboseHistory.length - 1
+                    ];
+
+                setLastMove({
+                    from: last.from,
+                    to: last.to,
+                });
+            } else {
+                setLastMove(null);
+            }
+
+            setSelectedSquare(null);
+            setLegalMoves([]);
+            setCheckmateSquare(null);
+
+            gameFinished.current =
+                false;
+        } catch (error) {
+            console.log(
+                "Fehler beim Laden des Spiels:",
+                error
+            );
+        }
+    }, []);
+
+    // =========================================================
+    // AUTO SCROLL MOVE HISTORY
+    // =========================================================
+
+    useEffect(() => {
+        scrollRef.current?.scrollToEnd({
+            animated: true,
+        });
+    }, [moveHistory]);
+
+    // =========================================================
+    // RESET
+    // =========================================================
+
+    const resetGame = () => {
+        const freshGame =
+            new Chess();
+
+        setGame(
+            freshGame
+        );
+
         setSelectedSquare(null);
         setLegalMoves([]);
-        setPromotionMove(null);
         setMoveHistory([]);
         setLastMove(null);
+        setCheckmateSquare(null);
 
         moveStack.current = [];
+
         setMoveIndex(0);
 
-        setBottomColor("w");
+        gameFinished.current =
+            false;
     };
+
+    // =========================================================
+    // RESTART
+    // =========================================================
+
+    const restartGame = () => {
+        Alert.alert(
+            "Restart game?",
+            "Your progress will be lost.",
+            [
+                {
+                    text: "No",
+                    style: "cancel",
+                },
+                {
+                    text: "Yes",
+                    onPress: async () => {
+                        if (
+                            moveHistory.length > 0
+                        ) {
+                            await saveGameToHistory(
+                                "local",
+                                "aborted"
+                            );
+                        }
+
+                        resetGame();
+                    },
+                },
+            ]
+        );
+    };
+
+    // =========================================================
+    // SAVE
+    // =========================================================
+
     const saveGame = async () => {
         try {
-            const timestamp = Date.now();
-            const key = `@saved_game_${timestamp}`;
+            const timestamp =
+                Date.now();
+
+            const key =
+                `@saved_game_${timestamp}`;
 
             await AsyncStorage.setItem(
                 key,
                 JSON.stringify({
                     fen: game.fen(),
-                    history: game.history({ verbose: true }),
-                    bottomColor,
+
+                    history:
+                        game.history({
+                            verbose: true,
+                        }),
+
+                    bottomColor:
+                        currentColor,
+
                     mode: "local",
+
                     timestamp,
                 })
             );
 
-            // 🔹 Eintrag in Spielverlauf hinzufügen
-            await saveGameToHistory("local", "aborted", timestamp); // abgebrochenes Spiel, falls noch nicht fertig gespielt
+            await saveGameToHistory(
+                "local",
+                "aborted",
+                timestamp
+            );
 
             Alert.alert(
                 "Game saved",
                 "You can continue it under „Saved Games“."
             );
-        } catch (e) {
-            console.log("SaveGame Error", e);
-            Alert.alert("Error", "The game could not be saved.");
+        } catch (error) {
+            console.log(
+                "SaveGame Error:",
+                error
+            );
+
+            Alert.alert(
+                "Error",
+                "The game could not be saved."
+            );
         }
     };
-    async function saveGameToHistory(mode: "bot" | "local", result: "win" | "loss" | "draw" | "aborted",
-        timestamp?: number
-    ) {
-        try {
-            const key = "game_history";
-            const stored = await AsyncStorage.getItem(key);
-            const history = stored ? JSON.parse(stored) : [];
 
-            history.unshift({
-                id: Date.now().toString(),
-                mode,
-                result,
-                timestamp: timestamp ?? Date.now(),
-                date: new Date(timestamp ?? Date.now()).toLocaleString(),
-            });
+    // =========================================================
+    // UNDO
+    // =========================================================
 
-
-            await AsyncStorage.setItem(key, JSON.stringify(history));
-        } catch (e) {
-            console.log("Fehler beim Speichern des Spielverlaufs", e);
+    const undoMove = () => {
+        if (moveIndex <= 0) {
+            return;
         }
-    }
 
-    const handlePromotion = (pieceType: string) => {
-        if (!promotionMove) return;
+        const newIndex =
+            moveIndex - 1;
 
-        const newGame = new Chess(game.fen());
-        const move = newGame.move({
-            from: promotionMove.from,
-            to: promotionMove.to,
-            promotion: pieceType,
-        });
-        if (!move) return;
+        const newGame =
+            new Chess();
 
-        setGame(newGame);
-        setMoveHistory(prev => [...prev, move.san]);
-        moveStack.current = newGame.history({ verbose: true });
-        setMoveIndex(moveStack.current.length);
-        setLastMove({ from: move.from, to: move.to });
+        try {
+            for (
+                let i = 0;
+                i < newIndex;
+                i++
+            ) {
+                newGame.move(
+                    moveStack.current[i]
+                );
+            }
+        } catch (error) {
+            console.log(
+                "Undo Error:",
+                error
+            );
+
+            return;
+        }
+
+        setGame(
+            newGame
+        );
+
+        setMoveIndex(
+            newIndex
+        );
+
+        setMoveHistory(
+            newGame.history()
+        );
+
+        if (newIndex > 0) {
+            const last =
+                moveStack.current[
+                    newIndex - 1
+                ];
+
+            setLastMove({
+                from: last.from,
+                to: last.to,
+            });
+        } else {
+            setLastMove(null);
+        }
+
         setSelectedSquare(null);
         setLegalMoves([]);
-        setPromotionMove(null);
-        setBottomColor(c => (c === "w" ? "b" : "w"));
+        setCheckmateSquare(null);
 
-
-
-        checkGameEndLocal(newGame);
+        gameFinished.current =
+            false;
     };
 
+    // =========================================================
+    // REDO
+    // =========================================================
+
+    const redoMove = () => {
+        if (
+            moveIndex >=
+            moveStack.current.length
+        ) {
+            return;
+        }
+
+        const newIndex =
+            moveIndex + 1;
+
+        const newGame =
+            new Chess();
+
+        try {
+            for (
+                let i = 0;
+                i < newIndex;
+                i++
+            ) {
+                newGame.move(
+                    moveStack.current[i]
+                );
+            }
+        } catch (error) {
+            console.log(
+                "Redo Error:",
+                error
+            );
+
+            return;
+        }
+
+        setGame(
+            newGame
+        );
+
+        setMoveIndex(
+            newIndex
+        );
+
+        setMoveHistory(
+            newGame.history()
+        );
+
+        const last =
+            moveStack.current[
+                newIndex - 1
+            ];
+
+        setLastMove({
+            from: last.from,
+            to: last.to,
+        });
+
+        setSelectedSquare(null);
+        setLegalMoves([]);
+        setCheckmateSquare(null);
+
+        gameFinished.current =
+            false;
+
+        checkGameEndLocal(
+            newGame
+        );
+    };
+
+    // =========================================================
+    // MAKE MOVE
+    // =========================================================
+
+    const makeMove = (
+        from: string,
+        to: string,
+        promotion?: "q" | "r" | "b" | "n"
+    ) => {
+        if (
+            gameFinished.current
+        ) {
+            return;
+        }
+
+        const newGame =
+            new Chess(
+                game.fen()
+            );
+
+        let move;
+
+        try {
+            move =
+                newGame.move({
+                    from: from as any,
+                    to: to as any,
+
+                    ...(promotion
+                        ? { promotion }
+                        : {}),
+                });
+        } catch (error) {
+            console.log(
+                "Move Error:",
+                error
+            );
+
+            return;
+        }
+
+        if (!move) {
+            return;
+        }
+
+        // =====================================================
+        // NACH UNDO/REDO ZUKUNFT ABSCHNEIDEN
+        // =====================================================
+
+        const newStack =
+            moveStack.current.slice(
+                0,
+                moveIndex
+            );
+
+        newStack.push({
+            from: move.from,
+            to: move.to,
+            promotion:
+                move.promotion,
+        });
+
+        moveStack.current =
+            newStack;
+
+        setMoveIndex(
+            newStack.length
+        );
+
+        setGame(
+            newGame
+        );
+
+        setMoveHistory(
+            newGame.history()
+        );
+
+        setLastMove({
+            from: move.from,
+            to: move.to,
+        });
+
+        setSelectedSquare(null);
+        setLegalMoves([]);
+
+        checkGameEndLocal(
+            newGame
+        );
+    };
+
+    // =========================================================
+    // PROMOTION
+    // =========================================================
+
+    const showPromotion = (
+        from: string,
+        to: string
+    ) => {
+        Alert.alert(
+            "Promote pawn",
+            "Choose a piece:",
+            [
+                {
+                    text: "Queen",
+                    onPress: () =>
+                        makeMove(
+                            from,
+                            to,
+                            "q"
+                        ),
+                },
+                {
+                    text: "Rook",
+                    onPress: () =>
+                        makeMove(
+                            from,
+                            to,
+                            "r"
+                        ),
+                },
+                {
+                    text: "Bishop",
+                    onPress: () =>
+                        makeMove(
+                            from,
+                            to,
+                            "b"
+                        ),
+                },
+                {
+                    text: "Knight",
+                    onPress: () =>
+                        makeMove(
+                            from,
+                            to,
+                            "n"
+                        ),
+                },
+            ]
+        );
+    };
+
+    // =========================================================
+    // SQUARE PRESS
+    // =========================================================
+
+    const onPressSquare = (
+        square: string
+    ) => {
+        if (
+            gameFinished.current
+        ) {
+            return;
+        }
+
+        /*
+         * WICHTIG:
+         *
+         * Kein humanColor mehr.
+         *
+         * Local Game:
+         * Weiß darf ziehen, wenn Weiß am Zug ist.
+         * Schwarz darf ziehen, wenn Schwarz am Zug ist.
+         */
+
+        const piece =
+            game.get(
+                square as any
+            );
+
+        // =====================================================
+        // KEINE FIGUR AUSGEWÄHLT
+        // =====================================================
+
+        if (!selectedSquare) {
+            if (!piece) {
+                return;
+            }
+
+            // Nur die Farbe, die gerade am Zug ist.
+            if (
+                piece.color !== game.turn()
+            ) {
+                return;
+            }
+
+            const moves =
+                game.moves({
+                    square:
+                        square as any,
+
+                    verbose: true,
+                });
+
+            if (
+                moves.length === 0
+            ) {
+                return;
+            }
+
+            setSelectedSquare(
+                square
+            );
+
+            setLegalMoves(
+                moves
+            );
+
+            return;
+        }
+
+        // =====================================================
+        // EIGENE FIGUR ANKLICKEN
+        // =====================================================
+
+        if (
+            piece &&
+            piece.color === game.turn()
+        ) {
+            const moves =
+                game.moves({
+                    square:
+                        square as any,
+
+                    verbose: true,
+                });
+
+            if (
+                moves.length === 0
+            ) {
+                setSelectedSquare(
+                    null
+                );
+
+                setLegalMoves(
+                    []
+                );
+
+                return;
+            }
+
+            setSelectedSquare(
+                square
+            );
+
+            setLegalMoves(
+                moves
+            );
+
+            return;
+        }
+
+        // =====================================================
+        // LEGAL MOVE
+        // =====================================================
+
+        const legalMove =
+            legalMoves.find(
+                (move) =>
+                    move.to === square
+            );
+
+        if (!legalMove) {
+            setSelectedSquare(
+                null
+            );
+
+            setLegalMoves(
+                []
+            );
+
+            return;
+        }
+
+        // =====================================================
+        // PROMOTION
+        // =====================================================
+
+        if (
+            legalMove.piece === "p" &&
+            (
+                square[1] === "8" ||
+                square[1] === "1"
+            )
+        ) {
+            showPromotion(
+                selectedSquare,
+                square
+            );
+
+            return;
+        }
+
+        // =====================================================
+        // NORMAL MOVE
+        // =====================================================
+
+        makeMove(
+            selectedSquare,
+            square
+        );
+    };
+
+    // =========================================================
+    // CHECK STATUS
+    // =========================================================
+
+    const isCheck =
+        game.isCheck();
+
+    const isCheckmate =
+        game.isCheckmate();
+
+    const isStalemate =
+        game.isStalemate();
+
+    const isDraw =
+        game.isDraw();
+
+    let checkSquare:
+        string | null = null;
+
+    if (isCheck) {
+        checkSquare =
+            getKingSquare(
+                game,
+                game.turn()
+            );
+    }
+
+    // =========================================================
+    // MOVE ROWS
+    // =========================================================
+
+    const moveRows =
+        moveHistory.reduce(
+            (
+                rows: any[],
+                move,
+                index
+            ) => {
+                if (
+                    index % 2 === 0
+                ) {
+                    rows.push({
+                        moveNumber:
+                            index / 2 + 1,
+
+                        white: move,
+
+                        black: "",
+                    });
+                } else {
+                    rows[
+                        rows.length - 1
+                    ].black = move;
+                }
+
+                return rows;
+            },
+            []
+        );
+
+    // =========================================================
+    // UI
+    // =========================================================
 
     return (
         <ImageBackground
-            source={backgroundImage}
-            style={{ flex: 1, }}
+            source={
+                backgroundImage
+            }
+            style={
+                styles.background
+            }
             resizeMode="cover"
         >
             <SafeAreaView
-                style={{ flex: 1, backgroundColor: 'transparent' }}
-                edges={['top', 'left', 'right']}
+                style={
+                    styles.safeArea
+                }
+                edges={[
+                    "top",
+                    "left",
+                    "right",
+                ]}
             >
                 <View
-                    style={{
-                        flex: 1,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        backgroundColor: 'transparent',
-                    }}
+                    style={
+                        styles.container
+                    }
                 >
-                    <View style={{ width: BOARD_SIZE }}>
 
-                        {/* Zugleiste oben */}
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.moveBar}
-                            contentContainerStyle={styles.moveBarContent}
-                            ref={scrollRef}
+                    {/* ========================================= */}
+                    {/* HEADER */}
+                    {/* ========================================= */}
+
+                    <View
+                        style={
+                            styles.header
+                        }
+                    >
+                        <Pressable
+                            onPress={() =>
+                                router.back()
+                            }
+                            style={
+                                styles.backButton
+                            }
                         >
-                            {moveHistory.reduce((rows: any[], move, index) => {
-                                if (index % 2 === 0) {
-                                    rows.push({ moveNumber: index / 2 + 1, white: move, black: "" });
-                                } else {
-                                    rows[rows.length - 1].black = move;
-                                }
-                                return rows;
-                            }, []).map((row, index) => (
-                                <Text key={index} style={styles.moveChip}>
-                                    {row.moveNumber}. {row.white} {row.black}
-                                </Text>
-                            ))}
-                        </ScrollView>
-
-                        {/* Promotion-Bar */}
-                        {promotionMove && (
-                            <View style={styles.promotionBar}>
-                                {[
-                                    { label: "Q", value: "q" },
-                                    { label: "R", value: "r" },
-                                    { label: "N", value: "n" },
-                                    { label: "B", value: "b" },
-                                ].map(p => (
-                                    <Pressable
-                                        key={p.value}
-                                        style={styles.promotionBtn}
-                                        onPress={() => handlePromotion(p.value)}
-                                    >
-                                        <Text>{p.label}</Text>
-                                    </Pressable>
-                                ))}
-                            </View>
-                        )}
-
-                        <View style={styles.board}>
-                            {displayBoard.map((row, displayRowIndex) => {
-                                const actualRowIndex = bottomColor === "w" ? displayRowIndex : 7 - displayRowIndex;
-
-                                return (
-                                    <React.Fragment key={displayRowIndex}>
-                                        {row.map((piece, colIndex) => {
-                                            const isBottomRank = bottomColor === "w" ? actualRowIndex === 7 : actualRowIndex === 0;
-                                            const isLeftFile = bottomColor === "w" ? colIndex === 0 : colIndex === 7;
-
-                                            const fileLabel = FILES[colIndex];
-                                            const rankLabel = bottomColor === "w"
-                                                ? RANKS[actualRowIndex]
-                                                : (8 - actualRowIndex).toString();
-
-                                            const square = toChessSquare(actualRowIndex, colIndex);
-                                            const isDark = (actualRowIndex + colIndex) % 2 === 1;
-                                            const isSelected = selectedSquare === square;
-                                            const legalMove = legalMoves.find(m => m.to === square);
-                                            const isLegalMove = !!legalMove;
-                                            const isCapture = !!legalMove?.captured;
-                                            const pieceKey = pieceToKey(piece);
-                                            const isLastFrom = lastMove?.from === square;
-                                            const isLastTo = lastMove?.to === square;
-
-                                            return (
-                                                <Pressable
-                                                    key={square}
-                                                    onPress={() => {
-                                                        if (piece && !isLegalMove) {
-                                                            setSelectedSquare(square);
-                                                            setLegalMoves(game.moves({ square: square as any, verbose: true }));
-                                                            return;
-                                                        }
-
-                                                        if (selectedSquare && isLegalMove) {
-                                                            if (legalMove.piece === "p" && (square[1] === "8" || square[1] === "1")) {
-                                                                setPromotionMove({ from: selectedSquare, to: square });
-                                                                return;
-                                                            }
-
-                                                            const newGame = new Chess(game.fen());
-                                                            const move = newGame.move({ from: selectedSquare as any, to: square as any });
-                                                            if (!move) return;
-
-                                                            setGame(newGame);
-                                                            setMoveHistory(prev => [...prev, move.san]);
-                                                            setLastMove({ from: move.from, to: move.to })
-                                                            setSelectedSquare(null);
-                                                            setLegalMoves([]);
-                                                            setBottomColor(c => (c === "w" ? "b" : "w"));
-                                                            // Alte undoneMoves löschen, falls man nach Undo einen neuen Zug macht
-                                                            moveStack.current = moveStack.current.slice(0, moveIndex);
-
-                                                            // Neuen Zug hinzufügen
-                                                            moveStack.current.push(move);
-                                                            setMoveIndex(moveStack.current.length);
-                                                            checkGameEndLocal(newGame);
-                                                        }
-                                                    }}
-                                                    style={[
-                                                        styles.square,
-                                                        {
-                                                            backgroundColor:
-                                                                square === checkmate
-                                                                    ? "#ff3b30"
-                                                                    : isLastTo
-                                                                        ? "#2d7ea4"       // Ziel-Feld (kräftig)
-                                                                        : isLastFrom
-                                                                            ? "#2d7ea4"      // Start-Feld (heller)
-                                                                            : isDark
-                                                                                ? "#769656"
-                                                                                : "#d8cdb4",
-                                                            borderWidth: isSelected ? 2 : 0,
-                                                            borderColor: isSelected ? "#ac442c" : "transparent",
-                                                        },
-                                                    ]}
-                                                >
-                                                    {pieceKey && (
-                                                        <Image
-                                                            source={pieces[pieceKey]}
-                                                            style={[
-                                                                styles.piece,
-
-                                                                // schwarze Bauern extra vergrößern
-                                                                pieceKey === "bp" && {
-                                                                    transform: [{ scale: 1.4 }, { translateY: 3.25 }, { translateX: -1 }]
-                                                                },
-
-                                                                // alle anderen schwarzen Figuren normal vergrößern
-                                                                pieceKey?.startsWith("b") && pieceKey !== "bp" && {
-                                                                    transform: [{ scale: 1.12 }],
-                                                                },
-
-                                                                // weiße Läufer, Dame und König vergrößern
-                                                                (pieceKey === "wb" || pieceKey === "wq" || pieceKey === "wk") && {
-                                                                    transform: [{ scale: 1.12 }],
-                                                                },
-                                                                pieceKey === "wp" && {
-                                                                    transform: [{ scale: 0.9 },]
-                                                                },
-
-
-                                                            ]}
-                                                        />
-                                                    )}
-                                                    {isLegalMove && !isCapture && <View style={styles.moveDot} />}
-                                                    {isLegalMove && isCapture && <View style={styles.captureRing} />}
-
-                                                    {/* Zahlen links */}
-                                                    {colIndex === 0 && (
-                                                        <Text style={[
-                                                            styles.coord, {
-                                                                left: 2,
-                                                                top: bottomColor === 'w' ? undefined : 2, bottom: bottomColor === 'w' ? 2 : undefined
-                                                            },
-                                                            { color: isDark ? "#e5e7eb" : "#334155" }]}>
-                                                            {rankLabel}
-                                                        </Text>
-                                                    )}
-
-                                                    {/* Buchstaben unten */}
-                                                    {displayRowIndex === 7 && (
-                                                        <Text style={[
-                                                            styles.coord, { right: 2, bottom: 2 },
-                                                            { color: isDark ? "#e5e7eb" : "#334155" }]}>
-                                                            {fileLabel}
-                                                        </Text>
-                                                    )}
-                                                </Pressable>
-                                            );
-                                        })}
-                                    </React.Fragment>
-                                );
-                            })}
-                        </View>
-
-                        {/* Bottom-Bar */}
-                        <View style={styles.bottomBar}>
-                            {/* Zurück zur Startseite */}
-                            <Pressable
-                                onPress={() =>
-                                    Alert.alert("Back to home?", "", [
-                                        { text: "No", style: "cancel" },
-                                        { text: "Yes", onPress: () => router.push('/') }, // zurück zur Startseite
-                                    ])
+                            <Text
+                                style={
+                                    styles.backText
                                 }
                             >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Zurück </Text>
-                            </Pressable>
+                                ‹
+                            </Text>
+                        </Pressable>
 
-                            {/* Speichern */}
-                            <Pressable
-                                onPress={async () => {
-                                    try {
-                                        await saveGame(); // bestehende Funktion verwenden
-                                        Alert.alert("Game saved", "Your game has been saved. You can continue it under „Saved Games“.");
-                                    } catch (e) {
-                                        console.log("Error saving game:", e);
-                                    }
-                                }}
-                            >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Save </Text>
-                            </Pressable>
+                        <Text
+                            style={
+                                styles.headerTitle
+                            }
+                        >
+                            LOCAL GAME
+                        </Text>
 
-                            {/* Neustarten */}
-                            <Pressable
-                                onPress={() =>
-                                    Alert.alert("Restart game?", "Your progress will be lost.", [
-                                        { text: "No", style: "cancel" },
-                                        {
-                                            text: "Yes",
-                                            onPress: async () => {
-                                                // Lokales Spiel als "abgebrochen" speichern
-                                                await saveGameToHistory("local", "aborted");
-
-                                                resetGame(); // Spiel zurücksetzen
-                                                setBottomColor("w"); // Weiß immer unten
-                                                setHumanColor("w"); // Mensch immer Weiß
-                                                setLastMove(null);
-                                            },
-                                        },
-                                    ])
-                                }
-                            >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Restart </Text>
-                            </Pressable>
-
-                        </View>
-                        {/* UNDO / REDO */}
+                        {/* Symmetrie rechts */}
                         <View
-                            style={{
-                                marginTop: 20,
-                                flexDirection: "row",
-                                justifyContent: "center",
-                                gap: 32,
-                            }}
-                        >
-                            <Pressable onPress={undoMove}>
-                                <Text style={{ fontSize: 17, color: "#f6f6f6" }}>⬅️ Last Move  </Text>
-                            </Pressable>
-
-                            <Pressable onPress={redoMove}>
-                                <Text style={{ fontSize: 17, color: "#f6f6f6" }}> Forward ➡️</Text>
-                            </Pressable>
-                        </View>
+                            style={
+                                styles.headerSpacer
+                            }
+                        />
                     </View>
+
+                    {/* ========================================= */}
+                    {/* MOVE HISTORY */}
+                    {/* ========================================= */}
+
+                    <View
+                        style={
+                            styles.moveHistoryWrapper
+                        }
+                    >
+                        <ScrollView
+                            ref={
+                                scrollRef
+                            }
+                            horizontal
+                            showsHorizontalScrollIndicator={
+                                false
+                            }
+                            contentContainerStyle={
+                                styles.moveHistoryContent
+                            }
+                        >
+                            {moveRows.map(
+                                (
+                                    row,
+                                    index
+                                ) => (
+                                    <Text
+                                        key={
+                                            index
+                                        }
+                                        style={
+                                            styles.moveChip
+                                        }
+                                    >
+                                        {
+                                            row.moveNumber
+                                        }
+                                        .{" "}
+                                        {
+                                            row.white
+                                        }{" "}
+                                        {
+                                            row.black
+                                        }
+                                    </Text>
+                                )
+                            )}
+                        </ScrollView>
+                    </View>
+
+                    {/* ========================================= */}
+                    {/* COMMON BOARD COMPONENT */}
+                    {/* ========================================= */}
+
+                    <Board
+                        board={
+                            board
+                        }
+
+                        selectedSquare={
+                            selectedSquare
+                        }
+
+                        legalMoves={
+                            legalMoves
+                        }
+
+                        lastMove={
+                            lastMove
+                        }
+
+                        checkSquare={
+                            checkSquare
+                        }
+
+                        onPressSquare={
+                            onPressSquare
+                        }
+
+                        pieces={
+                            pieces
+                        }
+
+                        pieceToKey={
+                            pieceToKey
+                        }
+
+                        myColor={
+                            myColor
+                        }
+
+                        mode="local"
+
+                        isCheck={
+                            isCheck
+                        }
+
+                        isCheckmate={
+                            isCheckmate
+                        }
+
+                        isStalemate={
+                            isStalemate
+                        }
+
+                        isDraw={
+                            isDraw
+                        }
+
+                        onUndo={
+                            undoMove
+                        }
+
+                        onRedo={
+                            redoMove
+                        }
+
+                        onSave={
+                            saveGame
+                        }
+
+                        onRestart={
+                            restartGame
+                        }
+                    />
+
+                    {/* ========================================= */}
+                    {/* LOCAL GAME INFO */}
+                    {/* ========================================= */}
+
+                    <View
+                        style={
+                            styles.turnContainer
+                        }
+                    >
+                        <Text
+                            style={
+                                styles.turnLabel
+                            }
+                        >
+                            AM ZUG
+                        </Text>
+
+                        <Text
+                            style={
+                                styles.turnText
+                            }
+                        >
+                            {currentColor === "w"
+                                ? "WEISS"
+                                : "SCHWARZ"}
+                        </Text>
+                    </View>
+
+                    {/* ========================================= */}
+                    {/* ACTION BUTTONS */}
+                    {/* ========================================= */}
+
+                    <View
+                        style={
+                            styles.actionsRow
+                        }
+                    >
+                        <Pressable
+                            onPress={
+                                undoMove
+                            }
+                            style={
+                                styles.actionButton
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.actionText
+                                }
+                            >
+                                Undo
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            onPress={
+                                redoMove
+                            }
+                            style={
+                                styles.actionButton
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.actionText
+                                }
+                            >
+                                Redo
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            onPress={
+                                saveGame
+                            }
+                            style={
+                                styles.actionButton
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.actionText
+                                }
+                            >
+                                Save
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            onPress={
+                                restartGame
+                            }
+                            style={
+                                styles.actionButton
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.actionText
+                                }
+                            >
+                                Restart
+                            </Text>
+                        </Pressable>
+                    </View>
+
                 </View>
             </SafeAreaView>
         </ImageBackground>
     );
 }
 
+// =============================================================
+// STYLES
+// =============================================================
+
 const styles = StyleSheet.create({
-    board: {
-        width: BOARD_SIZE,
-        height: BOARD_SIZE,
-        flexDirection: "row",
-        flexWrap: "wrap",
-        alignSelf: "center",
-        borderRadius: 5,
-        overflow: "hidden",
+    background: {
+        flex: 1,
     },
-    square: {
-        width: SQUARE_SIZE,
-        height: SQUARE_SIZE,
+
+    safeArea: {
+        flex: 1,
+        backgroundColor:
+            "transparent",
+    },
+
+    container: {
+        flex: 1,
+        width: "100%",
+        alignItems: "center",
+        paddingTop: 0,
+    },
+
+    // =========================================================
+    // HEADER
+    // =========================================================
+
+    header: {
+        width: "100%",
+        height: 70,
+        paddingHorizontal: 18,
+
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+
+    backButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 14,
+
+        backgroundColor:
+            "rgba(255,255,255,0.07)",
+
         justifyContent: "center",
         alignItems: "center",
     },
-    piece: {
-        width: SQUARE_SIZE * 0.9,
-        height: SQUARE_SIZE * 0.9,
-        resizeMode: "contain",
 
+    backText: {
+        color: "#fff",
+        fontSize: 34,
+        lineHeight: 34,
+        fontWeight: "300",
     },
-    moveDot: {
-        position: "absolute",
-        width: SQUARE_SIZE * 0.25,
-        height: SQUARE_SIZE * 0.25,
-        borderRadius: 100,
-        backgroundColor: "rgba(0,0,0,0.3)",
+
+    headerTitle: {
+        color: "#D4AF37",
+        fontSize: 13,
+        fontWeight: "800",
+        letterSpacing: 3,
     },
-    captureRing: {
-        position: "absolute",
-        width: SQUARE_SIZE * 0.9,
-        height: SQUARE_SIZE * 0.9,
-        borderRadius: 100,
-        borderWidth: 3,
-        borderColor: "rgba(0,0,0,0.35)",
+
+    headerSpacer: {
+        width: 42,
+        height: 42,
     },
-    moveBar: {
-        maxHeight: 40,
-        marginBottom: 12,
+
+    // =========================================================
+    // MOVE HISTORY
+    // =========================================================
+
+    moveHistoryWrapper: {
+        width: "92%",
+        height: 40,
+        marginBottom: 4,
     },
-    moveBarContent: {
-        paddingHorizontal: 12,
+
+    moveHistoryContent: {
         alignItems: "center",
+        paddingHorizontal: 4,
     },
+
     moveChip: {
         marginRight: 8,
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
-        backgroundColor: '#f6f6f6',
+
+        backgroundColor:
+            "#f6f6f6",
+
         color: "#111827",
         fontSize: 13,
     },
-    bottomBar: {
-        marginTop: 16,
+
+    // =========================================================
+    // TURN
+    // =========================================================
+
+    turnContainer: {
+        alignItems: "center",
+        marginTop: 10,
+    },
+
+    turnLabel: {
+        color: "#777",
+        fontSize: 9,
+        fontWeight: "800",
+        letterSpacing: 2,
+    },
+
+    turnText: {
+        color: "#D4AF37",
+        fontSize: 13,
+        fontWeight: "800",
+        letterSpacing: 2,
+        marginTop: 2,
+    },
+
+    // =========================================================
+    // ACTIONS
+    // =========================================================
+
+    actionsRow: {
+        width: "92%",
         flexDirection: "row",
         justifyContent: "space-between",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderTopWidth: 1,
-        borderColor: "#fff",
-        width: BOARD_SIZE,
+        marginTop: 12,
     },
-    bottomBtn: {
-        fontSize: 14,
-    },
-    promotionBar: {
-        position: "absolute",
-        bottom: BOARD_SIZE + 120,
-        alignSelf: "center",
-        flexDirection: "row",
-        backgroundColor: "#111827",
+
+    actionButton: {
+        minWidth: 70,
+        height: 38,
+
+        paddingHorizontal: 10,
+
         borderRadius: 12,
-        padding: 10,
-        zIndex: 100,
-        elevation: 10,
-    },
-    promotionBtn: {
-        marginHorizontal: 6,
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        backgroundColor: "#e5e7eb",
+
+        backgroundColor:
+            "rgba(255,255,255,0.07)",
+
+        borderWidth: 1,
+        borderColor:
+            "rgba(255,255,255,0.08)",
+
         justifyContent: "center",
         alignItems: "center",
     },
-    coord: {
-        position: "absolute",
-        fontSize: 10,
+
+    actionText: {
+        color: "#fff",
+        fontSize: 12,
         fontWeight: "600",
-        color: '#334155',
     },
 });

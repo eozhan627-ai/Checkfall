@@ -14,6 +14,7 @@ import {
     View,
 } from "react-native";
 import { io, Socket } from "socket.io-client";
+import { useChessInput } from "./hooks/useChessInput";
 
 const BOARD_SIZE = Dimensions.get("window").width - 32;
 const SQUARE_SIZE = BOARD_SIZE / 8;
@@ -85,9 +86,62 @@ export default function Playbot() {
         bottomColor: "w" | "b";
         humanColor: "w" | "b";
         botColor: "w" | "b";
+        botElo: 100 | 300 | 500 | 1000;
     };
     const [gameOver, setGameOver] = useState(false);
     const [savedData, setSavedData] = useState<SavedData | null>(null);
+    useEffect(() => {
+        const loadSavedGame = async () => {
+            if (!params.key) return;
+
+            try {
+                const key = params.key as string;
+                const stored = await AsyncStorage.getItem(key);
+
+                if (!stored) {
+                    Alert.alert("Error", "Saved game could not be found.");
+                    return;
+                }
+
+                const data = JSON.parse(stored);
+
+                setSavedData(data);
+
+                const loadedGame = new Chess(data.fen);
+
+                setGame(loadedGame);
+
+                // WICHTIG:
+                // Nicht loadedGame.history() benutzen.
+                // Die FEN kennt die vorherigen Züge nicht.
+                setMoveHistory(
+                    data.history?.map((move: any) => move.san) ?? []
+                );
+
+                setBottomColor(data.bottomColor);
+                setHumanColor(data.humanColor);
+                setBotColor(data.botColor);
+
+                if (data.botElo) {
+                    setBotElo(data.botElo);
+                }
+
+                setGameStarted(true);
+                setSelectedSquare(null);
+                setLegalMoves([]);
+                setLastMove(null);
+                setKingInCheck(null);
+                setGameOver(false);
+
+            } catch (error) {
+                console.log("Error loading saved bot game:", error);
+                Alert.alert("Error", "Saved game could not be loaded.");
+            }
+        };
+
+        loadSavedGame();
+    }, [params.key]);
+
     const displayBoard =
         bottomColor === "w" ? board : [...board].reverse().map(row => [...row].reverse());
 
@@ -102,13 +156,13 @@ export default function Playbot() {
         const s = io("https://checkfall-server-clean-1.onrender.com");
         socket.current = s;
 
-        const onOpponentMove = (botMove: string) => {
-            console.log("🔥 BOT MOVE RECEIVED:", botMove);
+        const onOpponentMove = (data: any) => {
+            console.log("🔥 BOT MOVE RECEIVED:", data);
 
             const moveObj = {
-                from: botMove.slice(0, 2),
-                to: botMove.slice(2, 4),
-                promotion: botMove[4] ?? undefined
+                from: data.from,
+                to: data.to,
+                promotion: data.promotion
             };
 
             setGame(prev => {
@@ -123,17 +177,39 @@ export default function Playbot() {
                 setMoveHistory(h => [...h, move.san]);
                 setLastMove({ from: move.from, to: move.to });
 
-
                 checkGameEnd(newGame);
-
                 return newGame;
             });
         };
 
-        s.on("connect", () => {
+        s.on("connect", async () => {
             console.log("✅ Connected:", s.id);
-        });
 
+            // Gespeichertes Bot-Spiel fortsetzen
+            if (params.key) {
+                try {
+                    const key = params.key as string;
+                    const stored = await AsyncStorage.getItem(key);
+
+                    if (!stored) return;
+
+                    const data = JSON.parse(stored);
+
+                    console.log("🔄 RESUMING SAVED BOT GAME");
+
+                    s.emit("find_bot_match", {
+                        name: "Player",
+                        avatar: "",
+                        level: data.botElo ?? 100,
+                        playerColor: data.humanColor,
+                        startFEN: data.fen,
+                    });
+
+                } catch (error) {
+                    console.log("❌ Error resuming bot game:", error);
+                }
+            }
+        });
         s.on("game_start", (data) => {
             console.log("🎮 GAME START:", data);
 
@@ -141,17 +217,45 @@ export default function Playbot() {
 
             const playerIsWhite = data.white !== "bot";
 
-            setHumanColor(playerIsWhite ? "w" : "b");
-            setBotColor(playerIsWhite ? "b" : "w");
-            setBottomColor(playerIsWhite ? "w" : "b");
+            const actualHumanColor: "w" | "b" =
+                playerIsWhite ? "w" : "b";
 
-            setGame(new Chess());
-            setMoveHistory([]);
-            setLastMove(null);
-            setSelectedSquare(null);
-            setLegalMoves([]);
-            setKingInCheck(null);
-            setGameOver(false);
+            const actualBotColor: "w" | "b" =
+                playerIsWhite ? "b" : "w";
+
+            console.log("🎨 ACTUAL COLORS:", {
+                human: actualHumanColor,
+                bot: actualBotColor,
+            });
+
+            setHumanColor(actualHumanColor);
+            setBotColor(actualBotColor);
+
+            // ==========================================
+            // NEUES SPIEL
+            // ==========================================
+
+            if (!params.key) {
+                setBottomColor(actualHumanColor);
+
+                setGame(new Chess());
+                setMoveHistory([]);
+                setLastMove(null);
+                setSelectedSquare(null);
+                setLegalMoves([]);
+                setKingInCheck(null);
+                setGameOver(false);
+                setGameStarted(true);
+
+                return;
+            }
+
+            // ==========================================
+            // SAVED GAME
+            // ==========================================
+
+            setBottomColor(actualHumanColor);
+            setGameStarted(true);
         });
 
         s.on("opponent_move", onOpponentMove);
@@ -186,6 +290,15 @@ export default function Playbot() {
         setGame(newGame);
         setMoveHistory(prev => [...prev, move.san]);
         setLastMove({ from: move.from, to: move.to });
+        socket.current?.emit("player_move", {
+            roomId,
+            move: {
+                from: move.from,
+                to: move.to,
+                promotion: pieceType,
+            },
+            fen: newGame.fen(),
+        });
         setSelectedSquare(null);
         setLegalMoves([]);
         setPromotionMove(null);
@@ -206,6 +319,7 @@ export default function Playbot() {
                 timestamp,
                 humanColor,
                 botColor,
+                botElo,
 
             })
         );

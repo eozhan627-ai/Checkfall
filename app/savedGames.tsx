@@ -99,12 +99,14 @@ export default function SavedGames() {
                                 onPress={() => {
                                     if (game.mode === "bot") {
                                         router.push({
-                                            pathname: "./bot-game",
-                                            params: { key: game.key },
+                                            pathname: "/game/bot-game" as any,
+                                            params: {
+                                                key: game.key,
+                                            },
                                         });
                                     } else {
                                         router.push({
-                                            pathname: "./Board",
+                                            pathname: "/game/board",
                                             params: {
                                                 savedData: JSON.stringify(game),
                                             },
@@ -169,4 +171,4 @@ export default function SavedGames() {
             </ScrollView>
         </ImageBackground>
     );
-}
+} 

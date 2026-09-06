@@ -1,247 +1,310 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import {
-  Animated,
-  Easing,
-  StyleSheet,
-  Text,
-  View
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getSocket } from "../../lib/socket";
-
-const SIZE = 8;
-const CELL = 42;
-
-const BoardBackground = () => {
-  const squares = [];
-
-  for (let row = 0; row < SIZE; row++) {
-    for (let col = 0; col < SIZE; col++) {
-      const dark = (row + col) % 2 === 1;
-
-      squares.push(
-        <View
-          key={`${row}-${col}`}
-          style={{
-            width: CELL,
-            height: CELL,
-            backgroundColor: dark
-              ? "rgba(255,255,255,0.04)"
-              : "transparent",
-          }}
-        />
-      );
-    }
-  }
-
-  return (
-    <View style={styles.boardBg}>
-      {squares}
-    </View>
-  );
-};
+import WaitingChessBoard from "../components/WaitingChessBoard";
 
 export default function WaitingScreen() {
-  const router = useRouter();
-  const params = useLocalSearchParams();
+    const router = useRouter();
+    const params = useLocalSearchParams();
 
-  const pulse = useRef(new Animated.Value(0)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
+    // ================================
+    // MATCHMAKING
+    // ================================
+    useEffect(() => {
+        const socket = getSocket();
 
-  const messages = [
-    "Searching opponents… ",
-    "Matching Elo… ",
-    "Analyzing pool… ",
-    "Building fair match… ",
-    "Syncing server… ",
-    "Preparing board… ",
-  ];
+        const handleGameStart = (data: any) => {
+            console.log(
+                "🎮 MATCHMAKING: GAME START",
+                data
+            );
 
-  const [status, setStatus] = useState(messages[0]);
-  const lastIndex = useRef(-1);
+            router.replace({
+                pathname: "/game/online-game",
+                params: data,
+            });
+        };
 
-  // socket find match
-  useEffect(() => {
-    const socket = getSocket();
+        const handleWaiting = () => {
+            console.log(
+                "⏳ MATCHMAKING: WAITING"
+            );
+        };
 
-    const handleGameStart = (data: any) => {
-      router.replace({
-        pathname: "/game/online-game",
-        params: data,
-      });
-    };
+        const handleError = (data: any) => {
+            console.log(
+                "❌ MATCHMAKING ERROR:",
+                data
+            );
+        };
 
-    socket.emit("find_match", {
-      name: params.name,
-      avatar: params.avatar,
-    });
+        const startMatchmaking = () => {
+            const rating = Number(params.rating);
 
-    socket.on("game_start", handleGameStart);
+            console.log(
+                "================================="
+            );
+            console.log(
+                "🔎 MATCHMAKING START"
+            );
+            console.log(
+                "SOCKET ID:",
+                socket.id
+            );
+            console.log(
+                "SOCKET CONNECTED:",
+                socket.connected
+            );
+            console.log(
+                "NAME:",
+                params.name
+            );
+            console.log(
+                "AVATAR:",
+                params.avatar
+            );
+            console.log(
+                "RATING:",
+                rating
+            );
+            console.log(
+                "================================="
+            );
 
-    return () => {
-      socket.off("game_start", handleGameStart); // ✔ wichtig
-    };
-  }, []);
-  // status rotation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      let i;
-      do {
-        i = Math.floor(Math.random() * messages.length);
-      } while (i === lastIndex.current);
+            if (!Number.isFinite(rating)) {
+                console.log(
+                    "❌ INVALID RATING:",
+                    params.rating
+                );
 
-      lastIndex.current = i;
-      setStatus(messages[i]);
-    }, 2000);
+                return;
+            }
 
-    return () => clearInterval(interval);
-  }, []);
+            socket.emit("find_match", {
+                name: params.name,
+                avatar: params.avatar,
+                rating,
+            });
 
-  // pulse animation
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 1200,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
+            console.log(
+                "📤 FIND_MATCH SENT"
+            );
+        };
 
-  // floating knight
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: 1,
-          duration: 1800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
+        // ================================
+        // LISTENERS
+        // ================================
 
-  const glow = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.1, 0.25],
-  });
+        socket.on(
+            "game_start",
+            handleGameStart
+        );
 
-  return (
-    <View style={styles.container}>
+        socket.on(
+            "waiting",
+            handleWaiting
+        );
 
-      {/* BACKGROUND */}
-      <View style={styles.bgGlow} />
-      <BoardBackground />
+        socket.on(
+            "matchmaking_error",
+            handleError
+        );
 
-      {/* CENTER CARD */}
-      <View style={styles.card}>
+        // ================================
+        // SOCKET CONNECTION
+        // ================================
 
-        <Animated.Image
-          source={require("../../assets/images/knight_black.png")}
-          style={[
-            styles.knight,
-            {
-              transform: [
-                {
-                  translateY: floatAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-6, 6],
-                  }),
-                },
-                {
-                  rotate: floatAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ["-4deg", "4deg"],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
+        if (socket.connected) {
+            console.log(
+                "🟢 SOCKET ALREADY CONNECTED"
+            );
 
-        <Text style={styles.title}>Finding Match</Text>
+            startMatchmaking();
+        } else {
+            console.log(
+                "🔌 SOCKET NOT CONNECTED → CONNECTING..."
+            );
 
-        <Text style={styles.subtitle}>{status}</Text>
+            socket.once(
+                "connect",
+                startMatchmaking
+            );
 
-        <Animated.View style={[styles.loadingBar, { opacity: glow }]} />
-      </View>
-    </View>
-  );
+            socket.connect();
+        }
+
+        // ================================
+        // CLEANUP
+        // ================================
+
+        return () => {
+            socket.off(
+                "game_start",
+                handleGameStart
+            );
+
+            socket.off(
+                "waiting",
+                handleWaiting
+            );
+
+            socket.off(
+                "matchmaking_error",
+                handleError
+            );
+
+            socket.off(
+                "connect",
+                startMatchmaking
+            );
+        };
+    }, []);
+
+    return (
+        <SafeAreaView style={styles.container}>
+
+            <View style={styles.content}>
+
+                {/* BRAND */}
+                <Text style={styles.brand}>
+                    POVCheck
+                </Text>
+
+                {/* TITLE */}
+                <Text style={styles.title}>
+                    Gegner wird gesucht
+                </Text>
+
+                {/* SUBTITLE */}
+                <Text style={styles.subtitle}>
+                    Wir suchen einen passenden Gegner für dich.
+                </Text>
+
+                {/* CHESS BOARD */}
+                <WaitingChessBoard />
+
+                {/* STATUS */}
+                <View style={styles.statusBox}>
+
+                    <View style={styles.statusDot} />
+
+                    <Text style={styles.statusText}>
+                        Suche nach einem Gegner...
+                    </Text>
+
+                </View>
+
+                {/* INFO */}
+                <Text style={styles.info}>
+                    Das Match startet automatisch,
+                    sobald ein Gegner gefunden wurde.
+                </Text>
+
+            </View>
+
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#050816",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    container: {
+        flex: 1,
+        backgroundColor: "#0f172a",
+    },
 
-  bgGlow: {
-    position: "absolute",
-    width: 600,
-    height: 600,
-    borderRadius: 400,
-    backgroundColor: "#3b82f6",
-    opacity: 0.08,
-  },
+    content: {
+        flex: 1,
 
-  boardBg: {
-    position: "absolute",
-    width: 336,
-    height: 336,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    opacity: 0.4,
-  },
+        alignItems: "center",
+        justifyContent: "center",
 
-  card: {
-    width: "78%",
-    padding: 22,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
+        paddingHorizontal: 20,
+    },
 
-  knight: {
-    width: 80,
-    height: 80,
-    marginBottom: 12,
-  },
+    brand: {
+        fontSize: 15,
+        fontWeight: "800",
 
-  title: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "600",
-  },
+        letterSpacing: 4,
 
-  subtitle: {
-    color: "#cbd5e1",
-    fontSize: 14,
-    marginTop: 6,
-    marginBottom: 14,
-  },
+        color: "#d4af37",
 
-  loadingBar: {
-    width: "60%",
-    height: 4,
-    borderRadius: 10,
-    backgroundColor: "#60a5fa",
-  },
+        marginBottom: 12,
+    },
+
+    title: {
+        fontSize: 26,
+        fontWeight: "800",
+
+        color: "#ffffff",
+
+        textAlign: "center",
+    },
+
+    subtitle: {
+        marginTop: 8,
+
+        fontSize: 14,
+
+        color: "#94a3b8",
+
+        textAlign: "center",
+    },
+
+    statusBox: {
+        flexDirection: "row",
+
+        alignItems: "center",
+
+        marginTop: 22,
+
+        paddingHorizontal: 18,
+        paddingVertical: 11,
+
+        borderRadius: 12,
+
+        backgroundColor: "#1e293b",
+
+        borderWidth: 1,
+        borderColor: "#334155",
+    },
+
+    statusDot: {
+        width: 8,
+        height: 8,
+
+        borderRadius: 4,
+
+        backgroundColor: "#22c55e",
+
+        marginRight: 9,
+    },
+
+    statusText: {
+        color: "#e5e7eb",
+
+        fontSize: 14,
+
+        fontWeight: "600",
+    },
+
+    info: {
+        marginTop: 18,
+
+        color: "#64748b",
+
+        fontSize: 12,
+
+        textAlign: "center",
+
+        lineHeight: 18,
+
+        maxWidth: 280,
+    },
 });

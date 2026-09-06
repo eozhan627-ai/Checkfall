@@ -1,46 +1,51 @@
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-export default function Impressum() {
+export default function Hilfe() {
     return (
         <View style={styles.container}>
 
             <View style={styles.header}>
-                <Text style={styles.title}>Imprint</Text>
-                <Text style={styles.subtitle}>Legal Information</Text>
+                <Text style={styles.title}>Help</Text>
+                <Text style={styles.subtitle}>FAQ & Support</Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Company</Text>
+                    <Text style={styles.cardTitle}>General</Text>
                     <Text style={styles.text}>
-                        Solid Pixel (GbR)
+                        Checkfall is a chess app for playing, learning, and training.
+                        Some features are still in development and may change over time.
                     </Text>
                 </View>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Responsible Person</Text>
+                    <Text style={styles.cardTitle}>Playing</Text>
                     <Text style={styles.text}>
-                        Enes Kazim Özhan{"\n"}
-                        Von-der-Marck-Str. 16{"\n"}
-                        58511 Lüdenscheid{"\n"}
-                        Germany
+                        • Play locally against another player or a bot{"\n"}
+                        • Online matches are available through matchmaking
                     </Text>
                 </View>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Contact</Text>
+                    <Text style={styles.cardTitle}>Game History</Text>
                     <Text style={styles.text}>
-                        Email: checkfall744@gmail.com
+                        Saved games are stored locally on your device.
+                    </Text>
+
+                    <Text style={styles.text}>
+                        • Long-press a saved game to delete it{"\n"}
+                        • Deleted games cannot be restored
                     </Text>
                 </View>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Copyright</Text>
+                    <Text style={styles.cardTitle}>Important Notes</Text>
                     <Text style={styles.text}>
-                        All content, graphics, and app components are protected by copyright law.
-                        Unauthorized reproduction or distribution is prohibited.
+                        • This app is still in testing phase{"\n"}
+                        • Visual or functional changes may occur{"\n"}
+                        • Data is stored locally or on servers for online play
                     </Text>
                 </View>
 
@@ -95,7 +100,7 @@ const styles = StyleSheet.create({
 
     text: {
         fontSize: 13,
-        color: "#bbb",
         lineHeight: 18,
+        color: "#bbb",
     },
 });

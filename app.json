@@ -1,26 +1,26 @@
 {
   "expo": {
-    "name": "Checkfall",
+    "name": "POVCheck",
     "slug": "Checkfall",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "checkfall",
+    "scheme": "povcheck",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/images/app-icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.checkfall",
+      "bundleIdentifier": "com.anonymous.povcheck",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.anonymous.checkfall",
+      "package": "com.anonymous.povcheck",
       "predictiveBackGestureEnabled": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#ffffff"
-      }
+      } 
     },
     "web": {
       "output": "static",

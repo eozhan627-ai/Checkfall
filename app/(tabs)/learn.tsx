@@ -1,16 +1,15 @@
-import { router } from 'expo-router';
-import React from 'react';
+import { router } from "expo-router";
+import React from "react";
 import {
     ImageBackground,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
-} from 'react-native';
+} from "react-native";
 
 export default function LearnScreen() {
-
-    const backgroundImage = require('../../assets/images/lektionbackground.png');
+    const backgroundImage = require("../../assets/images/loginbackground.png");
 
     return (
         <ImageBackground
@@ -18,22 +17,37 @@ export default function LearnScreen() {
             style={styles.container}
             resizeMode="cover"
         >
+            <View style={styles.overlay} />
+
+            <View style={styles.header}>
+                <Text style={styles.title}>Learn</Text>
+                <Text style={styles.subtitle}>
+                    Improve step by step
+                </Text>
+            </View>
+
             <View style={styles.lists}>
-
                 <TouchableOpacity
-                    style={styles.list}
-                    onPress={() => router.push('./learn/Tutorials')}
+                    activeOpacity={0.85}
+                    style={styles.card}
+                    onPress={() => router.push("/learn/tutorials")}
                 >
-                    <Text style={styles.listTitle}>Tutorials</Text>
+                    <Text style={styles.cardTitle}>Tutorials</Text>
+                    <Text style={styles.cardSub}>
+                        Learn fundamentals & strategies
+                    </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={styles.list}
-                    onPress={() => router.push('./learn/Puzzles')}
+                    activeOpacity={0.85}
+                    style={styles.card}
+                    onPress={() => router.push("/learn/puzzles")}
                 >
-                    <Text style={styles.listTitle}>Puzzles</Text>
+                    <Text style={styles.cardTitle}>Puzzles</Text>
+                    <Text style={styles.cardSub}>
+                        Train tactics & calculation
+                    </Text>
                 </TouchableOpacity>
-
             </View>
         </ImageBackground>
     );
@@ -44,24 +58,51 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.55)",
+    },
+
+    header: {
+        marginTop: 70,
+        paddingHorizontal: 20,
+    },
+
+    title: {
+        fontSize: 34,
+        fontWeight: "800",
+        color: "#fff",
+    },
+
+    subtitle: {
+        fontSize: 14,
+        color: "#ccc",
+        marginTop: 6,
+    },
+
     lists: {
         paddingHorizontal: 16,
-        marginTop: 20,
-        gap: 8,
+        marginTop: 30,
     },
 
-    list: {
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        borderRadius: 14,
+    card: {
+        backgroundColor: "rgba(255,255,255,0.08)",
+        borderRadius: 16,
         padding: 18,
-        marginBottom: 12,
+        marginBottom: 14,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderColor: "rgba(255,255,255,0.10)",
     },
 
-    listTitle: {
+    cardTitle: {
         fontSize: 18,
-        fontWeight: '600',
-        color: '#fff',
+        fontWeight: "700",
+        color: "#fff",
+    },
+
+    cardSub: {
+        fontSize: 13,
+        color: "#ccc",
+        marginTop: 6,
     },
 });

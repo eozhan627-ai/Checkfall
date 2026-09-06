@@ -23,7 +23,7 @@ export default function ClansScreen() {
     const [clans] = useState<Clan[]>([
         {
             id: "1",
-            name: "Checkfall Elite",
+            name: "POVCheck Elite",
             members: 12,
         },
         {
