@@ -10,10 +10,41 @@ export type AccountType = {
     avatar?: string;
     rating?: number;
     authId?: string;
+    clanId?: string; // NEU: lokal gecachte Clan-Zugehörigkeit (Quelle der Wahrheit ist die DB, siehe clans.ts)
 };
 
 const ACCOUNTS_KEY = "@accounts";
 const CURRENT_KEY = "@current_account";
+
+// =============================
+// SUPABASE PROFILE SYNC
+// =============================
+// Gäste haben keinen echten Supabase-Auth-User und werden NICHT
+// synchronisiert (sie können deshalb auch nicht per Suche gefunden
+// oder als Freund hinzugefügt werden). Aus demselben Grund können
+// Gäste auch keinem Clan beitreten (siehe clans.ts / clanSocket.js).
+
+async function syncProfileToSupabase(account: AccountType) {
+    if (account.guest || !account.authId) {
+        return;
+    }
+
+    try {
+        const { error } = await supabase.from("profiles").upsert({
+            id: account.authId,
+            username: account.username,
+            avatar: account.avatar || null,
+            rating: account.rating ?? 1000,
+            updated_at: new Date().toISOString(),
+        });
+
+        if (error) {
+            console.log("PROFILE SYNC ERROR:", error);
+        }
+    } catch (error) {
+        console.log("PROFILE SYNC ERROR:", error);
+    }
+}
 
 // =============================
 // RESET
@@ -33,6 +64,7 @@ export async function saveAccount(data: {
     authId?: string;
     avatar?: string;
     rating?: number;
+    clanId?: string;
 }): Promise<AccountType> {
     const id = data.authId || uuidv4();
 
@@ -73,6 +105,8 @@ export async function saveAccount(data: {
                 data.rating ??
                 existing.rating ??
                 1000,
+            clanId:
+                data.clanId ?? existing.clanId,
         };
 
         accounts[existingIndex] = updated;
@@ -86,6 +120,8 @@ export async function saveAccount(data: {
             CURRENT_KEY,
             updated.id
         );
+
+        await syncProfileToSupabase(updated);
 
         return updated;
     }
@@ -101,6 +137,7 @@ export async function saveAccount(data: {
         authId: data.authId,
         avatar: data.avatar,
         rating: data.rating ?? 1000,
+        clanId: data.clanId,
     };
 
     accounts.push(newAccount);
@@ -114,6 +151,8 @@ export async function saveAccount(data: {
         CURRENT_KEY,
         id
     );
+
+    await syncProfileToSupabase(newAccount);
 
     return newAccount;
 }
@@ -299,6 +338,7 @@ export async function updateAccount(
         rating: number;
         guest: boolean;
         authId: string;
+        clanId: string;
     }>
 ): Promise<AccountType | null> {
     const accounts = await getAccounts();
@@ -328,7 +368,22 @@ export async function updateAccount(
         updated.id
     );
 
+    await syncProfileToSupabase(updated);
+
     return updated;
+}
+
+// =============================
+// CLAN-ZUORDNUNG LOKAL SETZEN/LÖSCHEN
+// =============================
+// Wird von clans.ts nach erfolgreichem join/leave/kick aufgerufen,
+// damit die App nicht bei jedem Start extra danach fragen muss.
+
+export async function setLocalClanId(
+    id: string,
+    clanId: string | null
+): Promise<AccountType | null> {
+    return updateAccount(id, { clanId: clanId ?? undefined });
 }
 
 // =============================

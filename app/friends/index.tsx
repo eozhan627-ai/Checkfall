@@ -1,126 +1,265 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+    ActivityIndicator,
     ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    View
+    View,
 } from "react-native";
+import { AccountType, getCurrentAccount } from "../../lib/account";
+import {
+    FriendEntry,
+    FriendProfile,
+    acceptFriendRequest,
+    declineFriendRequest,
+    getFriends,
+    getIncomingRequests,
+    removeFriend,
+    searchUsers,
+    sendFriendRequest,
+} from "../../lib/friends";
+import { getSocket } from "../../lib/socket";
 
-type Friend = {
-    id: string;
-    name: string;
-    online: boolean;
-};
-
-type Request = {
-    id: string;
-    name: string;
-};
+type FriendWithStatus = FriendEntry & { online: boolean };
 
 export default function FriendsScreen() {
+    const backgroundImage = require("../../assets/images/socialbackground.png");
+
+    const [account, setAccount] = useState<AccountType | null>(null);
+    const [loading, setLoading] = useState(true);
+
     const [search, setSearch] = useState("");
-    const backgroundImage = require("../../assets/images/socialbackground.png"); // Hintergrundbild
+    const [searching, setSearching] = useState(false);
+    const [searchResults, setSearchResults] = useState<FriendProfile[]>([]);
+    const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
 
-    // 🔥 MOCK DATA (später ersetzt durch Server)
-    const [friends, setFriends] = useState<Friend[]>([
-        { id: "1", name: "€liT€_Suchti", online: true },
-        { id: "2", name: "Asyl", online: false },
-    ]);
+    const [friends, setFriends] = useState<FriendWithStatus[]>([]);
+    const [requests, setRequests] = useState<FriendEntry[]>([]);
 
-    const [requests, setRequests] = useState<Request[]>([
-        { id: "10", name: "SchachKing99" },
-    ]);
+    const loadData = useCallback(async () => {
+        const acc = await getCurrentAccount();
+        setAccount(acc);
 
-    function acceptRequest(id: string) {
-        const req = requests.find(r => r.id === id);
-        if (!req) return;
+        if (!acc || acc.guest || !acc.authId) {
+            setLoading(false);
+            return;
+        }
 
-        setFriends(prev => [
-            ...prev,
-            { id: req.id, name: req.name, online: false },
+        const [friendList, requestList] = await Promise.all([
+            getFriends(),
+            getIncomingRequests(),
         ]);
 
-        setRequests(prev => prev.filter(r => r.id !== id));
+        setFriends(friendList.map((f) => ({ ...f, online: false })));
+        setRequests(requestList);
+        setLoading(false);
+
+        const authIds = friendList.map((f) => f.profile.id).filter(Boolean);
+        if (authIds.length === 0) return;
+
+        const socket = getSocket();
+
+        const handleStatus = (data: any) => {
+            const online: string[] = Array.isArray(data?.online) ? data.online : [];
+
+            setFriends((prev) =>
+                prev.map((f) => ({
+                    ...f,
+                    online: online.includes(f.profile.id),
+                }))
+            );
+        };
+
+        socket.once("friends_online_status", handleStatus);
+        socket.emit("check_friends_online", { authIds });
+    }, []);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    async function handleSearch(text: string) {
+        setSearch(text);
+
+        if (text.trim().length < 2) {
+            setSearchResults([]);
+            return;
+        }
+
+        setSearching(true);
+
+        try {
+            const results = await searchUsers(text);
+            setSearchResults(results);
+        } catch (error) {
+            console.log("SEARCH ERROR:", error);
+        } finally {
+            setSearching(false);
+        }
     }
 
-    function declineRequest(id: string) {
-        setRequests(prev => prev.filter(r => r.id !== id));
+    async function handleAddFriend(userId: string) {
+        try {
+            await sendFriendRequest(userId);
+            setSentRequests((prev) => new Set(prev).add(userId));
+        } catch (error: any) {
+            console.log("ADD FRIEND ERROR:", error?.message || error);
+        }
     }
 
-    function addFriend() {
-        if (!search.trim()) return;
+    async function handleAccept(friendshipId: string) {
+        try {
+            await acceptFriendRequest(friendshipId);
+            await loadData();
+        } catch (error) {
+            console.log("ACCEPT ERROR:", error);
+        }
+    }
 
-        // fake add (später API call)
-        setRequests(prev => [
-            ...prev,
-            { id: Date.now().toString(), name: search },
-        ]);
+    async function handleDecline(friendshipId: string) {
+        try {
+            await declineFriendRequest(friendshipId);
+            setRequests((prev) => prev.filter((r) => r.friendshipId !== friendshipId));
+        } catch (error) {
+            console.log("DECLINE ERROR:", error);
+        }
+    }
 
-        setSearch("");
+    async function handleRemoveFriend(friendshipId: string) {
+        try {
+            await removeFriend(friendshipId);
+            setFriends((prev) => prev.filter((f) => f.friendshipId !== friendshipId));
+        } catch (error) {
+            console.log("REMOVE FRIEND ERROR:", error);
+        }
+    }
+
+    if (loading) {
+        return (
+            <ImageBackground source={backgroundImage} style={{ flex: 1 }}>
+                <View style={styles.center}>
+                    <ActivityIndicator color="#fff" />
+                </View>
+            </ImageBackground>
+        );
+    }
+
+    if (!account || account.guest || !account.authId) {
+        return (
+            <ImageBackground source={backgroundImage} style={{ flex: 1 }}>
+                <View style={styles.center}>
+                    <Text style={styles.title}>Freunde</Text>
+                    <Text style={styles.status}>
+                        Melde dich mit einem Account an, um Freunde hinzuzufügen.
+                        Als Gast ist das Freundessystem nicht verfügbar.
+                    </Text>
+                </View>
+            </ImageBackground>
+        );
     }
 
     return (
         <ImageBackground source={backgroundImage} style={{ flex: 1 }}>
-        <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+            <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+                <Text style={styles.title}>Freunde</Text>
 
-            {/* TITLE */}
-            <Text style={styles.title}>Freunde</Text>
+                {/* SEARCH */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>Freund hinzufügen</Text>
 
-            {/* SEARCH */}
-            <View style={styles.card}>
-                <Text style={styles.sectionTitle}>Freund hinzufügen</Text>
+                    <TextInput
+                        value={search}
+                        onChangeText={handleSearch}
+                        placeholder="Username suchen"
+                        placeholderTextColor="#aaa"
+                        style={styles.input}
+                        autoCapitalize="none"
+                    />
 
-                <TextInput
-                    value={search}
-                    onChangeText={setSearch}
-                    placeholder="Username"
-                    placeholderTextColor="#aaa"
-                    style={styles.input}
-                />
+                    {searching && (
+                        <ActivityIndicator style={{ marginTop: 10 }} color="#fff" />
+                    )}
 
-                <Pressable style={styles.button} onPress={addFriend}>
-                    <Text style={styles.buttonText}>Anfrage senden</Text>
-                </Pressable>
-            </View>
+                    {searchResults.map((user) => {
+                        const alreadySent = sentRequests.has(user.id);
+                        const alreadyFriend = friends.some(
+                            (f) => f.profile.id === user.id
+                        );
 
-            {/* REQUESTS */}
-            <Text style={styles.sectionTitle}>Anfragen</Text>
+                        return (
+                            <View key={user.id} style={styles.searchRow}>
+                                <Text style={styles.name}>{user.username}</Text>
 
-            {requests.map(r => (
-                <View key={r.id} style={styles.cardRow}>
-                    <Text style={styles.name}>{r.name}</Text>
+                                <Pressable
+                                    style={[
+                                        styles.smallButton,
+                                        (alreadySent || alreadyFriend) &&
+                                            styles.smallButtonDisabled,
+                                    ]}
+                                    disabled={alreadySent || alreadyFriend}
+                                    onPress={() => handleAddFriend(user.id)}
+                                >
+                                    <Text style={styles.buttonText}>
+                                        {alreadyFriend
+                                            ? "Befreundet"
+                                            : alreadySent
+                                                ? "Angefragt"
+                                                : "Hinzufügen"}
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        );
+                    })}
+                </View>
 
-                    <View style={{ flexDirection: "row", gap: 10 }}>
-                        <Pressable onPress={() => acceptRequest(r.id)}>
-                            <Text style={styles.accept}>✔</Text>
-                        </Pressable>
+                {/* REQUESTS */}
+                {requests.length > 0 && (
+                    <>
+                        <Text style={styles.sectionTitle}>Anfragen</Text>
 
-                        <Pressable onPress={() => declineRequest(r.id)}>
+                        {requests.map((r) => (
+                            <View key={r.friendshipId} style={styles.cardRow}>
+                                <Text style={styles.name}>{r.profile.username}</Text>
+
+                                <View style={{ flexDirection: "row", gap: 10 }}>
+                                    <Pressable onPress={() => handleAccept(r.friendshipId)}>
+                                        <Text style={styles.accept}>✔</Text>
+                                    </Pressable>
+
+                                    <Pressable onPress={() => handleDecline(r.friendshipId)}>
+                                        <Text style={styles.decline}>✖</Text>
+                                    </Pressable>
+                                </View>
+                            </View>
+                        ))}
+                    </>
+                )}
+
+                {/* FRIENDS */}
+                <Text style={styles.sectionTitle}>Freunde</Text>
+
+                {friends.length === 0 && (
+                    <Text style={styles.status}>Noch keine Freunde hinzugefügt.</Text>
+                )}
+
+                {friends.map((f) => (
+                    <View key={f.friendshipId} style={styles.cardRow}>
+                        <View>
+                            <Text style={styles.name}>{f.profile.username}</Text>
+                            <Text style={styles.statusInline}>
+                                {f.online ? "🟢 Online " : "⚪ Offline "}
+                            </Text>
+                        </View>
+
+                        <Pressable onPress={() => handleRemoveFriend(f.friendshipId)}>
                             <Text style={styles.decline}>✖</Text>
                         </Pressable>
                     </View>
-                </View>
-            ))}
-
-            {/* FRIENDS */}
-            <Text style={styles.sectionTitle}>Freunde</Text>
-
-            {friends.map(f => (
-                <View key={f.id} style={styles.cardRow}>
-                    <View>
-                        <Text style={styles.name}>{f.name}</Text>
-                        <Text style={styles.status}>
-                            {f.online ? "🟢 Online " : "⚪ Offline "}
-                        </Text>
-                    </View>
-
-                    <Text style={{ fontSize: 20 }}>💬</Text>
-                </View>
-            ))}
-        </ScrollView>
+                ))}
+            </ScrollView>
         </ImageBackground>
     );
 }
@@ -128,7 +267,13 @@ export default function FriendsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
 
+    center: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 24,
     },
 
     title: {
@@ -137,6 +282,7 @@ const styles = StyleSheet.create({
         color: "#fff",
         marginBottom: 20,
         marginTop: 20,
+        textAlign: "center",
     },
 
     sectionTitle: {
@@ -163,6 +309,13 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
 
+    searchRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 12,
+    },
+
     name: {
         color: "#fff",
         fontSize: 16,
@@ -170,6 +323,13 @@ const styles = StyleSheet.create({
     },
 
     status: {
+        color: "#d4d4d4",
+        marginTop: 8,
+        textAlign: "center",
+        lineHeight: 20,
+    },
+
+    statusInline: {
         color: "#d4d4d4",
         marginTop: 4,
     },
@@ -182,17 +342,21 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
 
-    button: {
-        marginTop: 10,
+    smallButton: {
         backgroundColor: "#1f2937",
-        padding: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
         borderRadius: 10,
-        alignItems: "center",
+    },
+
+    smallButtonDisabled: {
+        opacity: 0.5,
     },
 
     buttonText: {
         color: "#fff",
         fontWeight: "600",
+        fontSize: 13,
     },
 
     accept: {
