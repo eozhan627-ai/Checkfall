@@ -2,7 +2,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "./supabase";
-
 export type AccountType = {
     id: string;
     username: string;
@@ -10,9 +9,9 @@ export type AccountType = {
     avatar?: string;
     rating?: number;
     authId?: string;
-    clanId?: string; // NEU: lokal gecachte Clan-Zugehörigkeit (Quelle der Wahrheit ist die DB, siehe clans.ts)
+    clanId?: string;
+    vipTier?: "none" | "silver" | "gold" | "diamond"; // GEÄNDERT (vorher isVip)
 };
-
 const ACCOUNTS_KEY = "@accounts";
 const CURRENT_KEY = "@current_account";
 
@@ -44,8 +43,33 @@ async function syncProfileToSupabase(account: AccountType) {
     } catch (error) {
         console.log("PROFILE SYNC ERROR:", error);
     }
-}
+}// =============================
+// VIP TIER (live aus Supabase, nicht lokal cachen)
+// =============================
 
+export type VipTier = "none" | "silver" | "gold" | "diamond";
+
+export async function fetchVipTier(authId: string): Promise<VipTier> {
+    if (!authId) return "none";
+
+    try {
+        const { data, error } = await supabase
+            .from("profiles")
+            .select("vip_tier")
+            .eq("id", authId)
+            .single();
+
+        if (error) {
+            console.log("VIP TIER FETCH ERROR:", error);
+            return "none";
+        }
+
+        return (data?.vip_tier as VipTier) ?? "none";
+    } catch (error) {
+        console.log("VIP TIER FETCH ERROR:", error);
+        return "none";
+    }
+}
 // =============================
 // RESET
 // =============================
@@ -281,18 +305,16 @@ export async function getCurrentAccount(): Promise<AccountType | null> {
                 );
 
             if (authAccount) {
-                // Sicherstellen, dass dieser
-                // Account auch der aktuelle ist.
                 await AsyncStorage.setItem(
                     CURRENT_KEY,
                     authAccount.id
                 );
 
-                return authAccount;
+                const vipTier = await fetchVipTier(session.user.id); // GEÄNDERT
+
+                return { ...authAccount, vipTier }; // GEÄNDERT
             }
 
-            // Supabase User existiert,
-            // aber lokales Profil noch nicht.
             return null;
         }
 

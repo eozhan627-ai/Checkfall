@@ -15,8 +15,7 @@ export default function CallbackPage() {
             />
 
             <Text style={styles.text}>
-                Signing in...
-            </Text>
+                Signing in... </Text>
         </View>
     );
 }

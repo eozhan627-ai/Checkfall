@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { router } from "expo-router";
 import {
     ActivityIndicator,
     Alert,
@@ -46,7 +47,7 @@ import {
     sendClanMessage,
 } from "../../lib/clans";
 
-const backgroundImage = require("../../assets/images/clanbackground.png");
+const backgroundImage = require("../../assets/images/background.png");
 
 export default function ClansScreen() {
     // Ein einziger Socket für die ganze Komponente, statt an jeder
@@ -358,12 +359,24 @@ export default function ClansScreen() {
 
     return (
         <ImageBackground source={backgroundImage} style={{ flex: 1 }}>
-            <ScrollView
-                ref={scrollRef}
-                style={styles.container}
-                contentContainerStyle={{ padding: 16 }}
-            >
-                <Text style={styles.title}>Clans</Text>
+      <ScrollView
+    ref={scrollRef}
+    style={styles.container}
+    contentContainerStyle={{ padding: 16 }}
+>
+    {/* HEADER */}
+    <View style={styles.header}>
+        <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+        >
+            <Text style={styles.backText}>‹</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle}>Clans</Text>
+
+        <View style={{ width: 42 }} />
+    </View>
 
                 {/* OFFENE EINLADUNGEN */}
                 {invites.length > 0 && (
@@ -644,14 +657,38 @@ function translateClanError(code: string) {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     centered: { flex: 1, alignItems: "center", justifyContent: "center" },
+header: {
+    width: "100%",
+    height: 70,
+    paddingHorizontal: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+},
 
-    title: {
-        fontSize: 28,
-        fontWeight: "700",
-        color: "#fff",
-        marginBottom: 6,
-        marginTop: 20,
-    },
+backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "#201B16",
+    borderWidth: 1,
+    borderColor: "rgba(245,237,226,0.09)",
+    justifyContent: "center",
+    alignItems: "center",
+},
+
+backText: {
+    color: "#F8F4EE",
+    fontSize: 34,
+    lineHeight: 34,
+    fontWeight: "300",
+},
+
+headerTitle: {
+    color: "#F5EFE6",
+    fontSize: 16,
+    fontWeight: "600",
+},
 
     subtitle: { color: "#aaa", fontSize: 14, marginBottom: 20 },
 

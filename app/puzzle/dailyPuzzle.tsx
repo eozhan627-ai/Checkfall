@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getDailyPuzzle } from "../../lib/dailyPuzzle";
@@ -15,7 +16,7 @@ type Puzzle = {
 
 
 export default function DailyPuzzle() {
-
+    const router = useRouter();
     const [puzzle] = useState<Puzzle>(() => getDailyPuzzle());
     // 🔹 Game initialisieren
     const [game, setGame] = useState(() => new Chess(puzzle.fen));
@@ -149,7 +150,19 @@ export default function DailyPuzzle() {
             resizeMode="cover"
         >
             <ScrollView contentContainerStyle={styles.scroll}>
-                <Text style={styles.title}>Daily Puzzle</Text>
+                <View style={styles.header}>
+                    <Pressable
+                        onPress={() => router.back()}
+                        style={styles.backButton}
+                    >
+                        <Text style={styles.backText}>‹</Text>
+                    </Pressable>
+
+                    <Text style={styles.headerTitle}>Daily Puzzle</Text>
+
+                    <View style={{ width: 42 }} />
+                </View>
+
                 <Text style={styles.subtitle}>Rating: {puzzle.rating}</Text>
 
                 <PuzzleBoard
@@ -203,5 +216,37 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: "transparent",
     },
+   header: {
+    width: "100%",
+    height: 70,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+},
+
+backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "#201B16",
+    borderWidth: 1,
+    borderColor: "rgba(245,237,226,0.09)",
+    justifyContent: "center",
+    alignItems: "center",
+},
+
+backText: {
+    color: "#F8F4EE",
+    fontSize: 34,
+    lineHeight: 34,
+    fontWeight: "300",
+},
+
+headerTitle: {
+    color: "#F5EFE6",
+    fontSize: 16,
+    fontWeight: "600",
+},
     icon: { fontSize: 20, color: "#fff" },
 });

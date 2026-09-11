@@ -1,3 +1,4 @@
+import VipBadge from "@/components/VipBadge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
@@ -38,9 +39,14 @@ export default function Profile() {
     const externalAvatar = params.avatar as string | undefined;
     const externalUserId = params.userId as string | undefined;
     const isForeignProfile = !!externalUserId;
+    const externalRating = params.rating as string | undefined; // neu
     const backgroundImage = require("../assets/images/profilebackground.png");
     useEffect(() => {
         if (isForeignProfile) {
+            setStats((prev) => ({
+                ...prev,
+                rating: externalRating ? Number(externalRating) || 1000 : 1000,
+            }));
             setLoading(false);
             return;
         }
@@ -238,7 +244,15 @@ export default function Profile() {
                         >
                             <ProfileAvatar
                                 uri={avatarUri}
-                                frame="silver"
+                                frame={
+                                    isForeignProfile
+                                        ? "silver"
+                                        : account?.vipTier === "diamond"
+                                            ? "diamond"
+                                            : account?.vipTier === "gold"
+                                                ? "gold"
+                                                : "silver"
+                                }
                                 size={150}
                             />
                         </TouchableOpacity>
@@ -282,6 +296,11 @@ export default function Profile() {
                                 {displayedName}
                             </Text>
                         </Pressable>
+                    )}
+                    {!isForeignProfile && account?.vipTier && account.vipTier !== "none" && (
+                        <View style={{ marginTop: 8 }}>
+                            <VipBadge tier={account.vipTier} />
+                        </View>
                     )}
                 </View>
                 {/* STATS */}

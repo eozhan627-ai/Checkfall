@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import VipBadge from "../../components/VipBadge";
 import { AccountType, getCurrentAccount } from "../../lib/account";
 
 /**
@@ -349,6 +350,7 @@ export default function HomeScreen() {
   }
 
   const username = account?.username || "Player";
+  const hasAvatar = account?.avatar && account.avatar.trim().length > 0;
 
   const avatarSource =
     account?.avatar && account.avatar.trim().length > 0
@@ -396,13 +398,14 @@ export default function HomeScreen() {
       >
         {/* HEADER */}
         <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.logo}>POVCHECK</Text>
-
-            <Text style={styles.greeting}>Welcome back,</Text>
-
-            <Text style={styles.username}>{username}</Text>
-          </View>
+         <View style={styles.headerText}>
+  <Text style={styles.logo}>POVCHECK</Text>
+  <Text style={styles.greeting}>Welcome back,</Text>
+  <View style={styles.usernameRow}>
+    <Text style={styles.username}>{username}</Text>
+    {account?.vipTier && account.vipTier !== "none" && <VipBadge tier={account.vipTier} size="small" />}
+  </View>
+</View>
 
           <Pressable
             onPress={() => router.push("/profile")}
@@ -412,7 +415,13 @@ export default function HomeScreen() {
               pressed && styles.pressed,
             ]}
           >
-            <Image source={avatarSource} style={styles.profileImage} />
+            <Image
+              source={avatarSource}
+              style={[
+                styles.profileImage,
+                !hasAvatar && styles.placeholderImage,
+              ]}
+            />
           </Pressable>
         </View>
 
@@ -450,7 +459,28 @@ export default function HomeScreen() {
             />
           </View>
         </Pressable>
+{/* VIP TEASER */}
+{(!account?.vipTier || account.vipTier === "none") && (
+    <Pressable
+        onPress={() => router.push("/vip")}
+        style={({ pressed }) => [
+            styles.vipCard,
+            pressed && styles.pressed,
+        ]}
+    >
+        <View style={styles.vipContent}>
+            <Text style={styles.vipEyebrow}>POV CHECK VIP</Text>
+            <Text style={styles.vipTitle}>Go Premium</Text>
+            <Text style={styles.vipSubtitle}>
+                Ab 5,99 € · Clans, Badges & mehr
+            </Text>
+        </View>
 
+        <View style={styles.vipArrow}>
+            <Icon name="chevron" size={16} color="#D4AF37" />
+        </View>
+    </Pressable>
+)}
         {/* QUICK PLAY */}
         <Text style={styles.sectionTitle}>
           Quick Play
@@ -672,22 +702,29 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.8,
   },
+avatarFrame: {
+  width: 56,
+  height: 56,
+  borderRadius: 18,
+  padding: 0,
+  borderWidth: 1.5,
+  borderColor: "rgba(91, 141, 184, 0.55)",
+  backgroundColor: "#EDF0F3",
+  overflow: "hidden",
+},
 
-  avatarFrame: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    padding: 2,
-    borderWidth: 1.5,
-    borderColor: "rgba(91, 141, 184, 0.55)",
-    backgroundColor: "transparent",
-  },
+profileImage: {
+  width: "100%",
+  height: "100%",
+  borderRadius: 16,
+},
 
-  profileImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 24,
-  },
+placeholderImage: {
+  width: "88%",
+  height: "88%",
+  alignSelf: "center",
+  marginTop: "6%",
+},
 
   onlineCard: {
     minHeight: 132,
@@ -739,7 +776,54 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+vipCard: {
+    minHeight: 92,
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#1B2027",
+    borderWidth: 1,
+    borderColor: "rgba(212, 175, 55, 0.22)",
+    marginBottom: 28,
+},
 
+vipContent: {
+    flex: 1,
+},
+
+vipEyebrow: {
+    color: "#D4AF37",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    marginBottom: 6,
+},
+
+vipTitle: {
+    color: "#F5F7F9",
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+    marginBottom: 3,
+},
+
+vipSubtitle: {
+    color: "rgba(237, 240, 243, 0.5)",
+    fontSize: 12.5,
+},
+
+vipArrow: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+    backgroundColor: "rgba(212, 175, 55, 0.12)",
+},
   onlineArrow: {
     width: 34,
     height: 34,
@@ -820,7 +904,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 14,
   },
-
+usernameRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+},
   historyTitle: {
     color: "#F2F4F6",
     fontSize: 16,

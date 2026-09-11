@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ImageBackground, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, BackHandler, ImageBackground, Pressable, ScrollView, Text, View } from 'react-native';
 
 type SavedGame = {
     key: string;
@@ -44,6 +44,19 @@ export default function SavedGames() {
     useEffect(() => {
         loadGames();
     }, []);
+    useEffect(() => {
+        const onBackPress = () => {
+            router.back();
+            return true;
+        };
+
+        const subscription = BackHandler.addEventListener(
+            "hardwareBackPress",
+            onBackPress
+        );
+
+        return () => subscription.remove();
+    }, [router]);
 
     const deleteGame = async (key: string) => {
         await AsyncStorage.removeItem(key);

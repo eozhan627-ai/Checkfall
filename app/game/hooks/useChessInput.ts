@@ -1,5 +1,6 @@
 import { Chess } from "chess.js";
 import { useState } from "react";
+import { cloneWithHistory } from "../../../lib/chessUtils";
 
 export function useChessInput({
      game,
@@ -69,7 +70,7 @@ export function useChessInput({
             }
         }
 
-        const newGame = new Chess(game.fen());
+const newGame = cloneWithHistory(game); // GEÄNDERT (vorher: new Chess(game.fen()))
 
         let move = null;
 

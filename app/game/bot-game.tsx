@@ -3,10 +3,14 @@ import { Chess } from "chess.js";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    Alert,
+    Animated,
+    BackHandler,
     Dimensions,
+    Easing,
     Image,
     ImageBackground,
+    Modal,
+    PanResponder,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -14,7 +18,8 @@ import {
     View,
 } from "react-native";
 import { io, Socket } from "socket.io-client";
-import { useChessInput } from "./hooks/useChessInput";
+import { getCurrentAccount } from "../../lib/account";
+import { saveGameRecord } from "../../lib/games";
 
 const BOARD_SIZE = Dimensions.get("window").width - 32;
 const SQUARE_SIZE = BOARD_SIZE / 8;
@@ -36,6 +41,122 @@ const pieces: Record<string, any> = {
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"];
 
+
+// Slider geht jetzt bis 3200 - ab da spielt der Bot mit voller Stockfish-Stärke
+// (Kalibrierung passiert serverseitig über UCI_LimitStrength/UCI_Elo bzw.
+// eine eigene Schwäche-Simulation unterhalb der nativen Engine-Untergrenze).
+const BOT_ELO_MIN = 100;
+const BOT_ELO_MAX = 3200;
+const BOT_ELO_STEP = 50;
+const BOT_ELO_DEFAULT = 300;
+
+function getEloLabel(elo: number) {
+    if (elo < 250) return "Beginner";
+    if (elo < 600) return "Casual";
+    if (elo < 1000) return "Club Player";
+    if (elo < 1500) return "Strong";
+    if (elo < 2000) return "Expert";
+    if (elo < 2600) return "Master";
+    if (elo < 3200) return "Grandmaster";
+    return "Full Stockfish";
+
+}
+// Klont ein Chess-Objekt UNTER BEIBEHALTUNG der vollständigen Zughistorie.
+// new Chess(fen) allein reicht nicht - das kennt nur die aktuelle Stellung,
+// nicht die Züge davor, wodurch pgn() später nur den letzten Zug zeigen würde.
+function cloneWithHistory(g: Chess): Chess {
+    const clone = new Chess();
+    g.history({ verbose: true }).forEach((m: any) => {
+        clone.move({ from: m.from, to: m.to, promotion: m.promotion });
+    });
+    return clone;
+}
+
+// Reiner JS/RN-Slider ohne natives Modul. @react-native-community/slider
+// braucht einen echten Native-Rebuild (funktioniert NICHT in Expo Go, daher
+// der "Can't find view manager RNCSlider" Fehler) - das hier läuft überall.
+function EloSlider({
+    value,
+    onValueChange,
+    minimumValue,
+    maximumValue,
+    step,
+}: {
+    value: number;
+    onValueChange: (v: number) => void;
+    minimumValue: number;
+    maximumValue: number;
+    step: number;
+}) {
+    const trackWidthRef = useRef(0);
+
+    const clampToStep = (v: number) => {
+        const stepped = Math.round((v - minimumValue) / step) * step + minimumValue;
+        return Math.min(maximumValue, Math.max(minimumValue, stepped));
+    };
+
+    const updateFromX = (x: number) => {
+        if (trackWidthRef.current <= 0) return;
+        const ratio = Math.min(1, Math.max(0, x / trackWidthRef.current));
+        const raw = minimumValue + ratio * (maximumValue - minimumValue);
+        onValueChange(clampToStep(raw));
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderGrant: (evt) => updateFromX(evt.nativeEvent.locationX),
+            onPanResponderMove: (evt) => updateFromX(evt.nativeEvent.locationX),
+        })
+    ).current;
+
+    const ratio = Math.min(1, Math.max(0, (value - minimumValue) / (maximumValue - minimumValue)));
+
+    return (
+        <View
+            onLayout={(e) => {
+                trackWidthRef.current = e.nativeEvent.layout.width;
+            }}
+            {...panResponder.panHandlers}
+            hitSlop={{ top: 12, bottom: 12 }}
+            style={{ width: "100%", height: 40, justifyContent: "center" }}
+        >
+            <View
+                style={{
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: "rgba(255,255,255,0.25)",
+                    overflow: "hidden",
+                }}
+            >
+                <View
+                    style={{
+                        height: "100%",
+                        width: `${ratio * 100}%`,
+                        backgroundColor: "#FFD700",
+                    }}
+                />
+            </View>
+            <View
+                pointerEvents="none"
+                style={{
+                    position: "absolute",
+                    top: 8,
+                    left: `${ratio * 100}%`,
+                    marginLeft: -11,
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    backgroundColor: "#FFD700",
+                    borderWidth: 2,
+                    borderColor: "#111827",
+                }}
+            />
+        </View>
+    );
+}
+
 const toChessSquare = (
     row: number,
     col: number,
@@ -54,6 +175,11 @@ const pieceToKey = (piece: any) => {
     return `${piece.color}${piece.type}`;
 };
 
+type EndState = {
+    type: "win" | "loss" | "draw";
+    reason: "checkmate" | "stalemate" | "draw";
+};
+
 export default function Playbot() {
     const socket = useRef<Socket | null>(null);
     const [game, setGame] = useState(new Chess());
@@ -61,8 +187,7 @@ export default function Playbot() {
     const [legalMoves, setLegalMoves] = useState<any[]>([]);
     const [moveHistory, setMoveHistory] = useState<string[]>([]);
     const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null);
-    const [botElo, setBotElo] = useState<100 | 300 | 500 | 1000>(100);
-    const botLevels = [100, 300, 500, 1000] as const;
+    const [botElo, setBotElo] = useState<number>(BOT_ELO_DEFAULT);
     const [gameStarted, setGameStarted] = useState(false);
     const [bottomColor, setBottomColor] = useState<"w" | "b">("w");
     const [botColor, setBotColor] = useState<"w" | "b">("b");
@@ -86,10 +211,19 @@ export default function Playbot() {
         bottomColor: "w" | "b";
         humanColor: "w" | "b";
         botColor: "w" | "b";
-        botElo: 100 | 300 | 500 | 1000;
+        botElo: number;
     };
     const [gameOver, setGameOver] = useState(false);
     const [savedData, setSavedData] = useState<SavedData | null>(null);
+    const [endState, setEndState] = useState<EndState | null>(null);
+
+    // Custom Popups statt Alert.alert
+    const [showLeaveModal, setShowLeaveModal] = useState(false);
+    const [showRestartModal, setShowRestartModal] = useState(false);
+    const [showSaveModal, setShowSaveModal] = useState(false);
+
+    const endAnimation = useRef(new Animated.Value(0)).current;
+    const endPopupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
         const loadSavedGame = async () => {
             if (!params.key) return;
@@ -99,7 +233,6 @@ export default function Playbot() {
                 const stored = await AsyncStorage.getItem(key);
 
                 if (!stored) {
-                    Alert.alert("Error", "Saved game could not be found.");
                     return;
                 }
 
@@ -107,13 +240,22 @@ export default function Playbot() {
 
                 setSavedData(data);
 
-                const loadedGame = new Chess(data.fen);
+                // GEÄNDERT: Züge einzeln nachspielen statt nur FEN zu laden,
+                // damit die volle Historie für spätere PGN-Analyse erhalten bleibt
+                const replayedGame = new Chess();
 
-                setGame(loadedGame);
+                if (Array.isArray(data.history)) {
+                    for (const move of data.history) {
+                        replayedGame.move({
+                            from: move.from,
+                            to: move.to,
+                            promotion: move.promotion,
+                        });
+                    }
+                }
 
-                // WICHTIG:
-                // Nicht loadedGame.history() benutzen.
-                // Die FEN kennt die vorherigen Züge nicht.
+                setGame(replayedGame);
+
                 setMoveHistory(
                     data.history?.map((move: any) => move.san) ?? []
                 );
@@ -132,10 +274,10 @@ export default function Playbot() {
                 setLastMove(null);
                 setKingInCheck(null);
                 setGameOver(false);
+                setEndState(null);
 
             } catch (error) {
                 console.log("Error loading saved bot game:", error);
-                Alert.alert("Error", "Saved game could not be loaded.");
             }
         };
 
@@ -152,6 +294,63 @@ export default function Playbot() {
             scrollRef.current.scrollToEnd({ animated: true });
         }
     }, [moveHistory]);
+
+    // End-Game-Karte animiert einblenden, genau wie im Online-Screen
+    useEffect(() => {
+        if (!endState) return;
+
+        endAnimation.setValue(0);
+
+        Animated.timing(endAnimation, {
+            toValue: 1,
+            duration: 280,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [endState]);
+
+    useEffect(() => {
+        return () => {
+            if (endPopupTimer.current) {
+                clearTimeout(endPopupTimer.current);
+            }
+        };
+    }, []);
+    useEffect(() => {
+        const onBackPress = () => {
+            // Wenn gerade ein Popup offen ist → Popup schließen
+            if (showLeaveModal) {
+                setShowLeaveModal(false);
+                return true;
+            }
+
+            if (showRestartModal) {
+                setShowRestartModal(false);
+                return true;
+            }
+
+            if (showSaveModal) {
+                setShowSaveModal(false);
+                return true;
+            }
+
+            // Während einer Partie → Leave-Modal anzeigen
+            if (gameStarted) {
+                setShowLeaveModal(true);
+                return true;
+            }
+
+            // Im Setup-Screen → normale Navigation
+            return false;
+        };
+
+        const subscription = BackHandler.addEventListener(
+            "hardwareBackPress",
+            onBackPress
+        );
+
+        return () => subscription.remove();
+    }, [gameStarted, showLeaveModal, showRestartModal, showSaveModal]);
     useEffect(() => {
         const s = io("https://checkfall-server-clean-1.onrender.com");
         socket.current = s;
@@ -165,9 +364,10 @@ export default function Playbot() {
                 promotion: data.promotion
             };
 
-            setGame(prev => {
-                const newGame = new Chess(prev.fen());
-                const move = newGame.move(moveObj);
+       setGame(prev => {
+    const newGame = cloneWithHistory(prev); // GEÄNDERT (vorher: new Chess(prev.fen()))
+    const move = newGame.move(moveObj);
+    
 
                 if (!move) {
                     console.log("❌ INVALID BOT MOVE:", moveObj);
@@ -200,7 +400,7 @@ export default function Playbot() {
                     s.emit("find_bot_match", {
                         name: "Player",
                         avatar: "",
-                        level: data.botElo ?? 100,
+                        level: data.botElo ?? BOT_ELO_DEFAULT,
                         playerColor: data.humanColor,
                         startFEN: data.fen,
                     });
@@ -245,6 +445,7 @@ export default function Playbot() {
                 setLegalMoves([]);
                 setKingInCheck(null);
                 setGameOver(false);
+                setEndState(null);
                 setGameStarted(true);
 
                 return;
@@ -266,26 +467,25 @@ export default function Playbot() {
         };
     }, []);
     const botMoveRef = useRef(false);
+    // grobe lokale Einschätzung der Enginetiefe passend zur ELO (nur informativ,
+    // die tatsächliche Tiefe/Skill wird serverseitig aus "level" berechnet)
     const eloToDepth = (elo: number) => {
-        switch (elo) {
-            case 100: return 5;
-            case 300: return 8;
-            case 500: return 12;
-            case 1000: return 15;
-            default: return 10;
-        }
-    }
+        const clamped = Math.min(BOT_ELO_MAX, Math.max(BOT_ELO_MIN, elo));
+        const skill = Math.round(clamped / 50);
+        return Math.max(2, Math.round(2 + skill * 0.65));
+    };
     const [isBotThinking, setIsBotThinking] = useState(false);
 
 
-    const handlePromotion = (pieceType: string) => {
-        if (!promotionMove) return;
-        const newGame = new Chess(game.fen());
-        const move = newGame.move({
-            from: promotionMove.from,
-            to: promotionMove.to,
-            promotion: pieceType,
-        });
+ const handlePromotion = (pieceType: string) => {
+    if (!promotionMove) return;
+    const newGame = cloneWithHistory(game); // GEÄNDERT (vorher: new Chess(game.fen()))
+    const move = newGame.move({
+        from: promotionMove.from,
+        to: promotionMove.to,
+        promotion: pieceType,
+    });
+    
         if (!move) return;
         setGame(newGame);
         setMoveHistory(prev => [...prev, move.san]);
@@ -325,18 +525,20 @@ export default function Playbot() {
         );
     };
 
-    const resetGame = () => {
+    const resetToSetupScreen = () => {
         setGame(new Chess());
         setSelectedSquare(null);
         setLegalMoves([]);
         setPromotionMove(null);
         setMoveHistory([]);
         setLastMove(null);
-
         setKingInCheck(null);
         setGameOver(false);
-
+        setEndState(null);
+        setRoomId(null);
+        setGameStarted(false);
     };
+
     // currentGame: Chess
     const getKingSquare = (
         currentGame: Chess,
@@ -356,6 +558,18 @@ export default function Playbot() {
         return null;
     };
 
+    const showEndPopupAfterDelay = (state: EndState) => {
+        setGameOver(true);
+
+        if (endPopupTimer.current) {
+            clearTimeout(endPopupTimer.current);
+        }
+
+        endPopupTimer.current = setTimeout(() => {
+            setEndState(state);
+        }, 700); // Verzögerung, damit der letzte Zug sichtbar ist
+    };
+
     const checkGameEnd = (currentGame: Chess) => {
         if (currentGame.isCheck()) {
             const checkedKing = getKingSquare(
@@ -366,20 +580,11 @@ export default function Playbot() {
         } else {
             setKingInCheck(null);
         }
-        const showAlert = (title: string, message: string) => {
-            setTimeout(() => {
-                Alert.alert(title, message);
-            }, 900); // 0,8 Sekunden warten, damit der letzte Zug sichtbar ist
-        };
-
 
         if (currentGame.isCheckmate()) {
-
-            setGameOver(true);
-
             const loser = currentGame.turn();
             const winner = loser === "w" ? "b" : "w";
-            const result =
+            const result: "win" | "loss" | "draw" =
                 winner === humanColor ? "win"
                     : winner === botColor ? "loss"
                         : "draw";
@@ -387,38 +592,32 @@ export default function Playbot() {
             // Königfeld ermitteln
             const kingSquare = getKingSquare(currentGame, loser); // chess.js liefert z.B. "e8"
             setKingInCheck(kingSquare);
-            saveGameToHistory("bot", result);
+            saveGameToHistory("bot", result, currentGame.pgn());       // Checkmate
 
-
-            setTimeout(() => {
-                Alert.alert(
-                    "Checkmate",
-                    `${winner === "w" ? "White" : "Black"} has won the game!`
-                );
-            }, 900);
+            showEndPopupAfterDelay({ type: result, reason: "checkmate" });
             return true;
         }
         if (currentGame.isStalemate()) {
-            saveGameToHistory("bot", "draw");
-            showAlert("Stalemate", "No legal moves left – Draw");
+            saveGameToHistory("bot", "draw", currentGame.pgn());
+            showEndPopupAfterDelay({ type: "draw", reason: "stalemate" });
             return true;
         }
 
         if (currentGame.isThreefoldRepetition()) {
-            saveGameToHistory("bot", "draw");
-            showAlert("Remis", "Threefold Repetition");
+            saveGameToHistory("bot", "draw", currentGame.pgn());
+            showEndPopupAfterDelay({ type: "draw", reason: "draw" });
             return true;
         }
 
         if (currentGame.isInsufficientMaterial()) {
-            saveGameToHistory("bot", "draw");
-            showAlert("Remis", "Insufficient Material for Checkmate");
+            saveGameToHistory("bot", "draw", currentGame.pgn());
+            showEndPopupAfterDelay({ type: "draw", reason: "draw" });
             return true;
         }
 
         if (currentGame.isDraw()) {
-            saveGameToHistory("bot", "draw");
-            showAlert("Remis", "50-Move Rule or General Draw");
+            saveGameToHistory("bot", "draw", currentGame.pgn());
+            showEndPopupAfterDelay({ type: "draw", reason: "draw" });
             return true;
         }
 
@@ -427,6 +626,7 @@ export default function Playbot() {
     async function saveGameToHistory(
         mode: "bot",
         result: "win" | "loss" | "draw" | "aborted",
+        pgn: string,
         timestamp?: number
     ) {
         const key = "game_history";
@@ -442,11 +642,41 @@ export default function Playbot() {
 
         await AsyncStorage.setItem(key, JSON.stringify(history));
 
+        // NEU: zusätzlich in Supabase (nur für echte Accounts, nicht Gäste)
+        try {
+            const acc = await getCurrentAccount();
 
-
+            if (acc && !acc.guest && acc.authId) {
+                await saveGameRecord({
+                    userId: acc.authId,
+                    opponentId: null, // Bot ist kein echter User
+                    mode,
+                    result,
+                    pgn,
+                });
+            }
+        } catch (error) {
+            console.log("SAVE GAME RECORD ERROR:", error);
+        }
     }
 
-
+    const animatedCardStyle = {
+        opacity: endAnimation,
+        transform: [
+            {
+                translateY: endAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                }),
+            },
+            {
+                scale: endAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.92, 1],
+                }),
+            },
+        ],
+    };
 
     return (
         <ImageBackground source={backgroundImage}
@@ -498,50 +728,29 @@ export default function Playbot() {
                             </Pressable>
                         ))}
                     </View>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", marginBottom: 16 }}>
-                        {botLevels.map((level) => (
-                            <Pressable
-                                key={level}
-                                onPress={() => setBotElo(level)}
-                                style={{
-                                    margin: 6,
-                                    paddingVertical: 12,
-                                    paddingHorizontal: 18,
-                                    borderRadius: 12,
-                                    backgroundColor:
-                                        botElo === level
-                                            ? "rgba(255,215,0,0.18)"
-                                            : "rgba(255,255,255,0.08)",
-                                    borderWidth: 1.2,
-                                    borderColor:
-                                        botElo === level
-                                            ? "#FFD700"
-                                            : "rgba(255,255,255,0.15)",
-                                }}
-                            >
-                                <Text
-                                    style={{
-                                        color: "#fff",
-                                        fontSize: 14,
-                                        fontWeight: botElo === level ? "700" : "500",
-                                    }}
-                                >
-                                    {level === 100
-                                        ? "Beginner • 100"
-                                        : level === 300
-                                            ? "Casual • 300"
-                                            : level === 500
-                                                ? "Strong • 500"
-                                                : "Expert • 1000"}
-                                </Text>
-                            </Pressable>
-                        ))}
+
+                    {/* ELO Slider statt fester Buttons */}
+                    <View style={{ width: "80%", alignItems: "center", marginBottom: 20 }}>
+                        <Text style={{ color: "#FFD700", fontSize: 16, fontWeight: "700", marginBottom: 6 }}>
+                            {getEloLabel(botElo)} • ELO {botElo}
+                        </Text>
+                        <EloSlider
+                            minimumValue={BOT_ELO_MIN}
+                            maximumValue={BOT_ELO_MAX}
+                            step={BOT_ELO_STEP}
+                            value={botElo}
+                            onValueChange={setBotElo}
+                        />
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", width: "100%" }}>
+                            <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{BOT_ELO_MIN}</Text>
+                            <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{BOT_ELO_MAX}</Text>
+                        </View>
                     </View>
+
                     <Pressable
                         onPress={() => {
                             // Wenn savedData existiert, dann einfach Spiel starten
                             if (savedData) {
-                                const color = savedData.bottomColor;
                                 setHumanColor(savedData.humanColor);
                                 setBottomColor(savedData.bottomColor);
                                 setBotColor(savedData.botColor);
@@ -670,8 +879,8 @@ export default function Playbot() {
                                                             return;
                                                         }
 
-                                                        const newGame = new Chess(game.fen());
-                                                        const move = newGame.move({ from: selectedSquare as any, to: square as any });
+                                                      const newGame = cloneWithHistory(game); // GEÄNDERT (vorher: new Chess(game.fen()))
+const move = newGame.move({ from: selectedSquare as any, to: square as any });
                                                         if (!move) return;
 
                                                         setGame(newGame);
@@ -684,7 +893,10 @@ export default function Playbot() {
                                                         if (!roomId) return; // Sicherheitshalber
                                                         socket.current?.emit("player_move", {
                                                             roomId: roomId,
-                                                            move: move.from + move.to, // ✅ UCI Format
+                                                            // WICHTIG: der Server erwartet ein Objekt {from, to, promotion?},
+                                                            // kein UCI-String - sonst wird der Zug serverseitig verworfen
+                                                            // und der Bot bekommt nie mit, dass er am Zug ist.
+                                                            move: { from: move.from, to: move.to },
                                                             fen: newGame.fen(), // Optional, falls der Server die aktuelle Stellung braucht
                                                         });
 
@@ -695,16 +907,19 @@ export default function Playbot() {
                                                     {
                                                         backgroundColor:
                                                             square === kingInCheck
-                                                                ? "#ff3b30"
+                                                                ? "#ff4d4d"
                                                                 : isLastTo
-                                                                    ? "#facc15"       // Ziel-Feld (kräftig)
+                                                                    ? "#6bb6ff"
                                                                     : isLastFrom
-                                                                        ? "#fde68a"      // Start-Feld (heller)
-                                                                        : isDark
-                                                                            ? "#769656"
-                                                                            : "#eeeed2",
-                                                        borderWidth: isSelected ? 2 : 0,
-                                                        borderColor: isSelected ? "#ac442c" : "transparent",
+                                                                        ? "#4da3ff"
+                                                                        : isSelected
+                                                                            ? "#4da3ff"
+                                                                            : isDark
+                                                                                ? "#b58863"
+                                                                                : "#e7d5b7",
+
+                                                        borderWidth: 0,
+                                                        borderColor: "transparent",
                                                     },
                                                 ]}
                                             >
@@ -714,32 +929,42 @@ export default function Playbot() {
                                                         style={[
                                                             styles.piece,
                                                             {
-                                                                shadowColor: "#000",
-                                                                shadowOpacity: 0.6,
-                                                                shadowRadius: 4,
-                                                                shadowOffset: { width: 0, height: 2 },
-                                                            },
-                                                            // Rotation des Boards (falls nötig)
-                                                            rotateBoard ? { transform: [{ rotate: "0deg" }] } : {},
-
-                                                            // schwarze Bauern extra vergrößern und verschieben
-                                                            pieceKey === "bp" && {
                                                                 transform: [
-                                                                    { scale: 1.55 },
-                                                                    { translateY: 3.25 },
-                                                                    { translateX: -0.5 },
-                                                                ],
-                                                            },
+                                                                    {
+                                                                        scale:
+                                                                            pieceKey === "wp" ? 1.35 :
+                                                                                pieceKey === "wn" ? 1.55 :
+                                                                                    pieceKey === "wb" ? 1.7 :
+                                                                                        pieceKey === "wr" ? 1.65 :
+                                                                                            pieceKey === "wq" ? 1.55 :
+                                                                                                pieceKey === "wk" ? 1.30 :
 
-                                                            // alle anderen schwarzen Figuren leicht vergrößern
-                                                            pieceKey?.startsWith("b") && pieceKey !== "bp" && {
-                                                                transform: [{ scale: 1.12 }],
-                                                            },
+                                                                                                    pieceKey === "bp" ? 1.3 :
+                                                                                                        pieceKey === "bn" ? 1.20 :
+                                                                                                            pieceKey === "bb" ? 1.3 :
+                                                                                                                pieceKey === "br" ? 1.15 :
+                                                                                                                    pieceKey === "bq" ? 1.25 :
+                                                                                                                        pieceKey === "bk" ? 1.15 :
 
-                                                            // weiße Läufer, Dame und König leicht vergrößern
-                                                            (pieceKey === "wb" || pieceKey === "wq" || pieceKey === "wk") && {
-                                                                transform: [{ scale: 1.12 }],
-                                                            },
+                                                                                                                            1
+                                                                    },
+                                                                    {
+                                                                        translateY:
+                                                                            pieceKey === "wb" ? -1.1 :
+                                                                                pieceKey === "wr" ? -2 :
+                                                                                    pieceKey === "wq" ? -2 :
+                                                                                        pieceKey === "wp" ? 1.2 :
+
+                                                                                            pieceKey === "bp" ? 2 :
+                                                                                                pieceKey === "bn" ? 2 :
+                                                                                                    pieceKey === "br" ? 2 :
+                                                                                                        pieceKey === "bq" ? 2 :
+                                                                                                            pieceKey === "bb" ? 0.5 :
+
+                                                                                                                0
+                                                                    }
+                                                                ]
+                                                            }
                                                         ]}
                                                     />
                                                 )}
@@ -777,75 +1002,215 @@ export default function Playbot() {
                             </View>
                         </View>
                         <View style={styles.bottomBar}>
-                            <Pressable
-                                onPress={() =>
-                                    Alert.alert("Leave game?", "Your progress will be lost.", [
-                                        { text: "Cancel", style: "cancel" },
-                                        {
-                                            text: "Yes",
-                                            onPress: async () => {
-                                                const now = Date.now();
-                                                await saveGameToHistory("bot", "aborted", now);
-                                                router.back();
-                                            },
-                                        },
-                                    ])
-                                }
-                            >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Back </Text>
+                            <Pressable onPress={() => setShowLeaveModal(true)}>
+                                <Text style={styles.bottomBtn}>Back</Text>
                             </Pressable>
                             <Pressable
                                 onPress={async () => {
                                     await saveGame();
-                                    Alert.alert(
-                                        "Spiel gespeichert",
-                                        "Du kannst es unter „Gespeicherte Spiele“ fortsetzen."
-                                    );
+                                    setShowSaveModal(true);
                                 }}
                             >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Save </Text>
+                                <Text style={styles.bottomBtn}>Save</Text>
                             </Pressable>
 
-                            <Pressable
-                                onPress={() =>
-                                    Alert.alert(
-                                        "Restart game?",
-                                        "Your progress will be lost.",
-                                        [
-                                            { text: "No", style: "cancel" },
-                                            {
-                                                text: "Yes", onPress: async () => {
-
-                                                    // 1. Server informieren (wichtig!)
-                                                    if (roomId) {
-                                                        socket.current?.emit("resign_game", { roomId });
-                                                    }
-
-                                                    // 2. Lokal resetten
-                                                    setGame(new Chess());
-                                                    setSelectedSquare(null);
-                                                    setLegalMoves([]);
-                                                    setMoveHistory([]);
-                                                    setLastMove(null);
-                                                    setPromotionMove(null);
-                                                    setKingInCheck(null);
-                                                    setGameOver(false);
-
-                                                    // 3. Raum löschen
-                                                    setRoomId(null);
-
-                                                    // 4. zurück zum Startscreen
-                                                    setGameStarted(false);
-                                                }
-                                            },
-                                        ]
-                                    )
-                                }
-                            >
-                                <Text style={[styles.bottomBtn, { color: "#f6f6f6" }]}>Restart </Text>
+                            <Pressable onPress={() => setShowRestartModal(true)}>
+                                <Text style={styles.bottomBtn}>Restart</Text>
                             </Pressable>
-
                         </View>
+
+                        {/* =============================
+                            LEAVE MODAL
+                        ============================= */}
+                        <Modal
+                            visible={showLeaveModal}
+                            transparent
+                            animationType="fade"
+                            onRequestClose={() => setShowLeaveModal(false)}
+                        >
+                            <View style={styles.overlay}>
+                                <View style={styles.card}>
+                                    <Text style={styles.title}>Partie verlassen?</Text>
+                                    <Text style={styles.text}>
+                                        Dein Fortschritt geht verloren, wenn du das Spiel nicht vorher speicherst.
+                                    </Text>
+
+                                    <View style={styles.buttons}>
+                                        <Pressable
+                                            style={styles.cancelButton}
+                                            onPress={() => setShowLeaveModal(false)}
+                                        >
+                                            <Text style={styles.cancelButtonText}>Abbrechen</Text>
+                                        </Pressable>
+
+                                        <Pressable
+                                            style={styles.leaveButton}
+                                            onPress={async () => {
+                                                const now = Date.now();
+                                                await saveGameToHistory("bot", "aborted", game.pgn(), now);
+                                                setShowLeaveModal(false);
+                                                router.back();
+                                            }}
+                                        >
+                                            <Text style={styles.leaveButtonText}>Verlassen</Text>
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            </View>
+                        </Modal>
+
+                        {/* =============================
+                            RESTART MODAL
+                        ============================= */}
+                        <Modal
+                            visible={showRestartModal}
+                            transparent
+                            animationType="fade"
+                            onRequestClose={() => setShowRestartModal(false)}
+                        >
+                            <View style={styles.overlay}>
+                                <View style={styles.card}>
+                                    <Text style={styles.title}>Spiel neu starten?</Text>
+                                    <Text style={styles.text}>
+                                        Dein aktueller Fortschritt geht verloren.
+                                    </Text>
+
+                                    <View style={styles.buttons}>
+                                        <Pressable
+                                            style={styles.cancelButton}
+                                            onPress={() => setShowRestartModal(false)}
+                                        >
+                                            <Text style={styles.cancelButtonText}>Abbrechen</Text>
+                                        </Pressable>
+
+                                        <Pressable
+                                            style={styles.leaveButton}
+                                            onPress={() => {
+                                                if (roomId) {
+                                                    socket.current?.emit("resign_game", { roomId });
+                                                }
+                                                setShowRestartModal(false);
+                                                resetToSetupScreen();
+                                            }}
+                                        >
+                                            <Text style={styles.leaveButtonText}>Neustarten</Text>
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            </View>
+                        </Modal>
+
+                        {/* =============================
+                            SAVE CONFIRMATION MODAL
+                        ============================= */}
+                        <Modal
+                            visible={showSaveModal}
+                            transparent
+                            animationType="fade"
+                            onRequestClose={() => setShowSaveModal(false)}
+                        >
+                            <View style={styles.overlay}>
+                                <View style={styles.card}>
+                                    <Text style={styles.title}>Spiel gespeichert</Text>
+                                    <Text style={styles.text}>
+                                        Du kannst es unter „Gespeicherte Spiele“ fortsetzen.
+                                    </Text>
+
+                                    <Pressable
+                                        style={styles.primaryBtn}
+                                        onPress={() => setShowSaveModal(false)}
+                                    >
+                                        <Text style={styles.btnText}>OK</Text>
+                                    </Pressable>
+                                </View>
+                            </View>
+                        </Modal>
+
+                        {/* =============================
+                            END GAME POPUP
+                        ============================= */}
+                        {endState && (
+                            <View style={styles.endOverlay}>
+                                <Animated.View style={[styles.endCard, animatedCardStyle]}>
+                                    {endState.type === "win" && (
+                                        <>
+                                            <Text style={styles.winTitle}>Sieg!</Text>
+                                            <Text style={styles.subText}>
+                                                {endState.reason === "checkmate"
+                                                    ? "Du hast den Bot schachmatt gesetzt."
+                                                    : ""}
+                                            </Text>
+                                        </>
+                                    )}
+
+                                    {endState.type === "loss" && (
+                                        <>
+                                            <Text style={styles.loseTitle}>Niederlage</Text>
+                                            <Text style={styles.subText}>
+                                                {endState.reason === "checkmate"
+                                                    ? "Du wurdest schachmatt gesetzt."
+                                                    : ""}
+                                            </Text>
+                                        </>
+                                    )}
+
+                                    {endState.type === "draw" && (
+                                        <>
+                                            <Text style={styles.drawTitle}>🤝 Remis</Text>
+                                            <Text style={styles.subText}>
+                                                {endState.reason === "stalemate"
+                                                    ? "Patt – keine legalen Züge mehr."
+                                                    : "Remis durch Stellungswiederholung oder unzureichendes Material."}
+                                            </Text>
+                                        </>
+                                    )}
+
+                                    <View style={styles.endButtons}>
+                                        <Pressable
+                                            style={styles.primaryBtn}
+                                            onPress={() => {
+                                                const color = playerColor === "random" ? (Math.random() < 0.5 ? "w" : "b") : playerColor;
+
+                                                setEndState(null);
+                                                setGame(new Chess());
+                                                setSelectedSquare(null);
+                                                setLegalMoves([]);
+                                                setPromotionMove(null);
+                                                setMoveHistory([]);
+                                                setLastMove(null);
+                                                setKingInCheck(null);
+                                                setGameOver(false);
+                                                setRoomId(null);
+
+                                                setHumanColor(color);
+                                                setBottomColor(color);
+                                                setBotColor(color === "w" ? "b" : "w");
+
+                                                socket.current?.emit("find_bot_match", {
+                                                    name: "Player",
+                                                    avatar: "",
+                                                    level: botElo,
+                                                    playerColor: playerColor === "random" ? null : playerColor,
+                                                    startFEN: "startpos",
+                                                });
+                                            }}
+                                        >
+                                            <Text style={styles.btnText}>Neue Partie</Text>
+                                        </Pressable>
+
+                                        <Pressable
+                                            style={styles.secondaryBtn}
+                                            onPress={() => {
+                                                setEndState(null);
+                                                router.back();
+                                            }}
+                                        >
+                                            <Text style={styles.btnText}>Home</Text>
+                                        </Pressable>
+                                    </View>
+                                </Animated.View>
+                            </View>
+                        )}
                     </View>
                 </View>
             )
@@ -909,17 +1274,23 @@ const styles = StyleSheet.create({
         backgroundColor: "#e5e7eb",
         fontSize: 13,
     },
+
+    // Bottom-Bar im selben Style wie im Online-Screen
     bottomBar: {
         marginTop: 16,
         flexDirection: "row",
-        justifyContent: "space-around",
+        justifyContent: "space-between",
+        paddingHorizontal: 20,
         paddingVertical: 12,
         borderTopWidth: 1,
-        borderColor: "#e5e7eb",
+        borderColor: "#fff",
     },
     bottomBtn: {
-        fontSize: 14
+        color: "#f6f6f6",
+        fontWeight: "600",
+        fontSize: 14,
     },
+
     promotionBar: {
         position: "absolute",
         bottom: BOARD_SIZE + 120,
@@ -940,4 +1311,138 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-}); 
+
+    // ==== Popup-Styles im Online-Screen-Design ====
+    overlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.72)",
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 20,
+    },
+    card: {
+        width: "85%",
+        maxWidth: 380,
+        backgroundColor: "#1E1E1E",
+        borderRadius: 24,
+        padding: 24,
+        borderWidth: 1,
+        borderColor: "#D4AF37",
+    },
+    title: {
+        color: "#fff",
+        fontSize: 22,
+        fontWeight: "700",
+        textAlign: "center",
+        marginBottom: 12,
+    },
+    text: {
+        color: "#d0d0d0",
+        fontSize: 15,
+        textAlign: "center",
+        lineHeight: 22,
+        marginBottom: 24,
+    },
+    buttons: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        gap: 12,
+    },
+    cancelButton: {
+        flex: 1,
+        backgroundColor: "#2c2c2c",
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: "center",
+    },
+    leaveButton: {
+        flex: 1,
+        backgroundColor: "#c62828",
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: "center",
+    },
+    cancelButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    leaveButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "700",
+    },
+
+    primaryBtn: {
+        backgroundColor: "#D4AF37",
+        padding: 13,
+        borderRadius: 12,
+        alignItems: "center",
+    },
+    secondaryBtn: {
+        backgroundColor: "#222",
+        padding: 13,
+        borderRadius: 12,
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#333",
+    },
+    btnText: {
+        color: "#fff",
+        fontWeight: "700",
+    },
+
+    endOverlay: {
+        position: "absolute",
+        top: -BOARD_SIZE * 0.05,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 999,
+        backgroundColor: "rgba(0,0,0,0.18)",
+        borderRadius: 18,
+    },
+    endCard: {
+        width: "85%",
+        maxWidth: 380,
+        backgroundColor: "#111",
+        borderRadius: 24,
+        padding: 24,
+        borderWidth: 1,
+        borderColor: "#D4AF37",
+        alignItems: "center",
+        shadowOpacity: 0.4,
+        shadowRadius: 20,
+        elevation: 12,
+    },
+    winTitle: {
+        fontSize: 38,
+        fontWeight: "900",
+        color: "#FFD700",
+        marginBottom: 8,
+    },
+    loseTitle: {
+        fontSize: 38,
+        fontWeight: "900",
+        color: "#ff3b3b",
+        marginBottom: 8,
+    },
+    drawTitle: {
+        fontSize: 38,
+        fontWeight: "900",
+        color: "#aaa",
+        marginBottom: 8,
+    },
+    subText: {
+        color: "#ccc",
+        textAlign: "center",
+        lineHeight: 21,
+        marginBottom: 16,
+    },
+    endButtons: {
+        width: "100%",
+        gap: 10,
+    },
+});

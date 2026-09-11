@@ -26,7 +26,9 @@ import {
     getCurrentAccount,
     updateAccount,
 } from "../../lib/account";
+import { cloneWithHistory } from "../../lib/chessUtils";
 import { getFriendshipStatusWith, sendFriendRequest } from "../../lib/friends";
+import { saveGameRecord } from "../../lib/games";
 import { getSocket } from "../../lib/socket";
 import Board from "./components/Board";
 import { useChessInput } from "./hooks/useChessInput";
@@ -59,11 +61,11 @@ const pieceToKey = (piece: any) => (piece ? `${piece.color}${piece.type}` : null
 type EndState = {
     type: "win" | "loss" | "draw";
     reason:
-        | "checkmate"
-        | "timeout"
-        | "resign"
-        | "disconnect"
-        | "draw";
+    | "checkmate"
+    | "timeout"
+    | "resign"
+    | "disconnect"
+    | "draw";
 };
 
 type ChatMessage = {
@@ -298,12 +300,8 @@ export default function GameScreen() {
 
     const finishOnlineGame = async (
         result: "win" | "loss" | "draw",
-        reason:
-            | "checkmate"
-            | "timeout"
-            | "resign"
-            | "disconnect"
-            | "draw"
+        reason: "checkmate" | "timeout" | "resign" | "disconnect" | "draw",
+        pgnOverride?: string
     ) => {
         if (eloProcessed.current) return;
         if (!myColor) return;
@@ -315,62 +313,34 @@ export default function GameScreen() {
             const acc = await getCurrentAccount();
 
             if (!acc) {
-                console.log("Keine aktuelle Account gefunden.");
-
-                showEndPopupAfterDelay({
-                    type: result,
-                    reason,
-                });
-
+                showEndPopupAfterDelay({ type: result, reason });
                 return;
             }
 
             const currentRating = acc.rating ?? 1000;
+            const newRating = calculateElo(currentRating, opponentRating, result);
 
-            const newRating = calculateElo(
-                currentRating,
-                opponentRating,
-                result
-            );
+            await updateAccount(acc.id, { rating: newRating });
 
-            await updateAccount(acc.id, {
-                rating: newRating,
-            });
+            // GEÄNDERT: pgn + opponentAuthId mitgeben
+            await saveGameToHistory("online", result, pgnOverride ?? game.pgn(), opponentAuthId);
 
-            await saveGameToHistory("online", result);
-
-            showEndPopupAfterDelay({
-                type: result,
-                reason,
-            });
+            showEndPopupAfterDelay({ type: result, reason });
         } catch (error) {
             console.log("ELO UPDATE ERROR:", error);
-
-            // The game result should still be visible even if local
-            // rating/history persistence fails.
-            showEndPopupAfterDelay({
-                type: result,
-                reason,
-            });
+            showEndPopupAfterDelay({ type: result, reason });
         }
     };
 
     const checkGameState = (g: Chess) => {
         if (g.isCheckmate()) {
-            const result =
-                g.turn() === myColor
-                    ? "loss"
-                    : "win";
-
-            finishOnlineGame(
-                result,
-                "checkmate"
-            );
+            const result = g.turn() === myColor ? "loss" : "win";
+            finishOnlineGame(result, "checkmate", g.pgn());
             return;
         }
 
         if (g.isStalemate() || g.isDraw()) {
-            finishOnlineGame("draw", "draw");
+            finishOnlineGame("draw", "draw", g.pgn());
         }
     };
 
@@ -620,10 +590,10 @@ export default function GameScreen() {
 
             const reason =
                 data?.type === "timeout" ||
-                data?.type === "resign" ||
-                data?.type === "disconnect" ||
-                data?.type === "checkmate" ||
-                data?.type === "draw"
+                    data?.type === "resign" ||
+                    data?.type === "disconnect" ||
+                    data?.type === "checkmate" ||
+                    data?.type === "draw"
                     ? data.type
                     : "draw";
 
@@ -680,15 +650,9 @@ export default function GameScreen() {
             if (!from || !to) return;
 
             setGame((prev) => {
-                const newGame =
-                    new Chess(prev.fen());
+                const newGame = cloneWithHistory(prev); // GEÄNDERT (vorher: new Chess(prev.fen()))
+                const result = newGame.move({ from, to, promotion });
 
-                const result =
-                    newGame.move({
-                        from,
-                        to,
-                        promotion,
-                    });
 
                 if (!result) {
                     console.log(
@@ -740,8 +704,7 @@ export default function GameScreen() {
         const handleDrawOffer = (data: any) => {
             Alert.alert(
                 "Remis angeboten",
-                `${
-                    data?.name || "Dein Gegner"
+                `${data?.name || "Dein Gegner"
                 } möchte Remis.`,
                 [
                     {
@@ -885,7 +848,7 @@ export default function GameScreen() {
             Alert.alert(
                 "Revanche nicht möglich",
                 data?.message ||
-                    "Dein Gegner ist nicht mehr online."
+                "Dein Gegner ist nicht mehr online."
             );
         };
 
@@ -1028,25 +991,15 @@ export default function GameScreen() {
     // =============================
     // PROMOTION
     // =============================
-
-    const handlePromotion = (
-        piece:
-            | "q"
-            | "r"
-            | "b"
-            | "n"
-    ) => {
+    const handlePromotion = (piece: "q" | "r" | "b" | "n") => {
         if (!promotionMove) return;
+        const newGame = cloneWithHistory(game); // GEÄNDERT (vorher: new Chess(game.fen()))
+        const move = newGame.move({
+            from: promotionMove.from,
+            to: promotionMove.to,
+            promotion: piece,
+        });
 
-        const newGame =
-            new Chess(game.fen());
-
-        const move =
-            newGame.move({
-                from: promotionMove.from,
-                to: promotionMove.to,
-                promotion: piece,
-            });
 
         if (!move) {
             setPromotionMove(null);
@@ -1101,7 +1054,7 @@ export default function GameScreen() {
                     piece &&
                     piece.type === "k" &&
                     piece.color ===
-                        game.turn()
+                    game.turn()
                 ) {
                     checkSquare =
                         `${FILES[c]}${8 - r}`;
@@ -1171,33 +1124,39 @@ export default function GameScreen() {
 
     async function saveGameToHistory(
         mode: "online",
-        result:
-            | "win"
-            | "loss"
-            | "draw"
-            | "aborted",
+        result: "win" | "loss" | "draw" | "aborted",
+        pgn: string,
+        opponentId: string | null,
         timestamp?: number
     ) {
         const key = "game_history";
-        const stored =
-            await AsyncStorage.getItem(key);
-
-        const history = stored
-            ? JSON.parse(stored)
-            : [];
+        const stored = await AsyncStorage.getItem(key);
+        const history = stored ? JSON.parse(stored) : [];
 
         history.unshift({
             id: Date.now().toString(),
             mode,
             result,
-            timestamp:
-                timestamp ?? Date.now(),
+            timestamp: timestamp ?? Date.now(),
         });
 
-        await AsyncStorage.setItem(
-            key,
-            JSON.stringify(history)
-        );
+        await AsyncStorage.setItem(key, JSON.stringify(history));
+
+        try {
+            const acc = await getCurrentAccount();
+
+            if (acc && !acc.guest && acc.authId) {
+                await saveGameRecord({
+                    userId: acc.authId,
+                    opponentId,
+                    mode,
+                    result,
+                    pgn,
+                });
+            }
+        } catch (error) {
+            console.log("SAVE GAME RECORD ERROR:", error);
+        }
     }
 
     // =============================
@@ -1208,12 +1167,12 @@ export default function GameScreen() {
         myColor === "w"
             ? game.board()
             : [
-                  ...game.board(),
-              ]
-                  .reverse()
-                  .map((row) =>
-                      [...row].reverse()
-                  );
+                ...game.board(),
+            ]
+                .reverse()
+                .map((row) =>
+                    [...row].reverse()
+                );
 
     const animatedCardStyle = {
         opacity: endAnimation,
@@ -1443,7 +1402,7 @@ export default function GameScreen() {
                         }
                         behavior={
                             Platform.OS ===
-                            "ios"
+                                "ios"
                                 ? "padding"
                                 : undefined
                         }
@@ -1511,7 +1470,7 @@ export default function GameScreen() {
                                 keyboardShouldPersistTaps="handled"
                             >
                                 {chatMessages.length ===
-                                0 ? (
+                                    0 ? (
                                     <Text
                                         style={
                                             styles.emptyChat
@@ -1818,7 +1777,7 @@ export default function GameScreen() {
                                             params: {
                                                 userId:
                                                     myColor ===
-                                                    "w"
+                                                        "w"
                                                         ? black
                                                         : white,
                                                 name: opponentName,
@@ -1927,14 +1886,14 @@ export default function GameScreen() {
                                         ) => {
                                             if (
                                                 index %
-                                                    2 ===
+                                                2 ===
                                                 0
                                             ) {
                                                 rows.push(
                                                     {
                                                         moveNumber:
                                                             index /
-                                                                2 +
+                                                            2 +
                                                             1,
                                                         white:
                                                             move,
@@ -1945,7 +1904,7 @@ export default function GameScreen() {
                                             } else {
                                                 rows[
                                                     rows.length -
-                                                        1
+                                                    1
                                                 ].black =
                                                     move;
                                             }
@@ -2100,92 +2059,92 @@ export default function GameScreen() {
                                     >
                                         {endState.type ===
                                             "win" && (
-                                            <>
-                                                <Text
-                                                    style={
-                                                        styles.winTitle
-                                                    }
-                                                >
-                                                    Sieg!
-                                                </Text>
+                                                <>
+                                                    <Text
+                                                        style={
+                                                            styles.winTitle
+                                                        }
+                                                    >
+                                                        Sieg!
+                                                    </Text>
 
-                                                <Text
-                                                    style={
-                                                        styles.subText
-                                                    }
-                                                >
-                                                    {endState.reason ===
-                                                    "checkmate"
-                                                        ? "Du hast deinen Gegner schachmatt gesetzt."
-                                                        : endState.reason ===
-                                                          "timeout"
-                                                            ? "Die Zeit deines Gegners ist abgelaufen."
+                                                    <Text
+                                                        style={
+                                                            styles.subText
+                                                        }
+                                                    >
+                                                        {endState.reason ===
+                                                            "checkmate"
+                                                            ? "Du hast deinen Gegner schachmatt gesetzt."
                                                             : endState.reason ===
-                                                              "resign"
-                                                                ? "Dein Gegner hat aufgegeben."
+                                                                "timeout"
+                                                                ? "Die Zeit deines Gegners ist abgelaufen."
                                                                 : endState.reason ===
-                                                                  "disconnect"
-                                                                    ? "Dein Gegner hat die Verbindung verloren."
-                                                                    : ""}
-                                                </Text>
-                                            </>
-                                        )}
+                                                                    "resign"
+                                                                    ? "Dein Gegner hat aufgegeben."
+                                                                    : endState.reason ===
+                                                                        "disconnect"
+                                                                        ? "Dein Gegner hat die Verbindung verloren."
+                                                                        : ""}
+                                                    </Text>
+                                                </>
+                                            )}
 
                                         {endState.type ===
                                             "loss" && (
-                                            <>
-                                                <Text
-                                                    style={
-                                                        styles.loseTitle
-                                                    }
-                                                >
-                                                    Niederlage
-                                                </Text>
+                                                <>
+                                                    <Text
+                                                        style={
+                                                            styles.loseTitle
+                                                        }
+                                                    >
+                                                        Niederlage
+                                                    </Text>
 
-                                                <Text
-                                                    style={
-                                                        styles.subText
-                                                    }
-                                                >
-                                                    {endState.reason ===
-                                                    "checkmate"
-                                                        ? "Du wurdest schachmatt gesetzt."
-                                                        : endState.reason ===
-                                                          "timeout"
-                                                            ? "Deine Zeit ist abgelaufen."
+                                                    <Text
+                                                        style={
+                                                            styles.subText
+                                                        }
+                                                    >
+                                                        {endState.reason ===
+                                                            "checkmate"
+                                                            ? "Du wurdest schachmatt gesetzt."
                                                             : endState.reason ===
-                                                              "resign"
-                                                                ? "Du hast die Partie aufgegeben."
+                                                                "timeout"
+                                                                ? "Deine Zeit ist abgelaufen."
                                                                 : endState.reason ===
-                                                                  "disconnect"
-                                                                    ? "Die Verbindung wurde getrennt."
-                                                                    : ""}
-                                                </Text>
-                                            </>
-                                        )}
+                                                                    "resign"
+                                                                    ? "Du hast die Partie aufgegeben."
+                                                                    : endState.reason ===
+                                                                        "disconnect"
+                                                                        ? "Die Verbindung wurde getrennt."
+                                                                        : ""}
+                                                    </Text>
+                                                </>
+                                            )}
 
                                         {endState.type ===
                                             "draw" && (
-                                            <>
-                                                <Text
-                                                    style={
-                                                        styles.drawTitle
-                                                    }
-                                                >
-                                                    🤝 Remis
-                                                </Text>
+                                                <>
+                                                    <Text
+                                                        style={
+                                                            styles.drawTitle
+                                                        }
+                                                    >
+                                                        🤝 Remis
+                                                    </Text>
 
-                                                <Text
-                                                    style={
-                                                        styles.subText
-                                                    }
-                                                >
-                                                    Die Partie endet
-                                                    im
-                                                    Unentschieden.
-                                                </Text>
-                                            </>
-                                        )}
+                                                    <Text
+                                                        style={
+                                                            styles.subText
+                                                        }
+                                                    >
+                                                        Die Partie endet
+                                                        im
+                                                        Unentschieden.
+                                                    </Text>
+                                                </>
+                                            )}
 
                                         <View
                                             style={
@@ -2236,7 +2195,7 @@ export default function GameScreen() {
                                                 style={[
                                                     styles.secondaryBtn,
                                                     rematchWaiting &&
-                                                        styles.disabledBtn,
+                                                    styles.disabledBtn,
                                                 ]}
                                                 disabled={
                                                     rematchWaiting
