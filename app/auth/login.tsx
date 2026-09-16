@@ -19,7 +19,7 @@ import {
     View,
 } from "react-native";
 import {
-    createGuestAccount,
+    createGuestAccount ,
     getAccountByAuthId,
     getCurrentAccount,
     saveAccount,
