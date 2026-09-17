@@ -18,12 +18,14 @@ import {
     Lesson,
     Weakness,
 } from "../../lib/coachProfile";
+
 export default function CoachScreen() {
     const backgroundImage = require("../../assets/images/loginbackground.png");
     const [weaknesses, setWeaknesses] = useState<Weakness[]>([]);
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState<string | null>(null);
+
     const loadData = useCallback(async () => {
         try {
             const socket = getSocket();
@@ -44,23 +46,34 @@ export default function CoachScreen() {
             setLoading(false);
         }
     }, []);
+
     useFocusEffect(
         useCallback(() => {
             loadData();
         }, [loadData])
     );
+
     const handleGenerate = async (mistakeType: string) => {
         try {
             setGenerating(mistakeType);
             const socket = getSocket();
-            await generateLesson(socket, mistakeType);
-            await loadData();
+            const { lesson } = await generateLesson(socket, mistakeType);
+            router.push({
+                pathname: "/learn/[id]",
+                params: {
+                    id: lesson.id,
+                    title: lesson.title,
+                    explanation: lesson.explanation,
+                    mistake_type: lesson.mistake_type,
+                },
+            });
         } catch (error) {
             console.error("GENERATE LESSON ERROR:", error);
         } finally {
             setGenerating(null);
         }
     };
+
     return (
         <ImageBackground
             source={backgroundImage}
@@ -85,8 +98,6 @@ export default function CoachScreen() {
                         Personal lessons based on your games
                     </Text>
                 </View>
-                {/* Unsichtbarer Platzhalter sorgt dafür,
-                    dass der Titel optisch zentriert bleibt */}
                 <View style={styles.headerSpacer} />
             </View>
             {loading ? (
@@ -139,20 +150,36 @@ export default function CoachScreen() {
                         </Text>
                     )}
                     {lessons.map((l) => (
-                        <View key={l.id} style={styles.card}>
+                        <TouchableOpacity
+                            key={l.id}
+                            activeOpacity={0.85}
+                            style={styles.card}
+                            onPress={() =>
+                                router.push({
+                                    pathname: "/learn/[id]",
+                                    params: {
+                                        id: l.id,
+                                        title: l.title,
+                                        explanation: l.explanation,
+                                        mistake_type: l.mistake_type,
+                                    },
+                                })
+                            }
+                        >
                             <Text style={styles.cardTitle}>
                                 {l.title}
                             </Text>
                             <Text style={styles.cardSub}>
                                 {l.explanation}
                             </Text>
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </ScrollView>
             )}
         </ImageBackground>
     );
 }
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
