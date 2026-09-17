@@ -1138,6 +1138,7 @@ export default function GameScreen() {
             mode,
             result,
             timestamp: timestamp ?? Date.now(),
+            remoteId: null, // NEU, wird gleich befüllt falls Sync klappt
         });
 
         await AsyncStorage.setItem(key, JSON.stringify(history));
@@ -1146,13 +1147,23 @@ export default function GameScreen() {
             const acc = await getCurrentAccount();
 
             if (acc && !acc.guest && acc.authId) {
-                await saveGameRecord({
+                const remoteId = await saveGameRecord({
                     userId: acc.authId,
-                    opponentId,
+                    opponentId: opponentId ?? null, // bei bot-game.tsx einfach null lassen
                     mode,
                     result,
                     pgn,
                 });
+
+                // NEU: remoteId nachträglich in denselben History-Eintrag schreiben
+                if (remoteId) {
+                    const updatedHistory = history.map((item: any) =>
+                        item.timestamp === (timestamp ?? history[0].timestamp)
+                            ? { ...item, remoteId }
+                            : item
+                    );
+                    await AsyncStorage.setItem(key, JSON.stringify(updatedHistory));
+                }
             }
         } catch (error) {
             console.log("SAVE GAME RECORD ERROR:", error);

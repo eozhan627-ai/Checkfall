@@ -633,31 +633,41 @@ export default function Playbot() {
         const stored = await AsyncStorage.getItem(key);
         const history = stored ? JSON.parse(stored) : [];
 
-        history.unshift({
-            id: Date.now().toString(),
+     history.unshift({
+    id: Date.now().toString(),
+    mode,
+    result,
+    timestamp: timestamp ?? Date.now(),
+    remoteId: null, // NEU, wird gleich befüllt falls Sync klappt
+});
+
+await AsyncStorage.setItem(key, JSON.stringify(history));
+
+try {
+    const acc = await getCurrentAccount();
+
+    if (acc && !acc.guest && acc.authId) {
+        const remoteId = await saveGameRecord({
+            userId: acc.authId,
+            opponentId: null, // bei bot-game.tsx einfach null lassen
             mode,
             result,
-            timestamp: timestamp ?? Date.now(),
+            pgn,
         });
 
-        await AsyncStorage.setItem(key, JSON.stringify(history));
-
-        // NEU: zusätzlich in Supabase (nur für echte Accounts, nicht Gäste)
-        try {
-            const acc = await getCurrentAccount();
-
-            if (acc && !acc.guest && acc.authId) {
-                await saveGameRecord({
-                    userId: acc.authId,
-                    opponentId: null, // Bot ist kein echter User
-                    mode,
-                    result,
-                    pgn,
-                });
-            }
-        } catch (error) {
-            console.log("SAVE GAME RECORD ERROR:", error);
+        // NEU: remoteId nachträglich in denselben History-Eintrag schreiben
+        if (remoteId) {
+            const updatedHistory = history.map((item: any) =>
+                item.timestamp === (timestamp ?? history[0].timestamp)
+                    ? { ...item, remoteId }
+                    : item
+            );
+            await AsyncStorage.setItem(key, JSON.stringify(updatedHistory));
         }
+    }
+} catch (error) {
+    console.log("SAVE GAME RECORD ERROR:", error);
+}
     }
 
     const animatedCardStyle = {

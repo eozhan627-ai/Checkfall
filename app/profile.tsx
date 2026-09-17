@@ -5,8 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
     Alert,
-    ImageBackground,
-    Pressable,
+    ImageBackground, Linking, Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -131,6 +130,21 @@ export default function Profile() {
                 "Fehler",
                 "Das Profilbild konnte nicht gespeichert werden."
             );
+        }
+    };
+    const DONATION_URL = "https://paypal.me/businessacc263"; // ← hier deinen echten Link eintragen
+
+    const openDonation = async () => {
+        try {
+            const supported = await Linking.canOpenURL(DONATION_URL);
+            if (supported) {
+                await Linking.openURL(DONATION_URL);
+            } else {
+                Alert.alert("Fehler", "Der Link konnte nicht geöffnet werden.");
+            }
+        } catch (error) {
+            console.log("DONATION LINK ERROR:", error);
+            Alert.alert("Fehler", "Der Link konnte nicht geöffnet werden.");
         }
     };
     const saveUsername = async () => {
@@ -359,6 +373,13 @@ export default function Profile() {
                                 }
                             />
                         </View>
+                        <View style={styles.separator} />
+                        <ProfileAction
+                            icon="♥"
+                            title="POVCheck unterstützen"
+                            subtitle="Hilf mit, die App am Laufen zu halten"
+                            onPress={openDonation}
+                        />
                         {/* LOGOUT */}
                         <Pressable
                             style={styles.logoutButton}

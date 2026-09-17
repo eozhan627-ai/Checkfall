@@ -426,6 +426,7 @@ const styles = StyleSheet.create({
     },
     footnote: {
         color: "rgba(237,240,243,0.4)",
+    
         fontSize: 11.5,
         lineHeight: 16,
         marginTop: 4,

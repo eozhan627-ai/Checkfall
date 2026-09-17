@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"; // useRef ergänzt
+
 import {
   Alert,
   FlatList,
@@ -10,26 +11,103 @@ import {
   Text,
   View,
 } from "react-native";
+import { getCurrentAccount, VipTier } from "../lib/account";
+import {
+  onAnalysisComplete,
+  onAnalysisError,
+  onAnalysisProgress,
+  requestGameAnalysis,
+} from "../lib/games";
+import { getSocket } from "../lib/socket";
 
 const STORAGE_KEY = "game_history";
-
 type GameHistoryItem = {
   id: string;
   mode: "bot" | "local" | "online";
   date: string;
   result: "win" | "loss" | "draw" | "aborted";
   timestamp: number;
+  remoteId?: string | null; // NEU
 };
+type AnalysisMove = { moveNumber: number; san: string; evalCp: number | null };
+
+function summarizeAnalysis(moves: AnalysisMove[]) {
+  let prevEval = 0;
+  let worst: { moveNumber: number; san: string; swing: number; mover: "w" | "b" } | null = null;
+
+  moves.forEach((m, i) => {
+    if (m.evalCp === null) return;
+
+    const mover: "w" | "b" = i % 2 === 0 ? "w" : "b";
+    const diff = m.evalCp - prevEval;
+    const badness = mover === "w" ? -diff : diff; // schlecht aus Sicht des Ziehenden
+
+    if (!worst || badness > worst.swing) {
+      worst = { moveNumber: m.moveNumber, san: m.san, swing: badness, mover };
+    }
+
+    prevEval = m.evalCp;
+  });
+
+  return worst;
+}
 
 export default function GameHistory() {
   const [history, setHistory] = useState<GameHistoryItem[]>([]);
+  const [vipTier, setVipTier] = useState<VipTier>("none");
 
+  type AnalysisState = {
+    status: "idle" | "analyzing" | "done" | "error" | "not_vip";
+    progress?: number;
+    total?: number;
+    summary?: { moveNumber: number; san: string; swing: number; mover: "w" | "b" } | null;
+  };
+
+
+  const [analysisByRemoteId, setAnalysisByRemoteId] = useState<Record<string, AnalysisState>>({});
   const backgroundImage = require("../assets/images/background.png");
 
   useEffect(() => {
     loadHistory();
   }, []);
+  useEffect(() => {
+    (async () => {
+      const acc = await getCurrentAccount();
+      setVipTier(acc?.vipTier ?? "none");
+    })();
+  }, []);
 
+  useEffect(() => {
+    const socket = getSocket();
+
+    const offProgress = onAnalysisProgress(socket, ({ gameId, progress, total }) => {
+      setAnalysisByRemoteId((prev) => ({
+        ...prev,
+        [gameId]: { status: "analyzing", progress, total },
+      }));
+    });
+
+    const offComplete = onAnalysisComplete(socket, ({ gameId, analysis }) => {
+      const summary = summarizeAnalysis(analysis?.moves ?? []);
+      setAnalysisByRemoteId((prev) => ({
+        ...prev,
+        [gameId]: { status: "done", summary },
+      }));
+    });
+
+    const offError = onAnalysisError(socket, ({ gameId, error }) => {
+      setAnalysisByRemoteId((prev) => ({
+        ...prev,
+        [gameId]: { status: error === "NOT_VIP" ? "not_vip" : "error" },
+      }));
+    });
+
+    return () => {
+      offProgress();
+      offComplete();
+      offError();
+    };
+  }, []);
   async function loadHistory() {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEY);
@@ -58,7 +136,24 @@ export default function GameHistory() {
       console.log("Error deleting game", e);
     }
   }
+  async function handleAnalyze(remoteId: string) {
+    setAnalysisByRemoteId((prev) => ({
+      ...prev,
+      [remoteId]: { status: "analyzing", progress: 0, total: 0 },
+    }));
 
+    try {
+      const socket = getSocket();
+      await requestGameAnalysis(socket, remoteId);
+      // Ergebnis kommt über die Listener oben (analysis_complete/analysis_progress)
+    } catch (error: any) {
+      const message = error?.message || "UNKNOWN_ERROR";
+      setAnalysisByRemoteId((prev) => ({
+        ...prev,
+        [remoteId]: { status: message === "NOT_VIP" ? "not_vip" : "error" },
+      }));
+    }
+  }
   function confirmDelete(id: string) {
     Alert.alert(
       "Delete Game",
@@ -178,96 +273,111 @@ export default function GameHistory() {
         return styles.resultAborted;
     }
   }
+  function renderAnalysisSection(remoteId: string) {
+    const state = analysisByRemoteId[remoteId];
 
-  function renderItem({
-    item,
-  }: {
-    item: GameHistoryItem;
-  }) {
+    if (vipTier === "none" || state?.status === "not_vip") {
+      return (
+        <Pressable onPress={() => router.push("/vip")}>
+          <Text style={styles.vipHintText}>Analyse nur für VIP · Mehr erfahren</Text>
+        </Pressable>
+      );
+    }
+
+    if (!state || state.status === "idle") {
+      return (
+        <Pressable
+          onPress={() => handleAnalyze(remoteId)}
+          style={({ pressed }) => [styles.analyzeButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.analyzeButtonText}>Analysiere diese Partie</Text>
+        </Pressable>
+      );
+    }
+
+    if (state.status === "analyzing") {
+      return (
+        <Text style={styles.analyzingText}>
+          Analysiere... {state.progress ?? 0}/{state.total || "?"}
+        </Text>
+      );
+    }
+
+    if (state.status === "error") {
+      return <Text style={styles.errorText}>Analyse fehlgeschlagen</Text>;
+    }
+
+    if (state.status === "done") {
+      if (!state.summary) {
+        return <Text style={styles.doneText}>✓ Analysiert – keine Auffälligkeiten</Text>;
+      }
+
+      const { moveNumber, san, mover, swing } = state.summary;
+      const sideLabel = mover === "w" ? "Weiß" : "Schwarz";
+      const pawns = (swing / 100).toFixed(1);
+
+      return (
+        <Text style={styles.doneText}>
+          ✓ Größter Fehler: Zug {moveNumber} {san} ({sideLabel}, {pawns} Bauerneinheiten)
+        </Text>
+      );
+    }
+
+    return null;
+  }
+  function renderItem({ item }: { item: GameHistoryItem }) {
     const date = new Date(item.timestamp);
-
-    const formatted =
-      `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-
+    const formatted = `${date.toLocaleDateString()} · ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
     const resultInfo = getResultInfo(item.result);
     const modeInfo = getModeInfo(item.mode);
+    const canReview = !!item.remoteId;
 
     return (
-      <View
-        style={[
+      <Pressable
+        onPress={() => {
+          if (!canReview) {
+            Alert.alert("Nicht verfügbar", "Diese Partie kann nicht analysiert werden.");
+            return;
+          }
+          router.push({ pathname: "/game/review", params: { gameId: item.remoteId! } });
+        }}
+        style={({ pressed }) => [
           styles.gameCard,
-          {
-            backgroundColor: modeInfo.background,
-            borderColor: modeInfo.border,
-          },
+          { borderColor: modeInfo.border },
+          pressed && styles.pressed,
         ]}
       >
-        {/* RESULT ICON */}
-        <View
-          style={[
-            styles.resultIcon,
-            {
-              backgroundColor: resultInfo.background,
-              borderColor: resultInfo.border,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.resultIconText,
-              {
-                color: resultInfo.iconColor,
-              },
-            ]}
-          >
-            {resultInfo.icon}
-          </Text>
+        <View style={[styles.accentBar, { backgroundColor: resultInfo.iconColor }]} />
+
+        <View style={[styles.resultIcon, { backgroundColor: resultInfo.background, borderColor: resultInfo.border }]}>
+          <Text style={[styles.resultIconText, { color: resultInfo.iconColor }]}>{resultInfo.icon}</Text>
         </View>
 
-        {/* CONTENT */}
         <View style={styles.gameContent}>
-          <Text style={styles.gameTitle}>
-            {resultInfo.label}
-          </Text>
-
-          <Text style={styles.gameSubtitle}>
-            {modeInfo.label}
-          </Text>
-
-          <View style={styles.metaRow}>
-            <Text
-              style={styles.date}
-              numberOfLines={1}
-            >
-              {formatted}
-            </Text>
-
-            <View
-              style={[
-                styles.resultBadge,
-                getResultStyle(item.result),
-              ]}
-            >
-              <Text style={styles.resultText}>
-                {getResultLabel(item.result)}
-              </Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.gameTitle}>{resultInfo.label}</Text>
+            <View style={[styles.modeBadge, { backgroundColor: modeInfo.background, borderColor: modeInfo.border }]}>
+              <Text style={styles.modeBadgeText}>{modeInfo.label}</Text>
             </View>
           </View>
+
+          <Text style={styles.date}>{formatted}</Text>
+
+          {canReview ? (
+            <Text style={styles.reviewHint}>Zum Review antippen ›</Text>
+          ) : (
+            <Text style={styles.noReviewHint}>Nicht analysierbar</Text>
+          )}
         </View>
 
-        {/* DELETE */}
         <Pressable
           onPress={() => confirmDelete(item.id)}
-          style={({ pressed }) => [
-            styles.deleteButton,
-            pressed && styles.pressed,
-          ]}
+          hitSlop={10}
+          style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
         >
-          <Text style={styles.deleteText}>
-            ×
-          </Text>
+          <Text style={styles.deleteText}>×</Text>
         </Pressable>
-      </View>
+      </Pressable>
     );
   }
 
@@ -430,24 +540,26 @@ const styles = StyleSheet.create({
   },
 
   /* GAME CARD */
-
   gameCard: {
     width: "92%",
     maxWidth: 430,
-    minHeight: 94,
-
+    minHeight: 96,
     borderRadius: 20,
-
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-
-    marginBottom: 12,
-
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 14,
     flexDirection: "row",
     alignItems: "center",
-
     borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    overflow: "hidden",
   },
+  accentBar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
+  modeBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  modeBadgeText: { color: "#ccc", fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
+  reviewHint: { color: "#D4AF37", fontSize: 11, fontWeight: "600", marginTop: 6 },
+  noReviewHint: { color: "#555", fontSize: 11, marginTop: 6 },
 
   /* RESULT ICON */
 
@@ -598,6 +710,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
 
+
   emptyTitle: {
     color: "#fff",
     fontSize: 18,
@@ -616,5 +729,46 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.65,
     transform: [{ scale: 0.985 }],
+  },
+  analysisRow: {
+    marginTop: 8,
+  },
+
+  analyzeButton: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "rgba(212,175,55,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(212,175,55,0.35)",
+  },
+
+  analyzeButtonText: {
+    color: "#D4AF37",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  analyzingText: {
+    color: "#888",
+    fontSize: 11,
+  },
+
+  vipHintText: {
+    color: "#D4AF37",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  errorText: {
+    color: "#ff6464",
+    fontSize: 11,
+  },
+
+  doneText: {
+    color: "#8fd4a8",
+    fontSize: 11,
+    lineHeight: 15,
   },
 });

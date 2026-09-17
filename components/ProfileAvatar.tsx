@@ -1,10 +1,11 @@
 import React from "react";
 import { Image, View } from "react-native";
+import { DiamondSparkles } from "./DiamondSparkles"; // NEU: aus der Datei, die du mir geschickt hast
 
 const frames = {
     silver: require("../assets/images/silver_edge.png"),
     gold: require("../assets/images/gold_edge.png"),
-    diamond: require("../assets/images/bronze_edge.png"),
+    diamond: require("../assets/images/diamond_edge.png"), // NEU
 };
 
 function ProfileAvatar({
@@ -34,37 +35,22 @@ function ProfileAvatar({
                     height: size * 0.76,
                     overflow: "hidden",
                     borderRadius: 20,
-
-                    // Weiß nur beim Platzhalter
-                    backgroundColor: !uri
-                        ? "#fff"
-                        : "transparent",
+                    backgroundColor: !uri ? "#fff" : "transparent",
                 }}
             >
                 <Image
-                    source={
-                        uri
-                            ? { uri }
-                            : require("../assets/images/knight_black.png")
-                    }
+                    source={uri ? { uri } : require("../assets/images/knight_black.png")}
                     style={{
                         width: "100%",
                         height: "100%",
                         borderRadius: 20,
                     }}
                     resizeMode="cover"
-                    onLoad={() => {
-                        console.log("AVATAR LOADED:", uri);
-                    }}
-                    onError={(e) => {
-                        console.log(
-                            "AVATAR LOAD ERROR:",
-                            uri,
-                            e.nativeEvent
-                        );
-                    }}
                 />
             </View>
+
+            {/* SPARKLES (nur Diamant, zwischen Avatar und Rahmen) */}
+            {frame === "diamond" && <DiamondSparkles size={size} />}
 
             {/* FRAME (oben drüber) */}
             <Image
@@ -80,4 +66,6 @@ function ProfileAvatar({
             />
         </View>
     );
-} export default React.memo(ProfileAvatar);
+}
+
+export default React.memo(ProfileAvatar);

@@ -48,6 +48,16 @@ export default function LearnScreen() {
                         Train tactics & calculation
                     </Text>
                 </TouchableOpacity>
+                <TouchableOpacity
+    activeOpacity={0.85}
+    style={styles.coachCard}
+    onPress={() => router.push("/learn/coach")}
+>
+    <Text style={styles.cardTitle}>Your Coach</Text>
+    <Text style={styles.cardSub}>
+        Personal lessons based on your games
+    </Text>
+</TouchableOpacity>
             </View>
         </ImageBackground>
     );
@@ -105,4 +115,36 @@ const styles = StyleSheet.create({
         color: "#ccc",
         marginTop: 6,
     },
+    coachCard: {
+    minHeight: 76,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(27, 32, 39, 0.7)",
+    borderWidth: 1,
+    borderColor: "rgba(124, 148, 115, 0.25)", // Salbeigrün, dezent
+    marginTop: 4,
+    marginBottom: 12,
+},
+
+coachLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+},
+
+coachTitle: {
+    color: "#F2F4F6",
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 3,
+},
+
+coachSubtitle: {
+    color: "rgba(237, 240, 243, 0.5)",
+    fontSize: 12.5,
+},
 });
