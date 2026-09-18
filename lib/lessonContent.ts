@@ -7,28 +7,34 @@ export type LessonContent = {
 
 export const LESSONS: Record<string, LessonContent> = {
     blunder: {
-        title: "Blunder vermeiden",
+        title: "Patzer vermeiden",
         coachMessage: "Diesen Fehlertyp sehe ich öfter bei dir — lass uns das gemeinsam durchgehen.",
-        explanation: "Ein Blunder ist ein grober Fehler, der sofort Material oder die Partie kostet — meist, weil eine gegnerische Antwort übersehen wurde. Bevor du ziehst, prüfe kurz: Kann mein Gegner nach diesem Zug eine Figur schlagen, ein Matt setzen oder eine Fesselung ausnutzen?",
+        explanation: "Ein Patzer ist ein grober Fehler, der sofort Material oder die Partie kostet — meist, weil eine gegnerische Antwort übersehen wurde. Bevor du ziehst, prüfe kurz: Kann mein Gegner nach diesem Zug eine Figur schlagen, ein Matt setzen oder eine Fesselung ausnutzen?",
         tip: "Faustregel: Prüfe nach jedem geplanten Zug, welche drei stärksten Antworten dein Gegner hätte.",
     },
-    opening_mistake: {
-        title: "Fehler in der Eröffnung",
-        coachMessage: "Der Start der Partie entscheidet oft mehr, als man denkt — schauen wir uns das an.",
-        explanation: "In der Eröffnung geht es vor allem um Entwicklung, Zentrumskontrolle und Königssicherheit. Häufige Fehler sind: zu früh mit der Dame ziehen, dieselbe Figur mehrfach bewegen, oder die Rochade zu lange hinauszögern.",
-        tip: "Faustregel: Entwickle in den ersten Zügen Springer und Läufer, bevor du die Dame aktiv einsetzt, und rochiere früh.",
+    mistake: {
+        title: "Fehler vermeiden",
+        coachMessage: "Das ist ein Muster, das bei dir häufiger vorkommt — schauen wir's uns an.",
+        explanation: "Ein Fehler ist ein Zug, der die Stellung spürbar verschlechtert, auch wenn er nicht sofort Material kostet. Oft entsteht er durch einen zu kurzen Plan oder das Übersehen einer positionellen Schwäche, die der Gegner ausnutzen kann.",
+        tip: "Faustregel: Frag dich vor dem Zug nicht nur 'Ist das sicher?', sondern auch 'Verbessert das meine Stellung wirklich?'",
     },
-    endgame_mistake: {
-        title: "Fehler im Endspiel",
-        coachMessage: "Endspiele werden oft unterschätzt — dabei entscheiden sie viele Partien.",
-        explanation: "Im Endspiel zählt jeder Zug doppelt: König aktivieren, Freibauern vorantreiben und Figuren koordinieren. Ein häufiger Fehler ist, den eigenen König passiv zu lassen, obwohl er im Endspiel eine starke Figur ist.",
-        tip: "Faustregel: Sobald wenige Figuren auf dem Brett sind, wird dein König zu einer aktiven Kampffigur — nutze ihn.",
+    inaccuracy: {
+        title: "Ungenauigkeiten reduzieren",
+        coachMessage: "Kleinigkeiten wie diese summieren sich über die Partie — lohnt sich, genauer hinzuschauen.",
+        explanation: "Eine Ungenauigkeit ist kein grober Fehler, aber nicht der objektiv beste Zug — die Engine hätte eine klar bessere Fortsetzung gefunden. Häufig passiert das, wenn man sich zu schnell für eine 'gute genug' Option entscheidet, statt kurz die Alternativen zu vergleichen.",
+        tip: "Faustregel: Nimm dir bei ruhigen Stellungen einen Moment mehr Zeit und vergleiche mindestens zwei plausible Züge, bevor du ziehst.",
     },
-    time_trouble: {
-        title: "Zeitnot-Fehler",
-        coachMessage: "Unter Zeitdruck passieren Fehler, die du normalerweise nie machen würdest.",
-        explanation: "Fehler in Zeitnot entstehen meist, weil zu viel Zeit in unwichtigen Phasen verbraucht wurde. Wichtig ist, in klaren Stellungen schnell zu spielen und sich Bedenkzeit für wirklich kritische Momente aufzuheben.",
-        tip: "Faustregel: Verbring die meiste Zeit auf den 3–5 wirklich entscheidenden Zügen der Partie, nicht auf jedem einzelnen.",
+    missed_win: {
+        title: "Gewinnchancen nicht verpassen",
+        coachMessage: "Hier war mehr drin, als du rausgeholt hast — lass es uns anschauen.",
+        explanation: "Ein verpasster Gewinn bedeutet, dass eine klar gewinnende Fortsetzung zur Verfügung stand, die nicht gespielt wurde. Das passiert oft, wenn man sich mit einem 'guten' Zug zufriedengibt, statt aktiv nach der stärksten, entscheidenden Fortsetzung zu suchen.",
+        tip: "Faustregel: Wenn du im Vorteil bist, prüfe gezielt nach forcierenden Zügen — Schachs, Schlagzügen, Drohungen — bevor du einen ruhigen Zug spielst.",
+    },
+    slip: {
+        title: "Ausrutscher minimieren",
+        coachMessage: "Ein kleiner Ausrutscher, aber genau solche Kleinigkeiten kann man trainieren.",
+        explanation: "Ein Ausrutscher ist eine leichte Verschlechterung, oft aus Nachlässigkeit oder Zeitdruck entstanden, nicht aus fehlendem Verständnis. Meist reicht schon etwas mehr Konzentration in entscheidenden Momenten, um diese Fehler zu vermeiden.",
+        tip: "Faustregel: Bei kritischen Zügen kurz innehalten, statt aus Routine zu ziehen — auch wenn die Stellung einfach aussieht.",
     },
 };
 
