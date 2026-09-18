@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { getLessonContent } from "./tutorials";
 
 export default function LessonScreen() {
-    const { title, explanation, mistake_type } = useLocalSearchParams<{
+    const { title, mistake_type } = useLocalSearchParams<{
         id: string;
         title: string;
         explanation: string;
@@ -11,6 +12,7 @@ export default function LessonScreen() {
     }>();
 
     const coachImage = require("../../assets/images/coach.png");
+    const content = getLessonContent(mistake_type);
 
     return (
         <View style={styles.container}>
@@ -18,18 +20,37 @@ export default function LessonScreen() {
                 <Pressable onPress={() => router.back()} style={styles.iconButton}>
                     <Text style={styles.backText}>‹</Text>
                 </Pressable>
-                <Text style={styles.title}>{title}</Text>
+                <Text style={styles.title}>{title || content.title}</Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
+                {/* Coach mit Sprechblase, die zu ihm zeigt */}
                 <View style={styles.coachRow}>
-                    <Image source={coachImage} style={styles.coachImage} resizeMode="contain" />
-                    <View style={styles.coachBubble}>
-                        <Text style={styles.label}>{mistake_type?.replace(/_/g, " ")}</Text>
+                    <View style={styles.bubble}>
+                        <Text style={styles.bubbleText}>{content.coachMessage}</Text>
+                        <View style={styles.bubbleTail} />
                     </View>
+                    <Image source={coachImage} style={styles.coachImage} resizeMode="contain" />
                 </View>
 
-                <Text style={styles.explanation}>{explanation}</Text>
+                <View style={styles.card}>
+                    <Text style={styles.label}>
+                        {mistake_type?.replace(/_/g, " ")}
+                    </Text>
+                    <Text style={styles.explanation}>{content.explanation}</Text>
+
+                    {content.tip ? (
+                        <View style={styles.tipBox}>
+                            <Text style={styles.tipLabel}>💡 Tipp</Text>
+                            <Text style={styles.tipText}>{content.tip}</Text>
+                        </View>
+                    ) : null}
+                </View>
+
+                {/* TODO: hier folgt die eigentliche Übung/Aufgabe zum Lösen */}
+                <Pressable style={styles.solveButton}>
+                    <Text style={styles.solveButtonText}>Übung starten</Text>
+                </Pressable>
             </ScrollView>
         </View>
     );
@@ -54,32 +75,84 @@ const styles = StyleSheet.create({
     },
     backText: { color: "#ECEDEE", fontSize: 26, fontWeight: "300" },
     title: { fontSize: 22, fontWeight: "800", color: "#fff", flexShrink: 1 },
-    content: { padding: 20 },
+    content: { padding: 20, paddingBottom: 40 },
+
     coachRow: {
         flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 20,
+        alignItems: "flex-end",
+        justifyContent: "flex-end",
+        marginBottom: 24,
     },
     coachImage: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        marginRight: 14,
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        marginLeft: 10,
+        borderWidth: 2,
+        borderColor: "#7C9473",
     },
-    coachBubble: {
-        flex: 1,
-        backgroundColor: "rgba(255,255,255,0.08)",
-        borderRadius: 14,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
+    bubble: {
+        maxWidth: "72%",
+        backgroundColor: "rgba(124,148,115,0.18)",
+        borderColor: "#7C9473",
+        borderWidth: 1,
+        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        position: "relative",
+    },
+    bubbleText: {
+        color: "#ECEDEE",
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    // kleines Dreieck, das die Sprechblase in Richtung Coach zeigen lässt
+    bubbleTail: {
+        position: "absolute",
+        right: -8,
+        bottom: 14,
+        width: 0,
+        height: 0,
+        borderTopWidth: 8,
+        borderBottomWidth: 8,
+        borderLeftWidth: 10,
+        borderTopColor: "transparent",
+        borderBottomColor: "transparent",
+        borderLeftColor: "#7C9473",
+    },
+
+    card: {
+        backgroundColor: "rgba(255,255,255,0.06)",
+        borderRadius: 16,
+        padding: 18,
         borderWidth: 1,
         borderColor: "rgba(255,255,255,0.10)",
     },
     label: {
         fontSize: 13,
         fontWeight: "700",
-        color: "rgba(255,255,255,0.85)",
+        color: "rgba(255,255,255,0.55)",
         textTransform: "uppercase",
+        letterSpacing: 0.6,
+        marginBottom: 10,
     },
     explanation: { fontSize: 16, color: "#ECEDEE", lineHeight: 24 },
+
+    tipBox: {
+        marginTop: 16,
+        backgroundColor: "rgba(124,148,115,0.12)",
+        borderRadius: 12,
+        padding: 12,
+    },
+    tipLabel: { fontSize: 13, fontWeight: "700", color: "#7C9473", marginBottom: 4 },
+    tipText: { fontSize: 14, color: "#ECEDEE", lineHeight: 20 },
+
+    solveButton: {
+        marginTop: 24,
+        backgroundColor: "#7C9473",
+        borderRadius: 14,
+        paddingVertical: 16,
+        alignItems: "center",
+    },
+    solveButtonText: { color: "#0F1115", fontWeight: "800", fontSize: 16 },
 });
