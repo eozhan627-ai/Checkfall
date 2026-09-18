@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { getLessonContent } from "./tutorials";
+import { getLessonContent } from "../../lib/lessonContent";
+
 
 export default function LessonScreen() {
     const { title, mistake_type } = useLocalSearchParams<{
