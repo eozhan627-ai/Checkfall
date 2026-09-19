@@ -124,7 +124,8 @@ function buildReport(analysis: Analysis): string[] {
     };
 
     const lines: string[] = [];
-    const { white, black } = analysis.accuracy;
+    const { w: white, b: black } = analysis.accuracy;
+
 
     if (white >= black + 5) lines.push(`Weiß spielte insgesamt präziser (${white}% gegenüber ${black}%).`);
     else if (black >= white + 5) lines.push(`Schwarz spielte insgesamt präziser (${black}% gegenüber ${white}%).`);
@@ -507,14 +508,14 @@ export default function GameReview() {
                     <View style={styles.accuracyRow}>
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#ECEDEE" }]} />
-                            <Text style={styles.accuracyLabel}>Weiß</Text>
-                            <Text style={styles.accuracyValue}>{analysis.accuracy.white}%</Text>
+                            <Text style={styles.accuracyLabel}>Weiß </Text>
+                   <Text style={styles.accuracyValue}>{analysis.accuracy.w}%</Text>
                         </View>
                         <View style={styles.accuracyDivider} />
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#4B5058" }]} />
-                            <Text style={styles.accuracyLabel}>Schwarz</Text>
-                            <Text style={styles.accuracyValue}>{analysis.accuracy.black}%</Text>
+                            <Text style={styles.accuracyLabel}>Schwarz </Text>
+                    <Text style={styles.accuracyValue}>{analysis.accuracy.b}%</Text>
                         </View>
                     </View>
 
