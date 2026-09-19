@@ -7,7 +7,6 @@ import {
     BackHandler,
     Dimensions,
     Easing,
-    Image,
     ImageBackground,
     Modal,
     PanResponder,
@@ -20,9 +19,11 @@ import {
 import { io, Socket } from "socket.io-client";
 import { getCurrentAccount } from "../../lib/account";
 import { saveGameRecord } from "../../lib/games";
+import { cloneWithHistory } from "../../lib/chessUtils"; // GEÄNDERT: statt lokaler Kopie
+import Board from "./components/Board"; // NEU: geteilte Board-Komponente
+import { useChessInput } from "./hooks/useChessInput"; // NEU: geteilter Input-Hook
 
-const BOARD_SIZE = Dimensions.get("window").width - 32;
-const SQUARE_SIZE = BOARD_SIZE / 8;
+const BOARD_SIZE = Dimensions.get("window").width - 32; // nur noch für Popup-Positionierung gebraucht
 
 const pieces: Record<string, any> = {
     wp: require("../../assets/images/pawn_white.png"),
@@ -38,9 +39,11 @@ const pieces: Record<string, any> = {
     bq: require("../../assets/images/queen_black.png"),
     bk: require("../../assets/images/king_black.png"),
 };
-const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
-const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"];
 
+const pieceToKey = (piece: any) => {
+    if (!piece) return null;
+    return `${piece.color}${piece.type}`;
+};
 
 // Slider geht jetzt bis 3200 - ab da spielt der Bot mit voller Stockfish-Stärke
 // (Kalibrierung passiert serverseitig über UCI_LimitStrength/UCI_Elo bzw.
@@ -59,17 +62,6 @@ function getEloLabel(elo: number) {
     if (elo < 2600) return "Master";
     if (elo < 3200) return "Grandmaster";
     return "Full Stockfish";
-
-}
-// Klont ein Chess-Objekt UNTER BEIBEHALTUNG der vollständigen Zughistorie.
-// new Chess(fen) allein reicht nicht - das kennt nur die aktuelle Stellung,
-// nicht die Züge davor, wodurch pgn() später nur den letzten Zug zeigen würde.
-function cloneWithHistory(g: Chess): Chess {
-    const clone = new Chess();
-    g.history({ verbose: true }).forEach((m: any) => {
-        clone.move({ from: m.from, to: m.to, promotion: m.promotion });
-    });
-    return clone;
 }
 
 // Reiner JS/RN-Slider ohne natives Modul. @react-native-community/slider
@@ -157,24 +149,6 @@ function EloSlider({
     );
 }
 
-const toChessSquare = (
-    row: number,
-    col: number,
-    bottomColor: 'w' | 'b'
-) => {
-    const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
-
-    const realRow = bottomColor === "w" ? row : 7 - row;
-    const realCol = bottomColor === "w" ? col : 7 - col;
-
-    return `${files[realCol]}${8 - realRow}`;
-};
-
-const pieceToKey = (piece: any) => {
-    if (!piece) return null;
-    return `${piece.color}${piece.type}`;
-};
-
 type EndState = {
     type: "win" | "loss" | "draw";
     reason: "checkmate" | "stalemate" | "draw";
@@ -183,25 +157,20 @@ type EndState = {
 export default function Playbot() {
     const socket = useRef<Socket | null>(null);
     const [game, setGame] = useState(new Chess());
-    const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
-    const [legalMoves, setLegalMoves] = useState<any[]>([]);
     const [moveHistory, setMoveHistory] = useState<string[]>([]);
     const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null);
     const [botElo, setBotElo] = useState<number>(BOT_ELO_DEFAULT);
     const [gameStarted, setGameStarted] = useState(false);
     const [bottomColor, setBottomColor] = useState<"w" | "b">("w");
     const [botColor, setBotColor] = useState<"w" | "b">("b");
-    const [botStrength, setBotStrength] = useState(100);
-    const [botSide, setBotSide] = useState<'w' | 'b'>('b');
     const [playerColor, setPlayerColor] = useState<'w' | 'b' | 'random'>('random');
     const [humanColor, setHumanColor] = useState<'w' | 'b'>('w');
-    const rotateBoard = bottomColor === "b";
     const scrollRef = useRef<ScrollView>(null);
     const board = game.board();
     const [kingInCheck, setKingInCheck] = useState<string | null>(null);
     const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
 
-    const backgroundImage = require("../../assets/images/onlinebackground.png"); // Hintergrundbild
+    const backgroundImage = require("../../assets/images/onlinebackground.png");
 
     const [roomId, setRoomId] = useState<string | null>(null);
     const params = useLocalSearchParams();
@@ -217,13 +186,35 @@ export default function Playbot() {
     const [savedData, setSavedData] = useState<SavedData | null>(null);
     const [endState, setEndState] = useState<EndState | null>(null);
 
-    // Custom Popups statt Alert.alert
     const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [showRestartModal, setShowRestartModal] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
 
     const endAnimation = useRef(new Animated.Value(0)).current;
     const endPopupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // =============================
+    // GEÄNDERT: Board-Interaktion läuft jetzt über den geteilten Hook,
+    // genau wie in online-game.tsx, statt über einen eigenen onPressSquare.
+    // setShowPromotion ist hier ein No-Op, weil die Promotion-Leiste in
+    // diesem Screen schon allein an promotionMove hängt (siehe JSX unten).
+    // =============================
+    const { selectedSquare, legalMoves, onPressSquare } = useChessInput({
+        game,
+        setGame,
+        socket: socket.current,
+        roomId,
+        myColor: humanColor,
+        setPromotionMove,
+        setShowPromotion: () => {},
+        setMoveHistory: (updater: any) =>
+            setMoveHistory((prev) =>
+                typeof updater === "function" ? updater(prev) : updater
+            ),
+        setLastMove,
+        checkGameEnd: (g: Chess) => checkGameEnd(g),
+    });
+
     useEffect(() => {
         const loadSavedGame = async () => {
             if (!params.key) return;
@@ -240,8 +231,8 @@ export default function Playbot() {
 
                 setSavedData(data);
 
-                // GEÄNDERT: Züge einzeln nachspielen statt nur FEN zu laden,
-                // damit die volle Historie für spätere PGN-Analyse erhalten bleibt
+                // Züge einzeln nachspielen statt nur FEN zu laden, damit die
+                // volle Historie für spätere PGN-Analyse erhalten bleibt.
                 const replayedGame = new Chess();
 
                 if (Array.isArray(data.history)) {
@@ -255,11 +246,7 @@ export default function Playbot() {
                 }
 
                 setGame(replayedGame);
-
-                setMoveHistory(
-                    data.history?.map((move: any) => move.san) ?? []
-                );
-
+                setMoveHistory(data.history?.map((move: any) => move.san) ?? []);
                 setBottomColor(data.bottomColor);
                 setHumanColor(data.humanColor);
                 setBotColor(data.botColor);
@@ -269,13 +256,10 @@ export default function Playbot() {
                 }
 
                 setGameStarted(true);
-                setSelectedSquare(null);
-                setLegalMoves([]);
                 setLastMove(null);
                 setKingInCheck(null);
                 setGameOver(false);
                 setEndState(null);
-
             } catch (error) {
                 console.log("Error loading saved bot game:", error);
             }
@@ -287,15 +271,12 @@ export default function Playbot() {
     const displayBoard =
         bottomColor === "w" ? board : [...board].reverse().map(row => [...row].reverse());
 
-
-
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollToEnd({ animated: true });
         }
     }, [moveHistory]);
 
-    // End-Game-Karte animiert einblenden, genau wie im Online-Screen
     useEffect(() => {
         if (!endState) return;
 
@@ -316,41 +297,32 @@ export default function Playbot() {
             }
         };
     }, []);
+
     useEffect(() => {
         const onBackPress = () => {
-            // Wenn gerade ein Popup offen ist → Popup schließen
             if (showLeaveModal) {
                 setShowLeaveModal(false);
                 return true;
             }
-
             if (showRestartModal) {
                 setShowRestartModal(false);
                 return true;
             }
-
             if (showSaveModal) {
                 setShowSaveModal(false);
                 return true;
             }
-
-            // Während einer Partie → Leave-Modal anzeigen
             if (gameStarted) {
                 setShowLeaveModal(true);
                 return true;
             }
-
-            // Im Setup-Screen → normale Navigation
             return false;
         };
 
-        const subscription = BackHandler.addEventListener(
-            "hardwareBackPress",
-            onBackPress
-        );
-
+        const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
         return () => subscription.remove();
     }, [gameStarted, showLeaveModal, showRestartModal, showSaveModal]);
+
     useEffect(() => {
         const s = io("https://checkfall-server-clean-1.onrender.com");
         socket.current = s;
@@ -364,10 +336,9 @@ export default function Playbot() {
                 promotion: data.promotion
             };
 
-       setGame(prev => {
-    const newGame = cloneWithHistory(prev); // GEÄNDERT (vorher: new Chess(prev.fen()))
-    const move = newGame.move(moveObj);
-    
+            setGame(prev => {
+                const newGame = cloneWithHistory(prev);
+                const move = newGame.move(moveObj);
 
                 if (!move) {
                     console.log("❌ INVALID BOT MOVE:", moveObj);
@@ -385,7 +356,6 @@ export default function Playbot() {
         s.on("connect", async () => {
             console.log("✅ Connected:", s.id);
 
-            // Gespeichertes Bot-Spiel fortsetzen
             if (params.key) {
                 try {
                     const key = params.key as string;
@@ -404,56 +374,35 @@ export default function Playbot() {
                         playerColor: data.humanColor,
                         startFEN: data.fen,
                     });
-
                 } catch (error) {
                     console.log("❌ Error resuming bot game:", error);
                 }
             }
         });
+
         s.on("game_start", (data) => {
             console.log("🎮 GAME START:", data);
 
             setRoomId(data.roomId);
 
             const playerIsWhite = data.white !== "bot";
-
-            const actualHumanColor: "w" | "b" =
-                playerIsWhite ? "w" : "b";
-
-            const actualBotColor: "w" | "b" =
-                playerIsWhite ? "b" : "w";
-
-            console.log("🎨 ACTUAL COLORS:", {
-                human: actualHumanColor,
-                bot: actualBotColor,
-            });
+            const actualHumanColor: "w" | "b" = playerIsWhite ? "w" : "b";
+            const actualBotColor: "w" | "b" = playerIsWhite ? "b" : "w";
 
             setHumanColor(actualHumanColor);
             setBotColor(actualBotColor);
 
-            // ==========================================
-            // NEUES SPIEL
-            // ==========================================
-
             if (!params.key) {
                 setBottomColor(actualHumanColor);
-
                 setGame(new Chess());
                 setMoveHistory([]);
                 setLastMove(null);
-                setSelectedSquare(null);
-                setLegalMoves([]);
                 setKingInCheck(null);
                 setGameOver(false);
                 setEndState(null);
                 setGameStarted(true);
-
                 return;
             }
-
-            // ==========================================
-            // SAVED GAME
-            // ==========================================
 
             setBottomColor(actualHumanColor);
             setGameStarted(true);
@@ -466,26 +415,16 @@ export default function Playbot() {
             s.disconnect();
         };
     }, []);
-    const botMoveRef = useRef(false);
-    // grobe lokale Einschätzung der Enginetiefe passend zur ELO (nur informativ,
-    // die tatsächliche Tiefe/Skill wird serverseitig aus "level" berechnet)
-    const eloToDepth = (elo: number) => {
-        const clamped = Math.min(BOT_ELO_MAX, Math.max(BOT_ELO_MIN, elo));
-        const skill = Math.round(clamped / 50);
-        return Math.max(2, Math.round(2 + skill * 0.65));
-    };
-    const [isBotThinking, setIsBotThinking] = useState(false);
 
+    const handlePromotion = (pieceType: string) => {
+        if (!promotionMove) return;
+        const newGame = cloneWithHistory(game);
+        const move = newGame.move({
+            from: promotionMove.from,
+            to: promotionMove.to,
+            promotion: pieceType,
+        });
 
- const handlePromotion = (pieceType: string) => {
-    if (!promotionMove) return;
-    const newGame = cloneWithHistory(game); // GEÄNDERT (vorher: new Chess(game.fen()))
-    const move = newGame.move({
-        from: promotionMove.from,
-        to: promotionMove.to,
-        promotion: pieceType,
-    });
-    
         if (!move) return;
         setGame(newGame);
         setMoveHistory(prev => [...prev, move.san]);
@@ -499,12 +438,11 @@ export default function Playbot() {
             },
             fen: newGame.fen(),
         });
-        setSelectedSquare(null);
-        setLegalMoves([]);
         setPromotionMove(null);
 
         checkGameEnd(newGame);
     };
+
     const saveGame = async () => {
         const timestamp = Date.now();
         const key = `@saved_game_${timestamp}`;
@@ -520,15 +458,12 @@ export default function Playbot() {
                 humanColor,
                 botColor,
                 botElo,
-
             })
         );
     };
 
     const resetToSetupScreen = () => {
         setGame(new Chess());
-        setSelectedSquare(null);
-        setLegalMoves([]);
         setPromotionMove(null);
         setMoveHistory([]);
         setLastMove(null);
@@ -539,19 +474,13 @@ export default function Playbot() {
         setGameStarted(false);
     };
 
-    // currentGame: Chess
-    const getKingSquare = (
-        currentGame: Chess,
-        color: "w" | "b"
-    ) => {
-        const board = currentGame.board(); // 2D Array mit Pieces oder null
+    const getKingSquare = (currentGame: Chess, color: "w" | "b") => {
+        const board = currentGame.board();
         for (let rank = 0; rank < 8; rank++) {
             for (let file = 0; file < 8; file++) {
                 const piece = board[rank][file];
                 if (piece && piece.type === "k" && piece.color === color) {
-                    // Umrechnen in algebraische Notation: a1-h8
-                    const square = String.fromCharCode(97 + file) + (8 - rank);
-                    return square;
+                    return String.fromCharCode(97 + file) + (8 - rank);
                 }
             }
         }
@@ -567,15 +496,12 @@ export default function Playbot() {
 
         endPopupTimer.current = setTimeout(() => {
             setEndState(state);
-        }, 700); // Verzögerung, damit der letzte Zug sichtbar ist
+        }, 700);
     };
 
     const checkGameEnd = (currentGame: Chess) => {
         if (currentGame.isCheck()) {
-            const checkedKing = getKingSquare(
-                currentGame,
-                currentGame.turn()
-            );
+            const checkedKing = getKingSquare(currentGame, currentGame.turn());
             setKingInCheck(checkedKing);
         } else {
             setKingInCheck(null);
@@ -589,10 +515,9 @@ export default function Playbot() {
                     : winner === botColor ? "loss"
                         : "draw";
 
-            // Königfeld ermitteln
-            const kingSquare = getKingSquare(currentGame, loser); // chess.js liefert z.B. "e8"
+            const kingSquare = getKingSquare(currentGame, loser);
             setKingInCheck(kingSquare);
-            saveGameToHistory("bot", result, currentGame.pgn());       // Checkmate
+            saveGameToHistory("bot", result, currentGame.pgn());
 
             showEndPopupAfterDelay({ type: result, reason: "checkmate" });
             return true;
@@ -602,19 +527,16 @@ export default function Playbot() {
             showEndPopupAfterDelay({ type: "draw", reason: "stalemate" });
             return true;
         }
-
         if (currentGame.isThreefoldRepetition()) {
             saveGameToHistory("bot", "draw", currentGame.pgn());
             showEndPopupAfterDelay({ type: "draw", reason: "draw" });
             return true;
         }
-
         if (currentGame.isInsufficientMaterial()) {
             saveGameToHistory("bot", "draw", currentGame.pgn());
             showEndPopupAfterDelay({ type: "draw", reason: "draw" });
             return true;
         }
-
         if (currentGame.isDraw()) {
             saveGameToHistory("bot", "draw", currentGame.pgn());
             showEndPopupAfterDelay({ type: "draw", reason: "draw" });
@@ -623,6 +545,7 @@ export default function Playbot() {
 
         return false;
     };
+
     async function saveGameToHistory(
         mode: "bot",
         result: "win" | "loss" | "draw" | "aborted",
@@ -633,41 +556,40 @@ export default function Playbot() {
         const stored = await AsyncStorage.getItem(key);
         const history = stored ? JSON.parse(stored) : [];
 
-     history.unshift({
-    id: Date.now().toString(),
-    mode,
-    result,
-    timestamp: timestamp ?? Date.now(),
-    remoteId: null, // NEU, wird gleich befüllt falls Sync klappt
-});
-
-await AsyncStorage.setItem(key, JSON.stringify(history));
-
-try {
-    const acc = await getCurrentAccount();
-
-    if (acc && !acc.guest && acc.authId) {
-        const remoteId = await saveGameRecord({
-            userId: acc.authId,
-            opponentId: null, // bei bot-game.tsx einfach null lassen
+        history.unshift({
+            id: Date.now().toString(),
             mode,
             result,
-            pgn,
+            timestamp: timestamp ?? Date.now(),
+            remoteId: null,
         });
 
-        // NEU: remoteId nachträglich in denselben History-Eintrag schreiben
-        if (remoteId) {
-            const updatedHistory = history.map((item: any) =>
-                item.timestamp === (timestamp ?? history[0].timestamp)
-                    ? { ...item, remoteId }
-                    : item
-            );
-            await AsyncStorage.setItem(key, JSON.stringify(updatedHistory));
+        await AsyncStorage.setItem(key, JSON.stringify(history));
+
+        try {
+            const acc = await getCurrentAccount();
+
+            if (acc && !acc.guest && acc.authId) {
+                const remoteId = await saveGameRecord({
+                    userId: acc.authId,
+                    opponentId: null,
+                    mode,
+                    result,
+                    pgn,
+                });
+
+                if (remoteId) {
+                    const updatedHistory = history.map((item: any) =>
+                        item.timestamp === (timestamp ?? history[0].timestamp)
+                            ? { ...item, remoteId }
+                            : item
+                    );
+                    await AsyncStorage.setItem(key, JSON.stringify(updatedHistory));
+                }
+            }
+        } catch (error) {
+            console.log("SAVE GAME RECORD ERROR:", error);
         }
-    }
-} catch (error) {
-    console.log("SAVE GAME RECORD ERROR:", error);
-}
     }
 
     const animatedCardStyle = {
@@ -689,9 +611,7 @@ try {
     };
 
     return (
-        <ImageBackground source={backgroundImage}
-            style={{ flex: 1 }}
-            resizeMode="cover" >
+        <ImageBackground source={backgroundImage} style={{ flex: 1 }} resizeMode="cover">
             {!gameStarted ? (
                 <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
                     <Text style={{ color: "#fff", fontSize: 20, marginBottom: 16 }}>Start bot game  </Text>
@@ -722,24 +642,13 @@ try {
                                             : "rgba(255,255,255,0.15)",
                                 }}
                             >
-                                <Text
-                                    style={{
-                                        color: "#fff",
-                                        fontSize: 15,
-                                        fontWeight: "600",
-                                    }}
-                                >
-                                    {c === "w"
-                                        ? "white"
-                                        : c === "b"
-                                            ? "black"
-                                            : "random"}
+                                <Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>
+                                    {c === "w" ? "white" : c === "b" ? "black" : "random"}
                                 </Text>
                             </Pressable>
                         ))}
                     </View>
 
-                    {/* ELO Slider statt fester Buttons */}
                     <View style={{ width: "80%", alignItems: "center", marginBottom: 20 }}>
                         <Text style={{ color: "#FFD700", fontSize: 16, fontWeight: "700", marginBottom: 6 }}>
                             {getEloLabel(botElo)} • ELO {botElo}
@@ -759,18 +668,14 @@ try {
 
                     <Pressable
                         onPress={() => {
-                            // Wenn savedData existiert, dann einfach Spiel starten
                             if (savedData) {
                                 setHumanColor(savedData.humanColor);
                                 setBottomColor(savedData.bottomColor);
                                 setBotColor(savedData.botColor);
                                 setGameStarted(true);
-
-
                                 return;
                             }
 
-                            // sonst normale Startlogik
                             const color = playerColor === "random" ? (Math.random() < 0.5 ? "w" : "b") : playerColor;
 
                             setHumanColor(color);
@@ -778,7 +683,6 @@ try {
                             setBotColor(color === "w" ? "b" : "w");
                             setGameStarted(true);
 
-                            // 🔥 HIER HIN
                             socket.current?.emit("find_bot_match", {
                                 name: "Player",
                                 avatar: "",
@@ -786,8 +690,6 @@ try {
                                 playerColor: playerColor === "random" ? null : playerColor,
                                 startFEN: "startpos"
                             });
-
-
                         }}
                         style={{
                             marginTop: 12,
@@ -803,11 +705,7 @@ try {
                             shadowOffset: { width: 0, height: 3 },
                         }}
                     >
-                        <Text style={{
-                            color: "#fff",
-                            fontSize: 16,
-                            fontWeight: "700",
-                        }}>
+                        <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
                             Start game
                         </Text>
                     </Pressable>
@@ -852,165 +750,21 @@ try {
                                     </Text>
                                 ))}
                         </ScrollView>
-                        <View style={{ transform: rotateBoard ? [{ rotate: "0deg" }] : [] }}>
-                            <View style={styles.board}>
-                                {displayBoard.map((row, rowIndex) =>
-                                    row.map((piece, colIndex) => {
-                                        const square = toChessSquare(rowIndex, colIndex, bottomColor);
-                                        const isDark = (rowIndex + colIndex) % 2 === 1;
-                                        const isSelected = selectedSquare === square;
-                                        const legalMove = legalMoves.find((m) => m.to === square);
-                                        const isLegalMove = !!legalMove;
-                                        const isCapture = !!legalMove?.captured;
-                                        const pieceKey = pieceToKey(piece);
 
-                                        const rankLabel = bottomColor === "w" ? RANKS[rowIndex] : RANKS[7 - rowIndex];
-                                        const fileLabel = bottomColor === "w" ? FILES[colIndex] : FILES[7 - colIndex];
+                        {/* GEÄNDERT: geteilte Board-Komponente statt eigenem Rendering */}
+                        <Board
+                            board={displayBoard}
+                            selectedSquare={selectedSquare}
+                            legalMoves={legalMoves}
+                            lastMove={lastMove}
+                            checkSquare={kingInCheck}
+                            onPressSquare={onPressSquare}
+                            pieces={pieces}
+                            pieceToKey={pieceToKey}
+                            myColor={bottomColor}
+                            mode="bot"
+                        />
 
-                                        const isLastFrom = lastMove?.from === square;
-                                        const isLastTo = lastMove?.to === square;
-
-                                        return (
-                                            <Pressable
-                                                key={square}
-                                                onPress={() => {
-                                                    if (game.turn() !== humanColor) return;
-                                                    if (!selectedSquare && piece && piece.color !== humanColor) return;
-
-                                                    if (piece && !isLegalMove) {
-                                                        setSelectedSquare(square);
-                                                        setLegalMoves(game.moves({ square: square as any, verbose: true }));
-                                                        return;
-                                                    }
-
-                                                    if (selectedSquare && isLegalMove) {
-                                                        if (legalMove.piece === "p" && (square[1] === "8" || square[1] === "1")) {
-                                                            setPromotionMove({ from: selectedSquare, to: square });
-                                                            return;
-                                                        }
-
-                                                      const newGame = cloneWithHistory(game); // GEÄNDERT (vorher: new Chess(game.fen()))
-const move = newGame.move({ from: selectedSquare as any, to: square as any });
-                                                        if (!move) return;
-
-                                                        setGame(newGame);
-                                                        setMoveHistory(prev => [...prev, move.san]);
-                                                        setLastMove({ from: move.from, to: move.to });
-                                                        setSelectedSquare(null);
-                                                        setLegalMoves([]);
-                                                        checkGameEnd(newGame);
-
-                                                        if (!roomId) return; // Sicherheitshalber
-                                                        socket.current?.emit("player_move", {
-                                                            roomId: roomId,
-                                                            // WICHTIG: der Server erwartet ein Objekt {from, to, promotion?},
-                                                            // kein UCI-String - sonst wird der Zug serverseitig verworfen
-                                                            // und der Bot bekommt nie mit, dass er am Zug ist.
-                                                            move: { from: move.from, to: move.to },
-                                                            fen: newGame.fen(), // Optional, falls der Server die aktuelle Stellung braucht
-                                                        });
-
-                                                    }
-                                                }}
-                                                style={[
-                                                    styles.square,
-                                                    {
-                                                        backgroundColor:
-                                                            square === kingInCheck
-                                                                ? "#ff4d4d"
-                                                                : isLastTo
-                                                                    ? "#6bb6ff"
-                                                                    : isLastFrom
-                                                                        ? "#4da3ff"
-                                                                        : isSelected
-                                                                            ? "#4da3ff"
-                                                                            : isDark
-                                                                                ? "#b58863"
-                                                                                : "#e7d5b7",
-
-                                                        borderWidth: 0,
-                                                        borderColor: "transparent",
-                                                    },
-                                                ]}
-                                            >
-                                                {pieceKey && (
-                                                    <Image
-                                                        source={pieces[pieceKey]}
-                                                        style={[
-                                                            styles.piece,
-                                                            {
-                                                                transform: [
-                                                                    {
-                                                                        scale:
-                                                                            pieceKey === "wp" ? 1.35 :
-                                                                                pieceKey === "wn" ? 1.55 :
-                                                                                    pieceKey === "wb" ? 1.7 :
-                                                                                        pieceKey === "wr" ? 1.65 :
-                                                                                            pieceKey === "wq" ? 1.55 :
-                                                                                                pieceKey === "wk" ? 1.30 :
-
-                                                                                                    pieceKey === "bp" ? 1.3 :
-                                                                                                        pieceKey === "bn" ? 1.20 :
-                                                                                                            pieceKey === "bb" ? 1.3 :
-                                                                                                                pieceKey === "br" ? 1.15 :
-                                                                                                                    pieceKey === "bq" ? 1.25 :
-                                                                                                                        pieceKey === "bk" ? 1.15 :
-
-                                                                                                                            1
-                                                                    },
-                                                                    {
-                                                                        translateY:
-                                                                            pieceKey === "wb" ? -1.1 :
-                                                                                pieceKey === "wr" ? -2 :
-                                                                                    pieceKey === "wq" ? -2 :
-                                                                                        pieceKey === "wp" ? 1.2 :
-
-                                                                                            pieceKey === "bp" ? 2 :
-                                                                                                pieceKey === "bn" ? 2 :
-                                                                                                    pieceKey === "br" ? 2 :
-                                                                                                        pieceKey === "bq" ? 2 :
-                                                                                                            pieceKey === "bb" ? 0.5 :
-
-                                                                                                                0
-                                                                    }
-                                                                ]
-                                                            }
-                                                        ]}
-                                                    />
-                                                )}
-                                                {isLegalMove && !isCapture && <View style={styles.moveDot} />}
-                                                {isLegalMove && isCapture && <View style={styles.captureRing} />}
-
-                                                {colIndex === 0 && (
-                                                    <Text style={{
-                                                        position: "absolute",
-                                                        left: 2,
-                                                        top: 2,
-                                                        fontSize: 10,
-                                                        fontWeight: "600",
-                                                        color: isDark ? "#e5e7eb" : "#334155",
-                                                    }}>
-                                                        {bottomColor === "w" ? RANKS[rowIndex] : RANKS[7 - rowIndex]}
-                                                    </Text>
-                                                )}
-                                                {rowIndex === 7 && (
-                                                    <Text style={{
-                                                        position: "absolute",
-                                                        left: 2,
-                                                        bottom: 2,
-                                                        fontSize: 10,
-                                                        fontWeight: "600",
-                                                        color: isDark ? "#e5e7eb" : "#334155",
-                                                    }}>
-                                                        {bottomColor === "w" ? FILES[colIndex] : FILES[7 - colIndex]}
-                                                    </Text>
-                                                )}
-                                            </Pressable>
-                                        );
-                                    })
-                                )}
-                            </View>
-                        </View>
                         <View style={styles.bottomBar}>
                             <Pressable onPress={() => setShowLeaveModal(true)}>
                                 <Text style={styles.bottomBtn}>Back</Text>
@@ -1029,9 +783,6 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
                             </Pressable>
                         </View>
 
-                        {/* =============================
-                            LEAVE MODAL
-                        ============================= */}
                         <Modal
                             visible={showLeaveModal}
                             transparent
@@ -1046,10 +797,7 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
                                     </Text>
 
                                     <View style={styles.buttons}>
-                                        <Pressable
-                                            style={styles.cancelButton}
-                                            onPress={() => setShowLeaveModal(false)}
-                                        >
+                                        <Pressable style={styles.cancelButton} onPress={() => setShowLeaveModal(false)}>
                                             <Text style={styles.cancelButtonText}>Abbrechen</Text>
                                         </Pressable>
 
@@ -1069,9 +817,6 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
                             </View>
                         </Modal>
 
-                        {/* =============================
-                            RESTART MODAL
-                        ============================= */}
                         <Modal
                             visible={showRestartModal}
                             transparent
@@ -1086,10 +831,7 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
                                     </Text>
 
                                     <View style={styles.buttons}>
-                                        <Pressable
-                                            style={styles.cancelButton}
-                                            onPress={() => setShowRestartModal(false)}
-                                        >
+                                        <Pressable style={styles.cancelButton} onPress={() => setShowRestartModal(false)}>
                                             <Text style={styles.cancelButtonText}>Abbrechen</Text>
                                         </Pressable>
 
@@ -1110,9 +852,6 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
                             </View>
                         </Modal>
 
-                        {/* =============================
-                            SAVE CONFIRMATION MODAL
-                        ============================= */}
                         <Modal
                             visible={showSaveModal}
                             transparent
@@ -1123,22 +862,16 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
                                 <View style={styles.card}>
                                     <Text style={styles.title}>Spiel gespeichert</Text>
                                     <Text style={styles.text}>
-                                        Du kannst es unter „Gespeicherte Spiele“ fortsetzen.
+                                        Du kannst es unter „Gespeicherte Spiele" fortsetzen.
                                     </Text>
 
-                                    <Pressable
-                                        style={styles.primaryBtn}
-                                        onPress={() => setShowSaveModal(false)}
-                                    >
+                                    <Pressable style={styles.primaryBtn} onPress={() => setShowSaveModal(false)}>
                                         <Text style={styles.btnText}>OK</Text>
                                     </Pressable>
                                 </View>
                             </View>
                         </Modal>
 
-                        {/* =============================
-                            END GAME POPUP
-                        ============================= */}
                         {endState && (
                             <View style={styles.endOverlay}>
                                 <Animated.View style={[styles.endCard, animatedCardStyle]}>
@@ -1146,24 +879,18 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
                                         <>
                                             <Text style={styles.winTitle}>Sieg!</Text>
                                             <Text style={styles.subText}>
-                                                {endState.reason === "checkmate"
-                                                    ? "Du hast den Bot schachmatt gesetzt."
-                                                    : ""}
+                                                {endState.reason === "checkmate" ? "Du hast den Bot schachmatt gesetzt." : ""}
                                             </Text>
                                         </>
                                     )}
-
                                     {endState.type === "loss" && (
                                         <>
                                             <Text style={styles.loseTitle}>Niederlage</Text>
                                             <Text style={styles.subText}>
-                                                {endState.reason === "checkmate"
-                                                    ? "Du wurdest schachmatt gesetzt."
-                                                    : ""}
+                                                {endState.reason === "checkmate" ? "Du wurdest schachmatt gesetzt." : ""}
                                             </Text>
                                         </>
                                     )}
-
                                     {endState.type === "draw" && (
                                         <>
                                             <Text style={styles.drawTitle}>🤝 Remis</Text>
@@ -1183,8 +910,6 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
 
                                                 setEndState(null);
                                                 setGame(new Chess());
-                                                setSelectedSquare(null);
-                                                setLegalMoves([]);
                                                 setPromotionMove(null);
                                                 setMoveHistory([]);
                                                 setLastMove(null);
@@ -1223,54 +948,16 @@ const move = newGame.move({ from: selectedSquare as any, to: square as any });
                         )}
                     </View>
                 </View>
-            )
-            }
+            )}
         </ImageBackground>
     );
 }
-const styles = StyleSheet.create({
-    board: {
-        width: BOARD_SIZE,
-        height: BOARD_SIZE,
-        flexDirection: "row",
-        flexWrap: "wrap",
-        alignSelf: "center",
-        marginTop: 0,
-        borderRadius: 5,
-        overflow: "hidden",
 
-    },
-    square: {
-        width: SQUARE_SIZE,
-        height: SQUARE_SIZE,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    piece: {
-        width: SQUARE_SIZE * 0.8,
-        height: SQUARE_SIZE * 0.8,
-        resizeMode: "contain",
-    },
-    moveDot: {
-        position: "absolute",
-        width: SQUARE_SIZE * 0.25,
-        height: SQUARE_SIZE * 0.25,
-        borderRadius: 100,
-        backgroundColor: "rgba(0,0,0,0.3)",
-    },
-    captureRing: {
-        position: "absolute",
-        width: SQUARE_SIZE * 0.9,
-        height: SQUARE_SIZE * 0.9,
-        borderRadius: 100,
-        borderWidth: 3,
-        borderColor: "rgba(0,0,0,0.35)",
-    },
+const styles = StyleSheet.create({
     moveBar: {
         maxHeight: 40,
         marginBottom: 12,
         marginTop: 10,
-
     },
     moveBarContent: {
         paddingHorizontal: 12,
@@ -1284,8 +971,6 @@ const styles = StyleSheet.create({
         backgroundColor: "#e5e7eb",
         fontSize: 13,
     },
-
-    // Bottom-Bar im selben Style wie im Online-Screen
     bottomBar: {
         marginTop: 16,
         flexDirection: "row",
@@ -1300,7 +985,6 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         fontSize: 14,
     },
-
     promotionBar: {
         position: "absolute",
         bottom: BOARD_SIZE + 120,
@@ -1321,8 +1005,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-
-    // ==== Popup-Styles im Online-Screen-Design ====
     overlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.72)",
@@ -1382,7 +1064,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "700",
     },
-
     primaryBtn: {
         backgroundColor: "#D4AF37",
         padding: 13,
@@ -1401,7 +1082,6 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontWeight: "700",
     },
-
     endOverlay: {
         position: "absolute",
         top: -BOARD_SIZE * 0.05,
@@ -1427,32 +1107,9 @@ const styles = StyleSheet.create({
         shadowRadius: 20,
         elevation: 12,
     },
-    winTitle: {
-        fontSize: 38,
-        fontWeight: "900",
-        color: "#FFD700",
-        marginBottom: 8,
-    },
-    loseTitle: {
-        fontSize: 38,
-        fontWeight: "900",
-        color: "#ff3b3b",
-        marginBottom: 8,
-    },
-    drawTitle: {
-        fontSize: 38,
-        fontWeight: "900",
-        color: "#aaa",
-        marginBottom: 8,
-    },
-    subText: {
-        color: "#ccc",
-        textAlign: "center",
-        lineHeight: 21,
-        marginBottom: 16,
-    },
-    endButtons: {
-        width: "100%",
-        gap: 10,
-    },
+    winTitle: { fontSize: 38, fontWeight: "900", color: "#FFD700", marginBottom: 8 },
+    loseTitle: { fontSize: 38, fontWeight: "900", color: "#ff3b3b", marginBottom: 8 },
+    drawTitle: { fontSize: 38, fontWeight: "900", color: "#aaa", marginBottom: 8 },
+    subText: { color: "#ccc", textAlign: "center", lineHeight: 21, marginBottom: 16 },
+    endButtons: { width: "100%", gap: 10 },
 });
