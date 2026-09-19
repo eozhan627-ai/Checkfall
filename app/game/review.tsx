@@ -61,10 +61,11 @@ type MoveClassification =
     | "missed_win" | "precise_defense" | "only_move" | "slip";
 
 type AnalysisMove = { moveNumber: number; san: string; evalCp: number | null; bestMove: string; classification: MoveClassification };
+
 type Analysis = {
-    depth: number; tier: string; moves: AnalysisMove[];
-    accuracy: { white: number; black: number };
-    counts: Record<"w" | "b", Partial<Record<MoveClassification, number>>>;
+  depth: number; tier: string; moves: AnalysisMove[];
+  accuracy: { w: number | null; b: number | null };
+  counts: Record<"w" | "b", Partial<Record<MoveClassification, number>>>;
 };
 
 const CLASSIFICATION_META: Record<MoveClassification, { label: string; icon: string; color: string }> = {
