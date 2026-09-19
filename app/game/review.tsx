@@ -125,11 +125,12 @@ function buildReport(analysis: Analysis): string[] {
 
     const lines: string[] = [];
     const { w: white, b: black } = analysis.accuracy;
+const w = white ?? 0;
+const b = black ?? 0;
 
-
-    if (white >= black + 5) lines.push(`Weiß spielte insgesamt präziser (${white}% gegenüber ${black}%).`);
-    else if (black >= white + 5) lines.push(`Schwarz spielte insgesamt präziser (${black}% gegenüber ${white}%).`);
-    else lines.push(`Beide Seiten spielten ähnlich genau (${white}% zu ${black}%).`);
+if (w >= b + 5) lines.push(`Weiß spielte insgesamt präziser (${w}% gegenüber ${b}%).`);
+else if (b >= w + 5) lines.push(`Schwarz spielte insgesamt präziser (${b}% gegenüber ${w}%).`);
+else lines.push(`Beide Seiten spielten ähnlich genau (${w}% zu ${b}%).`);
 
     const w = worst(analysis.counts.w || {});
     const b = worst(analysis.counts.b || {});
