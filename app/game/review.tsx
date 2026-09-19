@@ -124,18 +124,18 @@ function buildReport(analysis: Analysis): string[] {
     };
 
     const lines: string[] = [];
-    const { w: white, b: black } = analysis.accuracy;
-const w = white ?? 0;
-const b = black ?? 0;
+const { w: white, b: black } = analysis.accuracy;
+const wAcc = white ?? 0;
+const bAcc = black ?? 0;
 
-if (w >= b + 5) lines.push(`Weiß spielte insgesamt präziser (${w}% gegenüber ${b}%).`);
-else if (b >= w + 5) lines.push(`Schwarz spielte insgesamt präziser (${b}% gegenüber ${w}%).`);
-else lines.push(`Beide Seiten spielten ähnlich genau (${w}% zu ${b}%).`);
+if (wAcc >= bAcc + 5) lines.push(`Weiß spielte insgesamt präziser (${wAcc}% gegenüber ${bAcc}%).`);
+else if (bAcc >= wAcc + 5) lines.push(`Schwarz spielte insgesamt präziser (${bAcc}% gegenüber ${wAcc}%).`);
+else lines.push(`Beide Seiten spielten ähnlich genau (${wAcc}% zu ${bAcc}%).`);
 
-    const w = worst(analysis.counts.w || {});
-    const b = worst(analysis.counts.b || {});
-    if (w) lines.push(`Größte Schwachstelle für Weiß: ${CLASSIFICATION_META[w.key].label} (${w.count}×).`);
-    if (b) lines.push(`Größte Schwachstelle für Schwarz: ${CLASSIFICATION_META[b.key].label} (${b.count}×).`);
+const w = worst(analysis.counts.w || {});
+const b = worst(analysis.counts.b || {});
+if (w) lines.push(`Größte Schwachstelle für Weiß: ${CLASSIFICATION_META[w.key].label} (${w.count}×).`);
+if (b) lines.push(`Größte Schwachstelle für Schwarz: ${CLASSIFICATION_META[b.key].label} (${b.count}×).`);
 
     const brilliantTotal = (analysis.counts.w?.brilliant || 0) + (analysis.counts.b?.brilliant || 0);
     if (brilliantTotal > 0) {
