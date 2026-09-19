@@ -510,7 +510,7 @@ export default function GameReview() {
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#ECEDEE" }]} />
                             <Text style={styles.accuracyLabel}>Weiß </Text>
-           <Text style={styles.accuracyValue}>{analysis.accuracy.w?.toFixed(1)}%</Te
+           <Text style={styles.accuracyValue}>{analysis.accuracy.w?.toFixed(1)}%</Text>
                         </View>
                         <View style={styles.accuracyDivider} />
                         <View style={styles.accuracyCard}>
