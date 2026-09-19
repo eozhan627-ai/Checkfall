@@ -509,13 +509,13 @@ export default function GameReview() {
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#ECEDEE" }]} />
                             <Text style={styles.accuracyLabel}>Weiß </Text>
-                   <Text style={styles.accuracyValue}>{analysis.accuracy.w}%</Text>
+           <Text style={styles.accuracyValue}>{analysis.accuracy.w?.toFixed(1)}%</Te
                         </View>
                         <View style={styles.accuracyDivider} />
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#4B5058" }]} />
                             <Text style={styles.accuracyLabel}>Schwarz </Text>
-                    <Text style={styles.accuracyValue}>{analysis.accuracy.b}%</Text>
+             <Text style={styles.accuracyValue}>{analysis.accuracy.b?.toFixed(1)}%</Text>
                         </View>
                     </View>
 
