@@ -437,6 +437,7 @@ const [dayStreak, setDayStreak] = useState(0);
         bounces
       >
         {/* HEADER */}
+            <View style={styles.header}>
          <View style={styles.headerText}>
   <Text style={styles.logo}>POVCHECK</Text>
   <Text style={styles.greeting}>Welcome back,</Text>
