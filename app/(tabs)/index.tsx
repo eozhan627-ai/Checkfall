@@ -20,7 +20,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  */
 
 type IconName = "pawn" | "rook" | "bot" | "bookmark" | "clock" | "chevron" | "flame";
-
+//
 
 function Icon({
   name,
@@ -266,6 +266,20 @@ function Icon({
           />
         </View>
       );
+case "flame":
+    return (
+        <View style={{ width: s, height: s, alignItems: "center", justifyContent: "center" }}>
+            <View
+                style={{
+                    width: s * 0.5,
+                    height: s * 0.75,
+                    borderRadius: s * 0.3,
+                    borderWidth: 1.5,
+                    borderColor: color,
+                }}
+            />
+        </View>
+    );
 
     case "chevron":
       return (
@@ -292,12 +306,30 @@ function Icon({
       );
   }
 }
+const STREAK_KEY = "povcheck_day_streak";
+
+async function updateDayStreak(): Promise<number> {
+    const today = new Date().toISOString().slice(0, 10);
+    const raw = await AsyncStorage.getItem(STREAK_KEY);
+    const stored = raw ? JSON.parse(raw) : null;
+
+    if (stored?.lastDate === today) return stored.count ?? 1;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    const newCount = stored?.lastDate === yesterdayStr ? (stored.count ?? 0) + 1 : 1;
+    await AsyncStorage.setItem(STREAK_KEY, JSON.stringify({ lastDate: today, count: newCount }));
+    return newCount;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
 
   const [account, setAccount] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
+const [dayStreak, setDayStreak] = useState(0);
 
   const placeholder = require("../../assets/images/knight_black.png");
   const backgroundImage = require("../../assets/images/loginbackground.png");
@@ -317,8 +349,12 @@ export default function HomeScreen() {
             return;
           }
 
-          setAccount(currentAccount);
+              setAccount(currentAccount);
+
+          const streak = await updateDayStreak();
+          if (mounted) setDayStreak(streak);
         } catch (error) {
+
           console.error("Failed to load account:", error);
 
           if (mounted) {
@@ -338,7 +374,7 @@ export default function HomeScreen() {
       };
     }, [router])
   );
-
+//
   if (loading) {
     return (
       <ImageBackground
@@ -401,7 +437,6 @@ export default function HomeScreen() {
         bounces
       >
         {/* HEADER */}
-        <View style={styles.header}>
          <View style={styles.headerText}>
   <Text style={styles.logo}>POVCHECK</Text>
   <Text style={styles.greeting}>Welcome back,</Text>
@@ -409,7 +444,17 @@ export default function HomeScreen() {
     <Text style={styles.username}>{username}</Text>
     {account?.vipTier && account.vipTier !== "none" && <VipBadge tier={account.vipTier} size="small" />}
   </View>
+
+  {dayStreak > 0 && (
+    <View style={styles.streakRow}>
+        <View style={styles.streakPill}>
+            <Icon name="flame" size={13} color="#E0914D" />
+            <Text style={styles.streakText}>{dayStreak} Tage in Folge</Text>
+        </View>
+    </View>
+  )}
 </View>
+
 
           <Pressable
             onPress={() => router.push("/profile")}
@@ -464,7 +509,8 @@ export default function HomeScreen() {
           </View>
         </Pressable>
 {/* VIP TEASER */}
-{(!account?.vipTier || account.vipTier === "none") && (
+{/* VIP */}
+{(!account?.vipTier || account.vipTier === "none") ? (
     <Pressable
         onPress={() => router.push("/vip")}
         style={({ pressed }) => [
@@ -484,7 +530,28 @@ export default function HomeScreen() {
             <Icon name="chevron" size={16} color="#D4AF37" />
         </View>
     </Pressable>
+) : (
+    <Pressable
+        onPress={() => router.push("/vip")}
+        style={({ pressed }) => [
+            styles.vipManageCard,
+            pressed && styles.pressed,
+        ]}
+    >
+        <View style={styles.vipContent}>
+            <Text style={styles.vipEyebrow}>POV CHECK VIP</Text>
+            <Text style={styles.vipManageTitle}>Abo verwalten</Text>
+            <Text style={styles.vipSubtitle}>
+                Tarif wechseln oder kündigen
+            </Text>
+        </View>
+
+        <View style={styles.vipArrow}>
+            <Icon name="chevron" size={16} color="#D4AF37" />
+        </View>
+    </Pressable>
 )}
+
         {/* QUICK PLAY */}
         <Text style={styles.sectionTitle}>
           Quick Play
@@ -919,7 +986,14 @@ usernameRow: {
     fontWeight: "600",
     marginBottom: 3,
   },
-
+streakRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+streakPill: {
+  flexDirection: "row", alignItems: "center", gap: 5,
+  paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
+  backgroundColor: "rgba(237, 240, 243, 0.06)",
+  borderWidth: 1, borderColor: "rgba(237, 240, 243, 0.08)",
+},
+streakText: { color: "rgba(237, 240, 243, 0.75)", fontSize: 11.5, fontWeight: "600" },
   historySubtitle: {
     color: "rgba(237, 240, 243, 0.5)",
     fontSize: 12.5,
