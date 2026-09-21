@@ -11,12 +11,16 @@ import {
 } from "react-native";
 import VipBadge from "../../components/VipBadge";
 import { AccountType, getCurrentAccount } from "../../lib/account";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 
 /**
  * Schlichte Outline-Icons (kein Fill), gebaut aus reinen View-Rahmen/Linien —
  * keine zusätzliche Dependency (kein react-native-svg) nötig.
  */
-type IconName = "pawn" | "rook" | "bot" | "bookmark" | "clock" | "chevron";
+
+type IconName = "pawn" | "rook" | "bot" | "bookmark" | "clock" | "chevron" | "flame";
+
 
 function Icon({
   name,
