@@ -5,7 +5,7 @@ import { getLessonContent } from "../../lib/lessonContent";
 
 
 export default function LessonScreen() {
-    const { title, mistake_type } = useLocalSearchParams<{
+    const { id, title, explanation, mistake_type } = useLocalSearchParams<{
         id: string;
         title: string;
         explanation: string;
@@ -38,7 +38,7 @@ export default function LessonScreen() {
                     <Text style={styles.label}>
                         {mistake_type?.replace(/_/g, " ")}
                     </Text>
-                    <Text style={styles.explanation}>{content.explanation}</Text>
+                    <Text style={styles.explanation}>{explanation || content.explanation}</Text>
 
                     {content.tip ? (
                         <View style={styles.tipBox}>
@@ -48,8 +48,20 @@ export default function LessonScreen() {
                     ) : null}
                 </View>
 
-                {/* TODO: hier folgt die eigentliche Übung/Aufgabe zum Lösen */}
-                <Pressable style={styles.solveButton}>
+                <Pressable
+                    style={styles.solveButton}
+                    onPress={() =>
+                        router.push({
+                            pathname: "/learn/lesson",
+                            params: {
+                                id,
+                                title: title || content.title,
+                                explanation: explanation || content.explanation,
+                                mistake_type,
+                            },
+                        })
+                    }
+                >
                     <Text style={styles.solveButtonText}>Übung starten</Text>
                 </Pressable>
             </ScrollView>

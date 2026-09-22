@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import {
   connectAuthenticatedSocket,
@@ -12,12 +13,38 @@ import {
   getSocket,
 } from "../lib/socket";
 import { supabase } from "../lib/supabase";
+
 export default function Layout() {
   const [sessionKicked, setSessionKicked] = useState(false);
-  // Verhindert, dass der Session-Kick
-  // durch erneutes Rendern / Auth-Events
-  // wieder überschrieben wird.
   const sessionKickedRef = useRef(false);
+
+  // =============================
+  // WEB: HINTERGRUNDBILD-FIX
+  // =============================
+  // React Native Web setzt flex:1 auf die Root-View, aber html/body im
+  // Browser haben ohne explizite Höhe keine Referenzgröße – dadurch
+  // rendert ImageBackground (z.B. auf iPad/Laptop) nur bis zur Höhe des
+  // sichtbaren Inhalts statt über den ganzen Viewport. Einmaliger,
+  // globaler CSS-Fix, betrifft nur Platform.OS === "web".
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      const styleId = "povcheck-web-height-fix";
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement("style");
+        style.id = styleId;
+        style.innerHTML = `
+          html, body, #root, #root > div {
+            height: 100%;
+          }
+          body {
+            margin: 0;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     const socket = getSocket();
@@ -29,15 +56,8 @@ export default function Layout() {
       console.log(
         "⚠️ SESSION KICKED: another device logged in"
       );
-      // Wichtig:
-      // Dieser Status bleibt aktiv,
-      // solange diese App geöffnet ist.
       sessionKickedRef.current = true;
-      // Socket dieses Geräts trennen.
       disconnectSocket();
-      // KEIN signOut
-      // KEIN logoutAccount
-      // KEIN router.replace
       setSessionKicked(true);
     };
     socket.on(
@@ -56,9 +76,6 @@ export default function Layout() {
           event
         );
         if (!mounted) return;
-        // Wenn dieses Gerät gekickt wurde,
-        // darf es sich NICHT automatisch
-        // wieder mit dem Socket verbinden.
         if (sessionKickedRef.current) {
           console.log(
             "SOCKET: blocked because this device was kicked"
@@ -123,9 +140,6 @@ export default function Layout() {
           animation: "none",
         }}
       />
-      {/* =============================
-          SESSION BLOCK SCREEN
-          ============================= */}
       {sessionKicked && (
         <View style={styles.overlay}>
           <View style={styles.card}>

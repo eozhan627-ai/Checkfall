@@ -13,6 +13,7 @@ import {
     BackHandler,
     ImageBackground,
     Modal,
+    Platform,
     Pressable,
     StyleSheet,
     Text,
@@ -72,9 +73,6 @@ export default function LoginPage() {
             BackHandler.addEventListener(
                 "hardwareBackPress",
                 () => {
-                    // Auf der Login-Seite nicht
-                    // zurück in einen alten
-                    // eingeloggten Screen gehen.
                     return true;
                 }
             );
@@ -106,6 +104,32 @@ export default function LoginPage() {
             console.log(
                 "LOGIN: no local account"
             );
+
+            // =============================
+            // WEB: RÜCKKEHR VON GOOGLE?
+            // =============================
+            // Auf Web nutzen wir für Google-Login einen Full-Page-Redirect
+            // statt eines Popups (siehe handleGoogleLogin). Nach der
+            // Rückkehr von Google landet der Browser wieder hier, mit einer
+            // frischen Supabase-Session, aber ohne lokalen Account. Das holen
+            // wir hier nach.
+            if (Platform.OS === "web") {
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession();
+
+                if (session?.user) {
+                    console.log(
+                        "LOGIN (WEB): Supabase-Session nach Google-Redirect gefunden"
+                    );
+                    setGoogleLoading(true);
+                    await resolveAccountAfterGoogleLogin(
+                        session.user
+                    );
+                    return;
+                }
+            }
+
             setLoading(false);
         } catch (e) {
             console.error(
@@ -191,14 +215,131 @@ export default function LoginPage() {
     function acceptTerms() {
         setTermsAccepted(true);
         setTermsVisible(false);
-        // Erst nach Zustimmung Google Login starten.
         handleGoogleLogin();
     }
     function acceptGuestTerms() {
         setTermsAccepted(true);
         setTermsVisible(false);
-        // Erst nach Zustimmung Guest Login starten.
         handleGuest();
+    }
+    // =============================
+    // GOOGLE: ACCOUNT NACH LOGIN AUFLÖSEN
+    // =============================
+    // Gemeinsame Logik für Native (nach manuellem Token-Exchange) und Web
+    // (nach Full-Page-Redirect, siehe checkCurrentAccount):
+    // 1. Gibt es lokal schon einen Account zu dieser authId?
+    // 2. Sonst: gibt es ein Supabase-Profil dazu (anderes Gerät)?
+    // 3. Sonst: neuer User → Onboarding.
+    async function resolveAccountAfterGoogleLogin(
+        user: any
+    ) {
+        try {
+            console.log(
+                "GOOGLE USER ID:",
+                user.id
+            );
+            console.log(
+                "GOOGLE USER EMAIL:",
+                user.email
+            );
+
+            // 1. LOCAL ACCOUNT CHECK
+            console.log(
+                "GOOGLE: checking local account..."
+            );
+            const existingLocalAccount =
+                await getAccountByAuthId(
+                    user.id
+                );
+
+            if (existingLocalAccount) {
+                console.log(
+                    "GOOGLE: LOCAL ACCOUNT FOUND"
+                );
+                await saveAccount({
+                    username:
+                        existingLocalAccount.username,
+                    guest: false,
+                    authId: user.id,
+                    avatar:
+                        existingLocalAccount.avatar,
+                    rating:
+                        existingLocalAccount.rating ??
+                        1000,
+                });
+                setGoogleLoading(false);
+                router.replace("/");
+                return;
+            }
+
+            // 2. SUPABASE PROFILE CHECK
+            console.log(
+                "GOOGLE: checking Supabase profile..."
+            );
+            const {
+                data: profile,
+                error: profileError,
+            } = await supabase
+                .from("profiles")
+                .select(
+                    "id, username, rating, avatar"
+                )
+                .eq("id", user.id)
+                .maybeSingle();
+
+            if (profileError) {
+                throw profileError;
+            }
+
+            // 3. EXISTING SUPABASE PROFILE
+            if (profile) {
+                console.log(
+                    "GOOGLE: SUPABASE PROFILE FOUND"
+                );
+                console.log(
+                    "GOOGLE: restoring profile locally..."
+                );
+                await saveAccount({
+                    username: profile.username,
+                    guest: false,
+                    authId: user.id,
+                    avatar:
+                        profile.avatar ??
+                        undefined,
+                    rating:
+                        typeof profile.rating ===
+                            "number"
+                            ? profile.rating
+                            : 1000,
+                });
+                console.log(
+                    "GOOGLE: profile restored, going directly to app"
+                );
+                setGoogleLoading(false);
+                router.replace("/");
+                return;
+            }
+
+            // 4. REALLY NEW ACCOUNT
+            console.log(
+                "GOOGLE: NO LOCAL ACCOUNT, NO SUPABASE PROFILE → onboarding"
+            );
+            setGoogleLoading(false);
+            router.replace(
+                "/auth/onboarding"
+            );
+        } catch (e: any) {
+            console.error(
+                "GOOGLE ACCOUNT RESOLVE ERROR:",
+                e
+            );
+            setGoogleLoading(false);
+            setError(
+                e?.message ||
+                "Google login failed."
+            );
+            triggerShake();
+        }
     }
     // =============================
     // GOOGLE LOGIN
@@ -216,8 +357,49 @@ export default function LoginPage() {
             console.log(
                 "================================="
             );
+
             // ---------------------------------
-            // REDIRECT URL
+            // WEB: FULL-PAGE-REDIRECT
+            // ---------------------------------
+            // Kein Popup mehr auf Web: iOS Safari (v.a. iPad) blockiert
+            // bzw. beendet Popup-Fenster oft, bevor die Tokens
+            // zurückkommen – das war vermutlich der Grund für
+            // "Verbindung zum Server kann nicht hergestellt werden".
+            // Nach der Rückkehr von Google übernimmt checkCurrentAccount().
+            if (Platform.OS === "web") {
+                const webRedirectTo =
+                    makeRedirectUri({
+                        isTripleSlashed: false,
+                    });
+
+                console.log(
+                    "GOOGLE WEB REDIRECT:",
+                    webRedirectTo
+                );
+
+                const {
+                    error: oauthError,
+                } =
+                    await supabase.auth.signInWithOAuth(
+                        {
+                            provider: "google",
+                            options: {
+                                redirectTo:
+                                    webRedirectTo,
+                            },
+                        }
+                    );
+
+                if (oauthError) {
+                    throw oauthError;
+                }
+
+                // Ab hier verlässt der Browser die Seite.
+                return;
+            }
+
+            // ---------------------------------
+            // NATIVE (iOS / Android App)
             // ---------------------------------
             const redirectTo =
                 makeRedirectUri({
@@ -229,9 +411,6 @@ export default function LoginPage() {
                 "GOOGLE REDIRECT:",
                 redirectTo
             );
-            // ---------------------------------
-            // REQUEST OAUTH URL
-            // ---------------------------------
             const {
                 data,
                 error: oauthError,
@@ -261,17 +440,11 @@ export default function LoginPage() {
                     "No Google authentication URL received."
                 );
             }
-            // ---------------------------------
-            // OPEN GOOGLE
-            // ---------------------------------
             const result =
                 await WebBrowser.openAuthSessionAsync(
                     data.url,
                     redirectTo
                 );
-            // ---------------------------------
-            // RESULT
-            // ---------------------------------
             console.log(
                 "GOOGLE RESULT:",
                 result
@@ -291,9 +464,6 @@ export default function LoginPage() {
             console.log(
                 "GOOGLE CALLBACK RECEIVED"
             );
-            // ---------------------------------
-            // HASH
-            // ---------------------------------
             const hashIndex =
                 callbackUrl.indexOf("#");
             if (hashIndex === -1) {
@@ -327,9 +497,6 @@ export default function LoginPage() {
                     ? "FOUND"
                     : "MISSING"
             );
-            // ---------------------------------
-            // TOKEN CHECK
-            // ---------------------------------
             if (
                 !accessToken ||
                 !refreshToken
@@ -346,9 +513,6 @@ export default function LoginPage() {
                     "Google authentication did not return valid session tokens."
                 );
             }
-            // ---------------------------------
-            // SET SUPABASE SESSION
-            // ---------------------------------
             const {
                 data: sessionData,
                 error: sessionError,
@@ -370,9 +534,6 @@ export default function LoginPage() {
             if (sessionError) {
                 throw sessionError;
             }
-            // ---------------------------------
-            // GET USER
-            // ---------------------------------
             const {
                 data: userData,
                 error: userError,
@@ -388,132 +549,9 @@ export default function LoginPage() {
                     "Google login completed, but no user was found."
                 );
             }
-            console.log(
-                "GOOGLE USER ID:",
-                user.id
-            );
-            console.log(
-                "GOOGLE USER EMAIL:",
-                user.email
-            );
-            // =================================
-            // 1. LOCAL ACCOUNT CHECK
-            // =================================
-            console.log(
-                "GOOGLE: checking local account..."
-            );
-            const existingLocalAccount =
-                await getAccountByAuthId(
-                    user.id
-                );
-            if (existingLocalAccount) {
-                console.log(
-                    "GOOGLE: LOCAL ACCOUNT FOUND"
-                );
-                await saveAccount({
-                    username:
-                        existingLocalAccount.username,
-                    guest: false,
-                    authId: user.id,
-                    avatar:
-                        existingLocalAccount.avatar,
-                    rating:
-                        existingLocalAccount.rating ??
-                        1000,
-                });
-                setGoogleLoading(false);
-                router.replace("/");
-                return;
-            }
-            // =================================
-            // 2. SUPABASE PROFILE CHECK
-            // =================================
-            //
-            // Wichtig für neues Gerät:
-            //
-            // AsyncStorage ist auf Gerät B leer.
-            // Das Profil existiert aber bereits
-            // zentral in Supabase.
-            //
-            // Deshalb prüfen wir jetzt
-            // profiles.id = user.id.
-            // =================================
-            console.log(
-                "GOOGLE: checking Supabase profile..."
-            );
-            const {
-                data: profile,
-                error: profileError,
-            } =
-                await supabase
-                    .from("profiles")
-                    .select(
-                        "id, username, rating, avatar"
-                    )
-                    .eq("id", user.id)
-                    .maybeSingle();
-            if (profileError) {
-                throw profileError;
-            }
-            // =================================
-            // 3. EXISTING SUPABASE PROFILE
-            // =================================
-            if (profile) {
-                console.log(
-                    "GOOGLE: SUPABASE PROFILE FOUND"
-                );
-                console.log(
-                    "GOOGLE: USERNAME:",
-                    profile.username
-                );
-                console.log(
-                    "GOOGLE: restoring profile locally..."
-                );
-                // Profil vom Server auf dieses
-                // Gerät übertragen.
-                await saveAccount({
-                    username:
-                        profile.username,
-                    guest: false,
-                    authId: user.id,
-                    avatar:
-                        profile.avatar ??
-                        undefined,
-                    rating:
-                        typeof profile.rating ===
-                            "number"
-                            ? profile.rating
-                            : 1000,
-                });
-                console.log(
-                    "GOOGLE: profile restored"
-                );
-                console.log(
-                    "GOOGLE: going directly to app"
-                );
-                setGoogleLoading(false);
-                router.replace("/");
-                return;
-            }
-            // =================================
-            // 4. REALLY NEW ACCOUNT
-            // =================================
-            console.log(
-                "GOOGLE: NO LOCAL ACCOUNT"
-            );
-            console.log(
-                "GOOGLE: NO SUPABASE PROFILE"
-            );
-            console.log(
-                "GOOGLE: first login → onboarding"
-            );
-            // Noch NICHT saveAccount().
-            //
-            // Der Username wird erst im
-            // Onboarding festgelegt.
-            setGoogleLoading(false);
-            router.replace(
-                "/auth/onboarding"
+
+            await resolveAccountAfterGoogleLogin(
+                user
             );
         } catch (e: any) {
             console.error(
@@ -1062,9 +1100,6 @@ const styles = StyleSheet.create({
     loadingText: {
         color: "#fff",
     },
-    // =============================
-    // TERMS MODAL
-    // =============================
     modalOverlay: {
         flex: 1,
         backgroundColor:
