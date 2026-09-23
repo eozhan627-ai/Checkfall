@@ -40,6 +40,7 @@ export default function Profile() {
     const isForeignProfile = !!externalUserId;
     const externalRating = params.rating as string | undefined; // neu
     const backgroundImage = require("../assets/images/profilebackground.png");
+    const isVip = !isForeignProfile && !!account?.vipTier && account.vipTier !== "none"; // NEU
     useEffect(() => {
         if (isForeignProfile) {
             setStats((prev) => ({
@@ -372,6 +373,19 @@ export default function Profile() {
                                     setEditingName(true)
                                 }
                             />
+                            {/* NEU: VIP-Abo verwalten, nur für bestehende Abonnenten.
+                                War vorher eine eigene Karte auf dem Homescreen. */}
+                            {isVip && (
+                                <>
+                                    <View style={styles.separator} />
+                                    <ProfileAction
+                                        icon="♛"
+                                        title="VIP-Abo verwalten"
+                                        subtitle="Tarif wechseln oder kündigen"
+                                        onPress={() => router.push("/vip")}
+                                    />
+                                </>
+                            )}
                         </View>
                         <View style={styles.separator} />
                         <ProfileAction

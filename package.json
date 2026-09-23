@@ -63,7 +63,8 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "stockfish.js": "^10.0.2",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

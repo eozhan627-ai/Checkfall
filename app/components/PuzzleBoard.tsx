@@ -1,4 +1,13 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useRef, useState } from "react";
+import {
+    Animated,
+    Dimensions,
+    Image,
+    PanResponder,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
 
 const piecesImages = {
     wP: require("../../assets/images/pawn_white.png"),
@@ -16,6 +25,8 @@ const piecesImages = {
     bK: require("../../assets/images/king_black.png"),
 };
 
+type PieceKey = keyof typeof piecesImages;
+
 type Piece = {
     type: string;
     color: string;
@@ -32,6 +43,25 @@ type Props = {
 const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const ranks = ["8", "7", "6", "5", "4", "3", "2", "1"];
 
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const BOARD_SIZE = Math.min(SCREEN_WIDTH - 32, 420);
+const SQUARE_SIZE = BOARD_SIZE / 8;
+const PIECE_SIZE = SQUARE_SIZE * 0.86;
+
+// Deine Scale/Offset-Werte, nur als Maps (gleiche Werte wie vorher)
+const PIECE_SCALE: Record<string, number> = {
+    wP: 1.35, wN: 1.55, wB: 1.7, wR: 1.65, wQ: 1.55, wK: 1.3,
+    bP: 1.3, bN: 1.2, bB: 1.3, bR: 1.15, bQ: 1.25, bK: 1.15,
+};
+const PIECE_OFFSET_Y: Record<string, number> = {
+    wB: -1.1, wR: -2, wQ: -2, wP: 1.2,
+    bP: 2, bN: 2, bR: 2, bQ: 2, bB: 0.5,
+};
+const pieceTransform = (key: string) => [
+    { scale: PIECE_SCALE[key] ?? 1 },
+    { translateY: PIECE_OFFSET_Y[key] ?? 0 },
+];
+
 export default function PuzzleBoard({
     board,
     selectedSquare,
@@ -39,162 +69,151 @@ export default function PuzzleBoard({
     onSquarePress,
     playerColor = "w",
 }: Props) {
-
     const rotate = playerColor === "b";
 
-    // Größe jeder Figur
-    const getPieceScale = (
-        pieceKey: keyof typeof piecesImages
-    ): number => {
+    // =========================================================
+    // DRAG & DROP
+    // =========================================================
 
-        switch (pieceKey) {
-            // Weiß
-            case "wP":
-                return 1.35;
+    const [drag, setDrag] = useState<{ from: string; pieceKey: PieceKey } | null>(null);
+    const dragPos = useRef(new Animated.ValueXY()).current;
 
-            case "wN":
-                return 1.55;
+    // PanResponder wird nur einmal erstellt -> aktuelle Props über Ref lesen
+    const latest = useRef<any>({});
+    latest.current = { board, rotate, playerColor, onSquarePress };
 
-            case "wB":
-                return 1.7;
+    const gesture = useRef({
+        startX: 0,
+        startY: 0,
+        startSquare: null as string | null,
+        dragging: false,
+    });
 
-            case "wR":
-                return 1.65;
+    // Touch-Koordinate (relativ zum Brett) -> Feld
+    const cellAt = (x: number, y: number) => {
+        const { board, rotate } = latest.current;
 
-            case "wQ":
-                return 1.55;
+        const r = Math.floor(y / SQUARE_SIZE);
+        const c = Math.floor(x / SQUARE_SIZE);
+        if (r < 0 || r > 7 || c < 0 || c > 7) return null;
 
-            case "wK":
-                return 1.30;
+        const sourceRow = rotate ? 7 - r : r;
+        const sourceCol = rotate ? 7 - c : c;
 
-            // Schwarz
-            case "bP":
-                return 1.3;
-
-            case "bN":
-                return 1.20;
-
-            case "bB":
-                return 1.3;
-
-            case "bR":
-                return 1.15;
-
-            case "bQ":
-                return 1.25;
-
-            case "bK":
-                return 1.15;
-
-            default:
-                return 1;
-        }
+        return {
+            square: files[sourceCol] + ranks[sourceRow],
+            piece: board[sourceRow][sourceCol] as Piece,
+        };
     };
 
-    // Vertikale Position jeder Figur
-    const getPieceTranslateY = (
-        pieceKey: keyof typeof piecesImages
-    ): number => {
-
-        switch (pieceKey) {
-            // Weiß
-            case "wB":
-                return -1.1;
-
-            case "wR":
-                return -2;
-
-            case "wQ":
-                return -2;
-
-            case "wP":
-                return 1.2;
-
-            // Schwarz
-            case "bP":
-                return 2;
-
-            case "bN":
-                return 2;
-
-            case "bR":
-                return 2;
-
-            case "bQ":
-                return 2;
-
-            case "bB":
-                return 0.5;
-
-            default:
-                return 0;
-        }
+    const resetDrag = () => {
+        gesture.current.dragging = false;
+        setDrag(null);
     };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: () => true,
+            onPanResponderTerminationRequest: () => false,
+
+            onPanResponderGrant: (e) => {
+                const { locationX: x, locationY: y } = e.nativeEvent;
+                const g = gesture.current;
+                const { playerColor, onSquarePress } = latest.current;
+
+                g.startX = x;
+                g.startY = y;
+                g.dragging = false;
+
+                const cell = cellAt(x, y);
+                g.startSquare = cell?.square ?? null;
+
+                // Eigene Figur: auswählen + Drag starten
+                if (cell?.piece && cell.piece.color === playerColor) {
+                    g.dragging = true;
+                    onSquarePress(cell.square);
+                    dragPos.setValue({ x, y });
+                    setDrag({
+                        from: cell.square,
+                        pieceKey: (cell.piece.color +
+                            cell.piece.type.toUpperCase()) as PieceKey,
+                    });
+                }
+            },
+
+            onPanResponderMove: (_e, gs) => {
+                const g = gesture.current;
+                if (!g.dragging) return;
+                dragPos.setValue({ x: g.startX + gs.dx, y: g.startY + gs.dy });
+            },
+
+            onPanResponderRelease: (_e, gs) => {
+                const g = gesture.current;
+                const { onSquarePress, playerColor } = latest.current;
+
+                if (g.dragging) {
+                    const target = cellAt(g.startX + gs.dx, g.startY + gs.dy);
+
+                    // Zug nur auslösen, wenn auf ein anderes Feld ohne eigene Figur losgelassen wurde
+                    if (
+                        target &&
+                        target.square !== g.startSquare &&
+                        !(target.piece && target.piece.color === playerColor)
+                    ) {
+                        onSquarePress(target.square);
+                    }
+                } else if (g.startSquare) {
+                    // normales Tippen (leeres Feld / Gegnerfigur als Ziel)
+                    onSquarePress(g.startSquare);
+                }
+
+                resetDrag();
+            },
+
+            onPanResponderTerminate: resetDrag,
+        })
+    ).current;
 
     return (
         <View style={styles.board}>
-
             {Array.from({ length: 8 }, (_, r) =>
                 Array.from({ length: 8 }, (_, c) => {
-
-                    const sourceRow = rotate
-                        ? 7 - r
-                        : r;
-
-                    const sourceCol = rotate
-                        ? 7 - c
-                        : c;
+                    const sourceRow = rotate ? 7 - r : r;
+                    const sourceCol = rotate ? 7 - c : c;
 
                     const piece = board[sourceRow][sourceCol];
+                    const square = files[sourceCol] + ranks[sourceRow];
 
-                    const square =
-                        files[sourceCol] + ranks[sourceRow];
-
-                    const isDark =
-                        (r + c) % 2 === 1;
-
-                    const isSelected =
-                        selectedSquare === square;
-
-                    const isLegal =
-                        legalSquares.includes(square);
+                    const isDark = (r + c) % 2 === 1;
+                    const isSelected = selectedSquare === square;
+                    const isLegal = legalSquares.includes(square);
 
                     const pieceKey = piece
-                        ? (
-                            piece.color +
-                            piece.type.toUpperCase()
-                        ) as keyof typeof piecesImages
+                        ? ((piece.color + piece.type.toUpperCase()) as PieceKey)
                         : null;
 
+                    // Figur, die gerade gezogen wird, am Ursprung ausblenden
+                    const hidden = drag?.from === square;
+
                     return (
-                        <Pressable
+                        <View
                             key={square}
-                            onPress={() => onSquarePress(square)}
                             style={[
                                 styles.square,
                                 {
-                                    backgroundColor: isDark
-                                        ? "#334155"
-                                        : "#e5e7eb",
+                                    backgroundColor: isDark ? "#3B82C4" : "#EAF4FC",
                                 },
-                                isSelected
-                                    ? styles.selected
-                                    : null,
+                                isSelected ? styles.selected : null,
                             ]}
                         >
-
                             {/* Rang */}
                             {c === 0 && (
                                 <Text
                                     style={[
                                         styles.coord,
-                                        isDark
-                                            ? styles.coordDark
-                                            : styles.coordLight,
-                                        {
-                                            left: 2,
-                                            top: 2,
-                                        },
+                                        isDark ? styles.coordDark : styles.coordLight,
+                                        { left: 2, top: 2 },
                                     ]}
                                 >
                                     {ranks[sourceRow]}
@@ -206,13 +225,8 @@ export default function PuzzleBoard({
                                 <Text
                                     style={[
                                         styles.coord,
-                                        isDark
-                                            ? styles.coordDark
-                                            : styles.coordLight,
-                                        {
-                                            right: 2,
-                                            bottom: 2,
-                                        },
+                                        isDark ? styles.coordDark : styles.coordLight,
+                                        { right: 2, bottom: 2 },
                                     ]}
                                 >
                                     {files[sourceCol]}
@@ -220,57 +234,77 @@ export default function PuzzleBoard({
                             )}
 
                             {/* Figur */}
-                            {piece && pieceKey && (
+                            {piece && pieceKey && !hidden && (
                                 <Image
                                     source={piecesImages[pieceKey]}
                                     style={[
                                         styles.piece,
-                                        {
-                                            transform: [
-                                                {
-                                                    scale: getPieceScale(
-                                                        pieceKey
-                                                    ),
-                                                },
-                                                {
-                                                    translateY:
-                                                        getPieceTranslateY(
-                                                            pieceKey
-                                                        ),
-                                                },
-                                            ],
-                                        },
+                                        { transform: pieceTransform(pieceKey) },
                                     ]}
                                 />
                             )}
 
                             {/* Legal Move Punkt */}
-                            {isLegal && (
-                                <View style={styles.dot} />
-                            )}
-
-                        </Pressable>
+                            {isLegal && <View style={styles.dot} />}
+                        </View>
                     );
                 })
             )}
 
+            {/* Unsichtbare Touch-Schicht über dem ganzen Brett */}
+            <View
+                style={StyleSheet.absoluteFill}
+                {...panResponder.panHandlers}
+            />
+
+            {/* Figur, die am Finger klebt (etwas über dem Finger, damit man sie sieht) */}
+            {drag && (
+                <Animated.View
+                    pointerEvents="none"
+                    style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        width: SQUARE_SIZE,
+                        height: SQUARE_SIZE,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transform: [
+                            { translateX: Animated.subtract(dragPos.x, SQUARE_SIZE / 2) },
+                            {
+                                translateY: Animated.subtract(
+                                    dragPos.y,
+                                    SQUARE_SIZE / 2 + SQUARE_SIZE * 0.5
+                                ),
+                            },
+                        ],
+                    }}
+                >
+                    <Image
+                        source={piecesImages[drag.pieceKey]}
+                        style={[
+                            styles.piece,
+                            { transform: pieceTransform(drag.pieceKey) },
+                        ]}
+                    />
+                </Animated.View>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-
     board: {
         alignSelf: "center",
-        width: 336,
-        height: 336,
+        width: BOARD_SIZE,
+        height: BOARD_SIZE,
         flexDirection: "row",
         flexWrap: "wrap",
     },
 
     square: {
-        width: 42,
-        height: 42,
+        width: SQUARE_SIZE,
+        height: SQUARE_SIZE,
         justifyContent: "center",
         alignItems: "center",
     },
@@ -281,8 +315,8 @@ const styles = StyleSheet.create({
     },
 
     piece: {
-        width: 36,
-        height: 36,
+        width: PIECE_SIZE,
+        height: PIECE_SIZE,
         resizeMode: "contain",
     },
 
@@ -307,5 +341,4 @@ const styles = StyleSheet.create({
     coordLight: {
         color: "#334155",
     },
-
 });
