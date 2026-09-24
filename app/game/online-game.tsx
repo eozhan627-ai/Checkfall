@@ -165,6 +165,30 @@ export default function GameScreen() {
     const scrollRef = useRef<ScrollView>(null);
     const chatScrollRef = useRef<ScrollView>(null);
 
+    // =============================
+    // PREMOVE (State + Refs)
+    // =============================
+    // Refs, weil die Socket-Handler nur einmal registriert werden und sonst
+    // veraltete Werte (myColor, roomId, checkGameState) sehen würden.
+    const [premove, setPremove] = useState<{ from: string; to: string } | null>(null);
+    const premoveRef = useRef<{ from: string; to: string } | null>(null);
+    const gameRef = useRef(game);
+    const roomIdRef = useRef(roomId);
+    const checkGameStateRef = useRef<(g: Chess) => void>(() => { });
+
+    gameRef.current = game;
+    roomIdRef.current = roomId;
+
+    const handlePremove = (from: string, to: string) => {
+        premoveRef.current = { from, to };
+        setPremove({ from, to });
+    };
+
+    const clearPremove = () => {
+        premoveRef.current = null;
+        setPremove(null);
+    };
+
     // The server is authoritative. This ref stores the last exact server clock.
     // The UI interpolates locally between server packets for a smooth timer.
     const clockSync = useRef({
@@ -307,6 +331,7 @@ export default function GameScreen() {
         if (!myColor) return;
 
         eloProcessed.current = true;
+        clearPremove(); // NEU: Premove bei Partieende verwerfen
         setGameEnded(true);
 
         try {
@@ -342,6 +367,72 @@ export default function GameScreen() {
         if (g.isStalemate() || g.isDraw()) {
             finishOnlineGame("draw", "draw", g.pgn());
         }
+    };
+
+    checkGameStateRef.current = checkGameState;
+
+    // =============================
+    // PREMOVE (Ausführung)
+    // =============================
+
+    // Eigene Uhr sofort anhalten, die des Gegners starten
+    // (der Server schickt gleich danach die exakten Zeiten und korrigiert).
+    const switchClockLocally = () => {
+        const s = clockSync.current;
+        const elapsed = Math.max(0, Date.now() - s.receivedAt);
+        const next: "w" | "b" = s.activeColor === "w" ? "b" : "w";
+
+        clockSync.current = {
+            whiteTime:
+                s.activeColor === "w"
+                    ? Math.max(0, s.whiteTime - elapsed)
+                    : s.whiteTime,
+            blackTime:
+                s.activeColor === "b"
+                    ? Math.max(0, s.blackTime - elapsed)
+                    : s.blackTime,
+            activeColor: next,
+            receivedAt: Date.now(),
+        };
+
+        setActiveColor(next);
+    };
+
+    const playPremove = (base: Chess) => {
+        const pm = premoveRef.current;
+        if (!pm) return;
+
+        clearPremove();
+        if (eloProcessed.current) return;
+
+        const next = cloneWithHistory(base);
+        let move: any = null;
+
+        try {
+            // Umwandlung: automatisch Dame
+            move = next.move({ from: pm.from, to: pm.to, promotion: "q" });
+        } catch {
+            move = null;
+        }
+
+        if (!move) return; // nicht mehr legal -> verworfen
+
+        gameRef.current = next;
+        setGame(next);
+        setMoveHistory((h) => [...h, move.san]);
+        setLastMove({ from: move.from, to: move.to });
+        switchClockLocally();
+
+        socket?.emit("player_move", {
+            roomId: roomIdRef.current,
+            move: {
+                from: move.from,
+                to: move.to,
+                promotion: move.promotion,
+            },
+        });
+
+        checkGameStateRef.current(next);
     };
 
     // =============================
@@ -488,6 +579,9 @@ export default function GameScreen() {
             const nextGame = new Chess(
                 data.fen || "startpos"
             );
+
+            gameRef.current = nextGame; // NEU
+            clearPremove(); // NEU
 
             setGame(nextGame);
             setMoveHistory([]);
@@ -649,36 +743,47 @@ export default function GameScreen() {
 
             if (!from || !to) return;
 
-            setGame((prev) => {
-                const newGame = cloneWithHistory(prev); // GEÄNDERT (vorher: new Chess(prev.fen()))
-                const result = newGame.move({ from, to, promotion });
+            // GEÄNDERT: Stellung synchron über gameRef berechnen (statt setGame-Updater),
+            // damit der Premove sofort mit der neuen Stellung gespielt werden kann.
+            const newGame = cloneWithHistory(gameRef.current);
+            let result: any = null;
 
-
-                if (!result) {
-                    console.log(
-                        "IGNORED INVALID MOVE:",
-                        {
-                            from,
-                            to,
-                            promotion,
-                        }
-                    );
-
-                    return prev;
-                }
-
-                setMoveHistory((history) => [
-                    ...history,
-                    result.san,
-                ]);
-
-                setLastMove({
-                    from: result.from,
-                    to: result.to,
+            try {
+                result = newGame.move({
+                    from,
+                    to,
+                    promotion: promotion ?? undefined,
                 });
+            } catch {
+                result = null;
+            }
 
-                return newGame;
+            if (!result) {
+                console.log(
+                    "IGNORED INVALID MOVE:",
+                    {
+                        from,
+                        to,
+                        promotion,
+                    }
+                );
+
+                return;
+            }
+
+            gameRef.current = newGame;
+            setGame(newGame);
+            setMoveHistory((history) => [
+                ...history,
+                result.san,
+            ]);
+            setLastMove({
+                from: result.from,
+                to: result.to,
             });
+
+            // NEU: Premove sofort abfeuern
+            playPremove(newGame);
         };
 
         socket.on(
@@ -1982,6 +2087,16 @@ export default function GameScreen() {
                                     myColor
                                 }
                                 mode="online"
+                                canPremove={
+                                    !!myColor &&
+                                    !gameEnded &&
+                                    !endState &&
+                                    !showPromotion &&
+                                    game.turn() !== myColor
+                                }
+                                premove={premove}
+                                onPremove={handlePremove}
+                                onClearPremove={clearPremove}
                             />
 
                             {/* BOTTOM BAR */}

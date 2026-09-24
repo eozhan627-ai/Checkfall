@@ -18,10 +18,10 @@ import {
 } from "react-native";
 import { io, Socket } from "socket.io-client";
 import { getCurrentAccount } from "../../lib/account";
+import { cloneWithHistory } from "../../lib/chessUtils";
 import { saveGameRecord } from "../../lib/games";
-import { cloneWithHistory } from "../../lib/chessUtils"; // GEÄNDERT: statt lokaler Kopie
-import Board from "./components/Board"; // NEU: geteilte Board-Komponente
-import { useChessInput } from "./hooks/useChessInput"; // NEU: geteilter Input-Hook
+import Board from "./components/Board";
+import { useChessInput } from "./hooks/useChessInput";
 
 const BOARD_SIZE = Dimensions.get("window").width - 32; // nur noch für Popup-Positionierung gebraucht
 
@@ -154,6 +154,8 @@ type EndState = {
     reason: "checkmate" | "stalemate" | "draw";
 };
 
+type Premove = { from: string; to: string } | null;
+
 export default function Playbot() {
     const socket = useRef<Socket | null>(null);
     const [game, setGame] = useState(new Chess());
@@ -194,7 +196,30 @@ export default function Playbot() {
     const endPopupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // =============================
-    // GEÄNDERT: Board-Interaktion läuft jetzt über den geteilten Hook,
+    // PREMOVE
+    // State (fürs Highlighting im Board) + Ref (für den Socket-Handler, der
+    // nur einmal registriert wird und sonst veraltete Werte sehen würde).
+    // =============================
+    const [premove, setPremoveState] = useState<Premove>(null);
+    const premoveRef = useRef<Premove>(null);
+    const setPremove = (v: Premove) => {
+        premoveRef.current = v;
+        setPremoveState(v);
+    };
+
+    // Immer der aktuelle Spielstand für den Socket-Handler
+    const gameRef = useRef(game);
+    gameRef.current = game;
+
+    // Der Socket-Handler wird nur einmal registriert -> aktuelle Werte/Funktionen über ein Ref lesen
+    const live = useRef<any>({});
+
+    // Premove ist erlaubt, solange das Spiel läuft und der Bot am Zug ist
+    const canPremove =
+        gameStarted && !gameOver && !endState && game.turn() !== humanColor;
+
+    // =============================
+    // Board-Interaktion läuft über den geteilten Hook,
     // genau wie in online-game.tsx, statt über einen eigenen onPressSquare.
     // setShowPromotion ist hier ein No-Op, weil die Promotion-Leiste in
     // diesem Screen schon allein an promotionMove hängt (siehe JSX unten).
@@ -206,7 +231,7 @@ export default function Playbot() {
         roomId,
         myColor: humanColor,
         setPromotionMove,
-        setShowPromotion: () => {},
+        setShowPromotion: () => { },
         setMoveHistory: (updater: any) =>
             setMoveHistory((prev) =>
                 typeof updater === "function" ? updater(prev) : updater
@@ -298,6 +323,13 @@ export default function Playbot() {
         };
     }, []);
 
+    // Spiel vorbei oder zurück im Setup -> Premove verwerfen
+    useEffect(() => {
+        if (gameOver || !gameStarted) {
+            setPremove(null);
+        }
+    }, [gameOver, gameStarted]);
+
     useEffect(() => {
         const onBackPress = () => {
             if (showLeaveModal) {
@@ -333,24 +365,73 @@ export default function Playbot() {
             const moveObj = {
                 from: data.from,
                 to: data.to,
-                promotion: data.promotion
+                promotion: data.promotion,
             };
 
-            setGame(prev => {
-                const newGame = cloneWithHistory(prev);
-                const move = newGame.move(moveObj);
+            // Außerhalb von setGame arbeiten (keine Side-Effects im Updater)
+            const newGame = cloneWithHistory(gameRef.current);
+            let move: any = null;
+            try {
+                move = newGame.move(moveObj);
+            } catch {
+                move = null;
+            }
 
-                if (!move) {
-                    console.log("❌ INVALID BOT MOVE:", moveObj);
-                    return prev;
+            if (!move) {
+                console.log("❌ INVALID BOT MOVE:", moveObj);
+                return;
+            }
+
+            setMoveHistory((h) => [...h, move.san]);
+            setLastMove({ from: move.from, to: move.to });
+
+            // live.current.checkGameEnd ist immer die Version des letzten Renders
+            // (mit aktuellem humanColor/botColor)
+            const ended = live.current.checkGameEnd(newGame);
+
+            let finalGame = newGame;
+
+            // ---------- PREMOVE AUSFÜHREN ----------
+            const pm = premoveRef.current;
+            if (pm) {
+                // Premove ist in jedem Fall "verbraucht" (ausgeführt oder ungültig)
+                setPremove(null);
+
+                if (!ended) {
+                    const pmGame = cloneWithHistory(newGame);
+                    let pmMove: any = null;
+                    try {
+                        // promotion: "q" wird von chess.js bei Nicht-Umwandlungszügen ignoriert,
+                        // Bauern-Premoves auf die letzte Reihe werden so automatisch zur Dame
+                        pmMove = pmGame.move({ from: pm.from, to: pm.to, promotion: "q" });
+                    } catch {
+                        pmMove = null;
+                    }
+
+                    if (pmMove) {
+                        finalGame = pmGame;
+                        setMoveHistory((h) => [...h, pmMove.san]);
+                        setLastMove({ from: pmMove.from, to: pmMove.to });
+
+                        s.emit("player_move", {
+                            roomId: live.current.roomId,
+                            move: {
+                                from: pmMove.from,
+                                to: pmMove.to,
+                                promotion: pmMove.promotion,
+                            },
+                            fen: pmGame.fen(),
+                        });
+
+                        live.current.checkGameEnd(pmGame);
+                    } else {
+                        console.log("⚠️ PREMOVE INVALID, verworfen:", pm);
+                    }
                 }
+            }
 
-                setMoveHistory(h => [...h, move.san]);
-                setLastMove({ from: move.from, to: move.to });
-
-                checkGameEnd(newGame);
-                return newGame;
-            });
+            gameRef.current = finalGame;
+            setGame(finalGame);
         };
 
         s.on("connect", async () => {
@@ -384,6 +465,7 @@ export default function Playbot() {
             console.log("🎮 GAME START:", data);
 
             setRoomId(data.roomId);
+            setPremove(null);
 
             const playerIsWhite = data.white !== "bot";
             const actualHumanColor: "w" | "b" = playerIsWhite ? "w" : "b";
@@ -471,6 +553,7 @@ export default function Playbot() {
         setGameOver(false);
         setEndState(null);
         setRoomId(null);
+        setPremove(null);
         setGameStarted(false);
     };
 
@@ -545,6 +628,11 @@ export default function Playbot() {
 
         return false;
     };
+
+    // Jeden Render die aktuellsten Werte/Funktionen für den Socket-Handler ablegen.
+    // (Behebt nebenbei, dass checkGameEnd im Handler sonst mit dem veralteten
+    // humanColor/botColor vom ersten Render gerechnet hätte.)
+    live.current = { checkGameEnd, roomId };
 
     async function saveGameToHistory(
         mode: "bot",
@@ -751,7 +839,7 @@ export default function Playbot() {
                                 ))}
                         </ScrollView>
 
-                        {/* GEÄNDERT: geteilte Board-Komponente statt eigenem Rendering */}
+                        {/* Geteilte Board-Komponente, jetzt mit Premove wie im Online-Spiel */}
                         <Board
                             board={displayBoard}
                             selectedSquare={selectedSquare}
@@ -763,6 +851,10 @@ export default function Playbot() {
                             pieceToKey={pieceToKey}
                             myColor={bottomColor}
                             mode="bot"
+                            canPremove={canPremove}
+                            premove={premove}
+                            onPremove={(from: string, to: string) => setPremove({ from, to })}
+                            onClearPremove={() => setPremove(null)}
                         />
 
                         <View style={styles.bottomBar}>
@@ -916,6 +1008,7 @@ export default function Playbot() {
                                                 setKingInCheck(null);
                                                 setGameOver(false);
                                                 setRoomId(null);
+                                                setPremove(null);
 
                                                 setHumanColor(color);
                                                 setBottomColor(color);

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Animated,
     Image,
@@ -28,6 +28,69 @@ const pieceTransform = (key: string) => [
     { translateY: PIECE_OFFSET_Y[key] ?? 0 },
 ];
 
+// =========================================================
+// PREMOVE: Felder, die eine Figur "geometrisch" erreichen könnte
+// (ohne Blocker und ohne Schach zu prüfen – die echte Legalitätsprüfung
+// passiert erst, wenn du wirklich am Zug bist)
+// =========================================================
+const premoveTargets = (from: string, pieceKey: string): string[] => {
+    const color = pieceKey[0];
+    const type = pieceKey[1];
+    const f = FILES.indexOf(from[0]);
+    const r = parseInt(from[1], 10);
+    const out: string[] = [];
+
+    const add = (df: number, dr: number) => {
+        const nf = f + df;
+        const nr = r + dr;
+        if (nf >= 0 && nf < 8 && nr >= 1 && nr <= 8) out.push(`${FILES[nf]}${nr}`);
+    };
+    const slide = (dirs: number[][]) =>
+        dirs.forEach(([df, dr]) => {
+            for (let i = 1; i < 8; i++) add(df * i, dr * i);
+        });
+
+    const DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+    const STRAIGHT = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+    switch (type) {
+        case "p": {
+            const dir = color === "w" ? 1 : -1;
+            add(0, dir);
+            if ((color === "w" && r === 2) || (color === "b" && r === 7)) add(0, 2 * dir);
+            add(-1, dir); // Schlagfelder (dürfen auch leer sein, Gegner kann noch ziehen)
+            add(1, dir);
+            break;
+        }
+        case "n":
+            [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]].forEach(
+                ([df, dr]) => add(df, dr)
+            );
+            break;
+        case "b":
+            slide(DIAG);
+            break;
+        case "r":
+            slide(STRAIGHT);
+            break;
+        case "q":
+            slide(DIAG);
+            slide(STRAIGHT);
+            break;
+        case "k":
+            [...DIAG, ...STRAIGHT].forEach(([df, dr]) => add(df, dr));
+            // Rochade
+            if ((color === "w" && from === "e1") || (color === "b" && from === "e8")) {
+                add(2, 0);
+                add(-2, 0);
+            }
+            break;
+    }
+    return out;
+};
+
+type PreSel = { square: string; key: string } | null;
+
 export default function Board({
     board,
     selectedSquare,
@@ -47,6 +110,11 @@ export default function Board({
     onRedo,
     onSave,
     onRestart,
+    // --- NEU für Premove ---
+    canPremove = false, // true, wenn Online-Spiel läuft und der GEGNER am Zug ist
+    premove = null, // { from: string; to: string } | null (State liegt im Parent)
+    onPremove, // (from, to) => void
+    onClearPremove, // () => void
 }: any) {
     // =========================================================
     // DRAG & DROP
@@ -56,9 +124,31 @@ export default function Board({
     const [drag, setDrag] = useState<{ from: string; pieceKey: string } | null>(null);
     const dragPos = useRef(new Animated.ValueXY()).current;
 
+    // Premove-Auswahl (nur lokal im Board, solange der Gegner am Zug ist)
+    const [preSel, setPreSelState] = useState<PreSel>(null);
+    const preSelRef = useRef<PreSel>(null);
+    const setPreSel = (v: PreSel) => {
+        preSelRef.current = v;
+        setPreSelState(v);
+    };
+
+    // Sobald ich wieder am Zug bin (oder das Spiel endet), Auswahl verwerfen
+    useEffect(() => {
+        if (!canPremove) setPreSel(null);
+    }, [canPremove]);
+
     // Der PanResponder wird nur einmal erstellt -> immer die aktuellen Props über ein Ref lesen
     const latest = useRef<any>({});
-    latest.current = { board, myColor, onPressSquare, pieceToKey, boardSize };
+    latest.current = {
+        board,
+        myColor,
+        onPressSquare,
+        pieceToKey,
+        boardSize,
+        canPremove,
+        onPremove,
+        onClearPremove,
+    };
 
     const gesture = useRef({
         startX: 0,
@@ -97,7 +187,7 @@ export default function Board({
             onPanResponderGrant: (e) => {
                 const { locationX: x, locationY: y } = e.nativeEvent;
                 const g = gesture.current;
-                const { myColor, pieceToKey, onPressSquare } = latest.current;
+                const { myColor, pieceToKey, onPressSquare, canPremove } = latest.current;
 
                 g.startX = x;
                 g.startY = y;
@@ -106,8 +196,22 @@ export default function Board({
                 const cell = cellAt(x, y);
                 g.startSquare = cell?.square ?? null;
 
+                const ownPiece = !!(cell?.piece && cell.piece.color === myColor);
+
+                if (canPremove) {
+                    // PREMOVE-MODUS: eigene Figur auswählen + Drag starten, aber KEIN onPressSquare
+                    if (ownPiece && cell) {
+                        const key = pieceToKey(cell.piece);
+                        g.dragging = true;
+                        setPreSel({ square: cell.square, key });
+                        dragPos.setValue({ x, y });
+                        setDrag({ from: cell.square, pieceKey: key });
+                    }
+                    return;
+                }
+
                 // Eigene Figur: auswählen + Drag starten
-                if (cell?.piece && cell.piece.color === myColor) {
+                if (ownPiece && cell) {
                     g.dragging = true;
                     onPressSquare(cell.square);
                     dragPos.setValue({ x, y });
@@ -126,8 +230,46 @@ export default function Board({
 
             onPanResponderRelease: (_e, gs) => {
                 const g = gesture.current;
-                const { onPressSquare, myColor } = latest.current;
+                const { onPressSquare, myColor, canPremove, onPremove, onClearPremove } =
+                    latest.current;
 
+                // ---------- PREMOVE-MODUS ----------
+                if (canPremove) {
+                    const sel = preSelRef.current;
+
+                    if (g.dragging) {
+                        // Drag: auf ein anderes Feld losgelassen?
+                        const target = cellAt(g.startX + gs.dx, g.startY + gs.dy);
+                        if (
+                            sel &&
+                            target &&
+                            target.square !== g.startSquare &&
+                            premoveTargets(sel.square, sel.key).includes(target.square)
+                        ) {
+                            onPremove?.(sel.square, target.square);
+                            setPreSel(null);
+                        }
+                        // sonst: Auswahl bleibt bestehen (wie beim normalen Antippen)
+                    } else if (g.startSquare) {
+                        // Tippen auf ein Feld ohne eigene Figur
+                        if (
+                            sel &&
+                            premoveTargets(sel.square, sel.key).includes(g.startSquare)
+                        ) {
+                            onPremove?.(sel.square, g.startSquare);
+                            setPreSel(null);
+                        } else {
+                            // ins Leere getippt -> Auswahl UND vorhandenen Premove löschen
+                            setPreSel(null);
+                            onClearPremove?.();
+                        }
+                    }
+
+                    resetDrag();
+                    return;
+                }
+
+                // ---------- NORMALER MODUS (unverändert) ----------
                 if (g.dragging) {
                     const target = cellAt(g.startX + gs.dx, g.startY + gs.dy);
 
@@ -152,6 +294,7 @@ export default function Board({
     ).current;
 
     const squareSize = boardSize / 8;
+    const preTargets = preSel ? premoveTargets(preSel.square, preSel.key) : [];
 
     return (
         <View style={styles.container}>
@@ -188,8 +331,12 @@ export default function Board({
                                 ? toSquare(r, c)
                                 : toSquare(7 - r, 7 - c);
 
-                        const isSelected = selectedSquare === square;
+                        const isSelected =
+                            selectedSquare === square || preSel?.square === square;
                         const isLegal = legalMoves?.some((m: any) => m.to === square);
+                        const isPreTarget = preTargets.includes(square);
+                        const isPremoveSq =
+                            !!premove && (premove.from === square || premove.to === square);
                         const isLastFrom = lastMove?.from === square;
                         const isLastTo = lastMove?.to === square;
                         const isCheckSq = checkSquare === square;
@@ -207,6 +354,7 @@ export default function Board({
                                     {
                                         backgroundColor: (() => {
                                             if (isCheckSq) return "#ff4d4d";
+                                            if (isPremoveSq) return "#e0735c";
                                             if (isLastTo) return "#6bb6ff";
                                             if (isLastFrom) return "#4da3ff";
                                             if (isSelected) return "#4da3ff";
@@ -224,7 +372,7 @@ export default function Board({
                                         ]}
                                     />
                                 )}
-                                {isLegal && <View style={styles.dot} />}
+                                {(isLegal || isPreTarget) && <View style={styles.dot} />}
 
                                 {c === 0 && (
                                     <Text
