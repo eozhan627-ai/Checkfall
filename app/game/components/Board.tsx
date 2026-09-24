@@ -14,6 +14,15 @@ const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"];
 
 const toSquare = (r: number, c: number) => `${FILES[c]}${8 - r}`;
 
+// Feld ("e4") -> Zeile/Spalte im angezeigten Brett (abhängig von der Brett-Orientierung)
+const squareToRC = (square: string, myColor: string) => {
+    const f = FILES.indexOf(square[0]);
+    const rank = parseInt(square[1], 10);
+    return myColor === "w"
+        ? { r: 8 - rank, c: f }
+        : { r: rank - 1, c: 7 - f };
+};
+
 // Deine Scale/Offset-Werte, nur ausgelagert, damit Brett und Drag-Figur gleich aussehen
 const PIECE_SCALE: Record<string, number> = {
     wp: 1.35, wn: 1.55, wb: 1.7, wr: 1.65, wq: 1.55, wk: 1.3,
@@ -32,6 +41,8 @@ const pieceTransform = (key: string) => [
 // PREMOVE: Felder, die eine Figur "geometrisch" erreichen könnte
 // (ohne Blocker und ohne Schach zu prüfen – die echte Legalitätsprüfung
 // passiert erst, wenn du wirklich am Zug bist)
+// Eigene Figuren auf dem Zielfeld sind absichtlich erlaubt: Der Gegner kann
+// dort schlagen, und du willst danach zurückschlagen.
 // =========================================================
 const premoveTargets = (from: string, pieceKey: string): string[] => {
     const color = pieceKey[0];
@@ -89,6 +100,63 @@ const premoveTargets = (from: string, pieceKey: string): string[] => {
     return out;
 };
 
+// =========================================================
+// VIRTUELLES BRETT: das echte Brett + alle vorgemerkten Züge angewandt.
+// So kannst du eine Figur, die du schon vorgezogen hast, gleich nochmal
+// vorziehen (Premove-Kette). Nur Darstellung - gespielt wird erst, wenn du dran bist.
+// =========================================================
+const buildVirtualBoard = (
+    board: any[][],
+    premoves: { from: string; to: string }[],
+    myColor: string
+) => {
+    const vb = board.map((row) => [...row]);
+
+    for (const pm of premoves) {
+        const a = squareToRC(pm.from, myColor);
+        const b = squareToRC(pm.to, myColor);
+        const p = vb[a.r]?.[a.c];
+        if (!p) continue;
+
+        vb[a.r][a.c] = null;
+        let placed = p;
+
+        if (p.type === "p") {
+            const lastRank = p.color === "w" ? "8" : "1";
+            if (pm.to[1] === lastRank) {
+                // Umwandlung -> Dame (wird beim echten Zug auch so gespielt)
+                placed = { type: "q", color: p.color };
+            } else if (pm.from[0] !== pm.to[0] && !vb[b.r][b.c]) {
+                // möglicher en passant: nur wenn dahinter wirklich ein gegnerischer Bauer steht
+                const cap = squareToRC(pm.to[0] + pm.from[1], myColor);
+                const capPiece = vb[cap.r][cap.c];
+                if (capPiece && capPiece.type === "p" && capPiece.color !== p.color) {
+                    vb[cap.r][cap.c] = null;
+                }
+            }
+        }
+
+        if (
+            p.type === "k" &&
+            Math.abs(FILES.indexOf(pm.to[0]) - FILES.indexOf(pm.from[0])) === 2
+        ) {
+            const rank = pm.from[1];
+            const short = pm.to[0] === "g";
+            const ra = squareToRC((short ? "h" : "a") + rank, myColor);
+            const rb = squareToRC((short ? "f" : "d") + rank, myColor);
+            const rook = vb[ra.r][ra.c];
+            if (rook && rook.type === "r") {
+                vb[ra.r][ra.c] = null;
+                vb[rb.r][rb.c] = rook;
+            }
+        }
+
+        vb[b.r][b.c] = placed;
+    }
+
+    return vb;
+};
+
 type PreSel = { square: string; key: string } | null;
 
 export default function Board({
@@ -110,9 +178,11 @@ export default function Board({
     onRedo,
     onSave,
     onRestart,
-    // --- NEU für Premove ---
-    canPremove = false, // true, wenn Online-Spiel läuft und der GEGNER am Zug ist
-    premove = null, // { from: string; to: string } | null (State liegt im Parent)
+    // --- Premove ---
+    canPremove = false, // true, wenn das Spiel läuft und der GEGNER am Zug ist
+    premove = null, // Einzel-Premove { from, to } | null (alter Weg, z.B. Online-Spiel)
+    premoves, // NEU: Liste { from, to }[] für mehrere Premoves hintereinander
+    multiPremove = false, // NEU: true -> Premove-Kette mit virtuellem Brett
     onPremove, // (from, to) => void
     onClearPremove, // () => void
 }: any) {
@@ -137,10 +207,21 @@ export default function Board({
         if (!canPremove) setPreSel(null);
     }, [canPremove]);
 
+    // Liste der vorgemerkten Züge (Rückwärtskompatibel mit dem alten Einzel-Premove)
+    const pmList: { from: string; to: string }[] =
+        premoves ?? (premove ? [premove] : []);
+
+    // Brett, das angezeigt wird und auf dem geklickt wird:
+    // im Ketten-Modus mit den vorgemerkten Zügen bereits angewandt
+    const vboard =
+        multiPremove && canPremove && pmList.length > 0
+            ? buildVirtualBoard(board, pmList, myColor)
+            : board;
+
     // Der PanResponder wird nur einmal erstellt -> immer die aktuellen Props über ein Ref lesen
     const latest = useRef<any>({});
     latest.current = {
-        board,
+        board: vboard,
         myColor,
         onPressSquare,
         pieceToKey,
@@ -173,6 +254,14 @@ export default function Board({
         return { square, piece: board[r][c] };
     };
 
+    // Steht die ausgewählte Figur (auf dem aktuell angezeigten Brett) noch dort?
+    const selStillValid = (sel: NonNullable<PreSel>) => {
+        const { board, myColor, pieceToKey } = latest.current;
+        const { r, c } = squareToRC(sel.square, myColor);
+        const p = board[r]?.[c];
+        return !!p && pieceToKey(p) === sel.key;
+    };
+
     const resetDrag = () => {
         gesture.current.dragging = false;
         setDrag(null);
@@ -199,8 +288,25 @@ export default function Board({
                 const ownPiece = !!(cell?.piece && cell.piece.color === myColor);
 
                 if (canPremove) {
+                    // Veraltete Auswahl (Figur wurde geschlagen / steht woanders) verwerfen
+                    let sel = preSelRef.current;
+                    if (sel && !selStillValid(sel)) {
+                        setPreSel(null);
+                        sel = null;
+                    }
+
+                    // Tippt man auf ein gültiges Ziel der ausgewählten Figur, das von einer
+                    // EIGENEN Figur besetzt ist (Wiederschlagen nach Abtausch), dann ist das
+                    // ein Ziel und keine neue Auswahl. Das Setzen passiert beim Loslassen.
+                    const onTarget = !!(
+                        sel &&
+                        cell &&
+                        cell.square !== sel.square &&
+                        premoveTargets(sel.square, sel.key).includes(cell.square)
+                    );
+
                     // PREMOVE-MODUS: eigene Figur auswählen + Drag starten, aber KEIN onPressSquare
-                    if (ownPiece && cell) {
+                    if (ownPiece && cell && !onTarget) {
                         const key = pieceToKey(cell.piece);
                         g.dragging = true;
                         setPreSel({ square: cell.square, key });
@@ -251,7 +357,7 @@ export default function Board({
                         }
                         // sonst: Auswahl bleibt bestehen (wie beim normalen Antippen)
                     } else if (g.startSquare) {
-                        // Tippen auf ein Feld ohne eigene Figur
+                        // Tippen auf ein Zielfeld (leer, Gegnerfigur oder eigene Figur)
                         if (
                             sel &&
                             premoveTargets(sel.square, sel.key).includes(g.startSquare)
@@ -259,7 +365,7 @@ export default function Board({
                             onPremove?.(sel.square, g.startSquare);
                             setPreSel(null);
                         } else {
-                            // ins Leere getippt -> Auswahl UND vorhandenen Premove löschen
+                            // ins Leere getippt -> Auswahl UND alle vorhandenen Premoves löschen
                             setPreSel(null);
                             onClearPremove?.();
                         }
@@ -324,7 +430,7 @@ export default function Board({
                 // -2 wegen borderWidth: 1 (links + rechts)
                 onLayout={(e) => setBoardSize(e.nativeEvent.layout.width - 2)}
             >
-                {board.map((row: any[], r: number) =>
+                {vboard.map((row: any[], r: number) =>
                     row.map((piece, c) => {
                         const square =
                             myColor === "w"
@@ -335,8 +441,9 @@ export default function Board({
                             selectedSquare === square || preSel?.square === square;
                         const isLegal = legalMoves?.some((m: any) => m.to === square);
                         const isPreTarget = preTargets.includes(square);
-                        const isPremoveSq =
-                            !!premove && (premove.from === square || premove.to === square);
+                        const isPremoveSq = pmList.some(
+                            (m) => m.from === square || m.to === square
+                        );
                         const isLastFrom = lastMove?.from === square;
                         const isLastTo = lastMove?.to === square;
                         const isCheckSq = checkSquare === square;

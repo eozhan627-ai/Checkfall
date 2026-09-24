@@ -52,6 +52,7 @@ const BOT_ELO_MIN = 100;
 const BOT_ELO_MAX = 3200;
 const BOT_ELO_STEP = 50;
 const BOT_ELO_DEFAULT = 300;
+const MAX_PREMOVES = 8; // so viele Züge kann man maximal hintereinander vormerken
 
 function getEloLabel(elo: number) {
     if (elo < 250) return "Beginner";
@@ -154,7 +155,7 @@ type EndState = {
     reason: "checkmate" | "stalemate" | "draw";
 };
 
-type Premove = { from: string; to: string } | null;
+type Premove = { from: string; to: string };
 
 export default function Playbot() {
     const socket = useRef<Socket | null>(null);
@@ -200,12 +201,13 @@ export default function Playbot() {
     // State (fürs Highlighting im Board) + Ref (für den Socket-Handler, der
     // nur einmal registriert wird und sonst veraltete Werte sehen würde).
     // =============================
-    const [premove, setPremoveState] = useState<Premove>(null);
-    const premoveRef = useRef<Premove>(null);
-    const setPremove = (v: Premove) => {
-        premoveRef.current = v;
-        setPremoveState(v);
+    const [premoves, setPremovesState] = useState<Premove[]>([]);
+    const premovesRef = useRef<Premove[]>([]);
+    const setPremoves = (v: Premove[]) => {
+        premovesRef.current = v;
+        setPremovesState(v);
     };
+    const clearPremoves = () => setPremoves([]);
 
     // Immer der aktuelle Spielstand für den Socket-Handler
     const gameRef = useRef(game);
@@ -326,7 +328,7 @@ export default function Playbot() {
     // Spiel vorbei oder zurück im Setup -> Premove verwerfen
     useEffect(() => {
         if (gameOver || !gameStarted) {
-            setPremove(null);
+            clearPremoves();
         }
     }, [gameOver, gameStarted]);
 
@@ -391,13 +393,13 @@ export default function Playbot() {
 
             let finalGame = newGame;
 
-            // ---------- PREMOVE AUSFÜHREN ----------
-            const pm = premoveRef.current;
-            if (pm) {
-                // Premove ist in jedem Fall "verbraucht" (ausgeführt oder ungültig)
-                setPremove(null);
-
-                if (!ended) {
+            // ---------- PREMOVE AUSFÜHREN (immer der erste der Kette) ----------
+            const queue = premovesRef.current;
+            if (queue.length > 0) {
+                if (ended) {
+                    setPremoves([]);
+                } else {
+                    const [pm, ...rest] = queue;
                     const pmGame = cloneWithHistory(newGame);
                     let pmMove: any = null;
                     try {
@@ -409,6 +411,8 @@ export default function Playbot() {
                     }
 
                     if (pmMove) {
+                        // Rest der Kette bleibt stehen und wird nach dem nächsten Bot-Zug gespielt
+                        setPremoves(rest);
                         finalGame = pmGame;
                         setMoveHistory((h) => [...h, pmMove.san]);
                         setLastMove({ from: pmMove.from, to: pmMove.to });
@@ -425,7 +429,9 @@ export default function Playbot() {
 
                         live.current.checkGameEnd(pmGame);
                     } else {
-                        console.log("⚠️ PREMOVE INVALID, verworfen:", pm);
+                        // Ist ein Premove ungültig, sind auch die folgenden hinfällig
+                        console.log("⚠️ PREMOVE INVALID, Kette verworfen:", pm);
+                        setPremoves([]);
                     }
                 }
             }
@@ -465,7 +471,7 @@ export default function Playbot() {
             console.log("🎮 GAME START:", data);
 
             setRoomId(data.roomId);
-            setPremove(null);
+            clearPremoves();
 
             const playerIsWhite = data.white !== "bot";
             const actualHumanColor: "w" | "b" = playerIsWhite ? "w" : "b";
@@ -553,7 +559,7 @@ export default function Playbot() {
         setGameOver(false);
         setEndState(null);
         setRoomId(null);
-        setPremove(null);
+        clearPremoves();
         setGameStarted(false);
     };
 
@@ -852,9 +858,13 @@ export default function Playbot() {
                             myColor={bottomColor}
                             mode="bot"
                             canPremove={canPremove}
-                            premove={premove}
-                            onPremove={(from: string, to: string) => setPremove({ from, to })}
-                            onClearPremove={() => setPremove(null)}
+                            premoves={premoves}
+                            multiPremove
+                            onPremove={(from: string, to: string) => {
+                                if (premovesRef.current.length >= MAX_PREMOVES) return;
+                                setPremoves([...premovesRef.current, { from, to }]);
+                            }}
+                            onClearPremove={clearPremoves}
                         />
 
                         <View style={styles.bottomBar}>
@@ -1008,7 +1018,7 @@ export default function Playbot() {
                                                 setKingInCheck(null);
                                                 setGameOver(false);
                                                 setRoomId(null);
-                                                setPremove(null);
+                                                clearPremoves();
 
                                                 setHumanColor(color);
                                                 setBottomColor(color);
