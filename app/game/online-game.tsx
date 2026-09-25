@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
     Alert,
     Animated,
+    BackHandler,
     Dimensions,
     Easing,
     Image,
@@ -20,7 +21,7 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
     calculateElo,
     getCurrentAccount,
@@ -40,6 +41,9 @@ const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const BOARD_SIZE = Math.min(Dimensions.get("window").width * 0.9, 520);
 const SQUARE_SIZE = BOARD_SIZE / 8;
 
+// Wie im Bot-Spiel: so viele Premoves können maximal hintereinander vorgemerkt werden.
+const MAX_PREMOVES = 8;
+
 const pieces: Record<string, any> = {
     wp: require("../../assets/images/pawn_white.png"),
     wr: require("../../assets/images/rook_white.png"),
@@ -57,6 +61,62 @@ const pieces: Record<string, any> = {
 
 const toSquare = (row: number, col: number) => `${FILES[col]}${8 - row}`;
 const pieceToKey = (piece: any) => (piece ? `${piece.color}${piece.type}` : null);
+
+// =============================
+// MATERIAL / GESCHLAGENE FIGUREN
+// =============================
+// Zeigt an, wer wie viele Figuren welchen Typs geschlagen hat und wer im
+// Materialwert vorne liegt (z.B. "+1" nach einem geschlagenen Bauern).
+const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+const CAPTURED_SYMBOL: Record<string, string> = {
+    p: "♟",
+    n: "♞",
+    b: "♝",
+    r: "♜",
+    q: "♛",
+};
+const STARTING_COUNTS: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+
+type CapturedInfo = {
+    // von Weiß geschlagene (also fehlende schwarze) Figuren
+    byWhite: { type: string; count: number }[];
+    byBlack: { type: string; count: number }[];
+    advantage: number; // positiv = Weiß vorne, negativ = Schwarz vorne
+};
+
+const getMaterialInfo = (g: Chess): CapturedInfo => {
+    const counts: Record<string, number> = {};
+    for (const row of g.board()) {
+        for (const square of row) {
+            if (!square) continue;
+            const key = `${square.color}${square.type}`;
+            counts[key] = (counts[key] || 0) + 1;
+        }
+    }
+
+    const byWhite: { type: string; count: number }[] = [];
+    const byBlack: { type: string; count: number }[] = [];
+    let whiteValue = 0;
+    let blackValue = 0;
+
+    (Object.keys(STARTING_COUNTS) as (keyof typeof STARTING_COUNTS)[]).forEach(
+        (type) => {
+            const missingBlack = STARTING_COUNTS[type] - (counts[`b${type}`] || 0);
+            const missingWhite = STARTING_COUNTS[type] - (counts[`w${type}`] || 0);
+
+            if (missingBlack > 0) {
+                byWhite.push({ type, count: missingBlack });
+                whiteValue += missingBlack * PIECE_VALUES[type];
+            }
+            if (missingWhite > 0) {
+                byBlack.push({ type, count: missingWhite });
+                blackValue += missingWhite * PIECE_VALUES[type];
+            }
+        }
+    );
+
+    return { byWhite, byBlack, advantage: whiteValue - blackValue };
+};
 
 type EndState = {
     type: "win" | "loss" | "draw";
@@ -82,6 +142,7 @@ type FriendStatus = "none" | "pending_sent" | "pending_received" | "friends";
 export default function GameScreen() {
     const router = useRouter();
     const navigation = useNavigation();
+    const insets = useSafeAreaInsets();
 
     const rawParams = useLocalSearchParams();
 
@@ -150,17 +211,25 @@ export default function GameScreen() {
 
     const [endState, setEndState] =
         useState<EndState | null>(null);
+    // NEU: erlaubt es, die Endergebnis-Karte wegzutippen, um die Endstellung
+    // (z.B. wie man schachmatt gesetzt wurde) anzusehen, ohne endState zu verlieren.
+    const [endCardVisible, setEndCardVisible] = useState(true);
 
     const [showChat, setShowChat] = useState(false);
     const [chatInput, setChatInput] = useState("");
     const [chatMessages, setChatMessages] =
         useState<ChatMessage[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     const [rematchWaiting, setRematchWaiting] = useState(false);
     const [showRematchOffer, setShowRematchOffer] = useState(false);
 
     const isLeaving = useRef(false);
+    const showChatRef = useRef(false);
     const eloProcessed = useRef(false);
+    // NEU: damit der Timer-Interval (wird nur einmal registriert) weiß,
+    // ob das Spiel inzwischen vorbei ist, ohne die Uhr weiterlaufen zu lassen.
+    const gameEndedRef = useRef(false);
     const endPopupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scrollRef = useRef<ScrollView>(null);
     const chatScrollRef = useRef<ScrollView>(null);
@@ -170,8 +239,10 @@ export default function GameScreen() {
     // =============================
     // Refs, weil die Socket-Handler nur einmal registriert werden und sonst
     // veraltete Werte (myColor, roomId, checkGameState) sehen würden.
-    const [premove, setPremove] = useState<{ from: string; to: string } | null>(null);
-    const premoveRef = useRef<{ from: string; to: string } | null>(null);
+    // Wie im Bot-Spiel: eine Kette aus mehreren Premoves statt nur einem
+    // einzelnen vorgemerkten Zug.
+    const [premoves, setPremovesState] = useState<{ from: string; to: string }[]>([]);
+    const premovesRef = useRef<{ from: string; to: string }[]>([]);
     const gameRef = useRef(game);
     const roomIdRef = useRef(roomId);
     const checkGameStateRef = useRef<(g: Chess) => void>(() => { });
@@ -179,15 +250,21 @@ export default function GameScreen() {
     gameRef.current = game;
     roomIdRef.current = roomId;
 
-    const handlePremove = (from: string, to: string) => {
-        premoveRef.current = { from, to };
-        setPremove({ from, to });
+    const setPremoves = (v: { from: string; to: string }[]) => {
+        premovesRef.current = v;
+        setPremovesState(v);
     };
 
-    const clearPremove = () => {
-        premoveRef.current = null;
-        setPremove(null);
-    };
+    const clearPremoves = () => setPremoves([]);
+
+    useEffect(() => {
+        gameEndedRef.current = gameEnded;
+    }, [gameEnded]);
+
+    useEffect(() => {
+        showChatRef.current = showChat;
+        if (showChat) setUnreadCount(0);
+    }, [showChat]);
 
     // The server is authoritative. This ref stores the last exact server clock.
     // The UI interpolates locally between server packets for a smooth timer.
@@ -230,6 +307,9 @@ export default function GameScreen() {
 
     useEffect(() => {
         const interval = setInterval(() => {
+            // NEU: nach Spielende (Sieg/Niederlage/Remis) nicht mehr weiterzählen
+            if (gameEndedRef.current) return;
+
             const sync = clockSync.current;
             const elapsed = Math.max(
                 0,
@@ -279,9 +359,14 @@ export default function GameScreen() {
     };
 
     const formatTime = (milliseconds: number) => {
-        const totalSeconds = Math.ceil(
-            Math.max(0, milliseconds) / 1000
-        );
+        const clamped = Math.max(0, milliseconds);
+
+        // Unter 20 Sekunden: eine Nachkommastelle für mehr Präzision.
+        if (clamped < 20000) {
+            return (clamped / 1000).toFixed(1);
+        }
+
+        const totalSeconds = Math.ceil(clamped / 1000);
 
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
@@ -331,7 +416,7 @@ export default function GameScreen() {
         if (!myColor) return;
 
         eloProcessed.current = true;
-        clearPremove(); // NEU: Premove bei Partieende verwerfen
+        clearPremoves(); // NEU: Premove-Kette bei Partieende verwerfen
         setGameEnded(true);
 
         try {
@@ -398,13 +483,15 @@ export default function GameScreen() {
         setActiveColor(next);
     };
 
+    // GEÄNDERT: spielt nur noch den ERSTEN Premove der Kette. Die restlichen
+    // bleiben stehen und werden nach dem jeweils nächsten Gegner-Zug
+    // nacheinander abgearbeitet - genau wie im Bot-Spiel.
     const playPremove = (base: Chess) => {
-        const pm = premoveRef.current;
-        if (!pm) return;
-
-        clearPremove();
+        const queue = premovesRef.current;
+        if (queue.length === 0) return;
         if (eloProcessed.current) return;
 
+        const [pm, ...rest] = queue;
         const next = cloneWithHistory(base);
         let move: any = null;
 
@@ -415,8 +502,15 @@ export default function GameScreen() {
             move = null;
         }
 
-        if (!move) return; // nicht mehr legal -> verworfen
+        if (!move) {
+            // Ist ein Premove ungültig, sind auch die folgenden hinfällig
+            console.log("⚠️ PREMOVE INVALID, Kette verworfen:", pm);
+            setPremoves([]);
+            return;
+        }
 
+        // Rest der Kette bleibt stehen und wird nach dem nächsten Gegner-Zug gespielt
+        setPremoves(rest);
         gameRef.current = next;
         setGame(next);
         setMoveHistory((h) => [...h, move.san]);
@@ -581,7 +675,7 @@ export default function GameScreen() {
             );
 
             gameRef.current = nextGame; // NEU
-            clearPremove(); // NEU
+            clearPremoves(); // NEU
 
             setGame(nextGame);
             setMoveHistory([]);
@@ -594,6 +688,7 @@ export default function GameScreen() {
             setRematchWaiting(false);
             setShowRematchOffer(false);
             setChatMessages([]);
+            setUnreadCount(0);
 
             eloProcessed.current = false;
             isLeaving.current = false;
@@ -782,7 +877,7 @@ export default function GameScreen() {
                 to: result.to,
             });
 
-            // NEU: Premove sofort abfeuern
+            // NEU: (nächsten) Premove der Kette sofort abfeuern
             playPremove(newGame);
         };
 
@@ -881,6 +976,11 @@ export default function GameScreen() {
                 ...current,
                 message,
             ]);
+
+            // NEU: ungelesene Nachrichten zählen, solange der Chat nicht offen ist.
+            if (!showChatRef.current) {
+                setUnreadCount((c) => c + 1);
+            }
 
             setTimeout(() => {
                 chatScrollRef.current?.scrollToEnd({
@@ -1198,6 +1298,7 @@ export default function GameScreen() {
     useEffect(() => {
         if (!endState) return;
 
+        setEndCardVisible(true);
         endAnimation.setValue(0);
 
         Animated.timing(
@@ -1213,6 +1314,24 @@ export default function GameScreen() {
         ).start();
     }, [endState]);
 
+    // NEU: Android-Zurück-Taste schließt zuerst nur die Endergebnis-Karte
+    // (Stellung ansehen), statt gar nichts zu tun oder den Screen zu verlassen.
+    useEffect(() => {
+        const onBackPress = () => {
+            if (endState && endCardVisible) {
+                setEndCardVisible(false);
+                return true;
+            }
+            return false;
+        };
+
+        const subscription = BackHandler.addEventListener(
+            "hardwareBackPress",
+            onBackPress
+        );
+        return () => subscription.remove();
+    }, [endState, endCardVisible]);
+
     useEffect(() => {
         return () => {
             if (endPopupTimer.current) {
@@ -1222,6 +1341,13 @@ export default function GameScreen() {
             }
         };
     }, []);
+
+    // Spiel vorbei -> Premove-Kette verwerfen (analog Bot-Spiel)
+    useEffect(() => {
+        if (gameEnded || !!endState) {
+            clearPremoves();
+        }
+    }, [gameEnded, endState]);
 
     // =============================
     // HISTORY
@@ -1278,6 +1404,8 @@ export default function GameScreen() {
     // =============================
     // UI
     // =============================
+
+    const material = getMaterialInfo(game);
 
     const displayBoard =
         myColor === "w"
@@ -1454,34 +1582,9 @@ export default function GameScreen() {
                                 gegen dich spielen.
                             </Text>
 
-                            <View
-                                style={
-                                    styles.buttons
-                                }
-                            >
+                            <View style={styles.rematchButtons}>
                                 <Pressable
-                                    style={
-                                        styles.cancelButton
-                                    }
-                                    onPress={() =>
-                                        answerRematch(
-                                            false
-                                        )
-                                    }
-                                >
-                                    <Text
-                                        style={
-                                            styles.cancelButtonText
-                                        }
-                                    >
-                                        Nein
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    style={
-                                        styles.primaryBtn
-                                    }
+                                    style={styles.primaryBtn}
                                     onPress={() =>
                                         answerRematch(
                                             true
@@ -1494,6 +1597,23 @@ export default function GameScreen() {
                                         }
                                     >
                                         Spielen
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    style={styles.declineLink}
+                                    onPress={() =>
+                                        answerRematch(
+                                            false
+                                        )
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.declineLinkText
+                                        }
+                                    >
+                                        Nein, danke
                                     </Text>
                                 </Pressable>
                             </View>
@@ -1645,9 +1765,10 @@ export default function GameScreen() {
                             </ScrollView>
 
                             <View
-                                style={
-                                    styles.chatInputRow
-                                }
+                                style={[
+                                    styles.chatInputRow,
+                                    { paddingBottom: 12 + insets.bottom },
+                                ]}
                             >
                                 <TextInput
                                     value={
@@ -1849,6 +1970,21 @@ export default function GameScreen() {
                                         whiteTime
                                     )}
                                 </Text>
+                                {(material.byWhite.length > 0 || material.advantage > 0) && (
+                                    <View style={styles.capturedRow}>
+                                        {material.byWhite.map((c) => (
+                                            <Text key={c.type} style={styles.capturedPiece}>
+                                                {CAPTURED_SYMBOL[c.type]}
+                                                {c.count > 1 ? `×${c.count}` : ""}
+                                            </Text>
+                                        ))}
+                                        {material.advantage > 0 && (
+                                            <Text style={styles.capturedAdvantage}>
+                                                +{material.advantage}
+                                            </Text>
+                                        )}
+                                    </View>
+                                )}
                             </View>
 
                             <View
@@ -1874,6 +2010,21 @@ export default function GameScreen() {
                                         blackTime
                                     )}
                                 </Text>
+                                {(material.byBlack.length > 0 || material.advantage < 0) && (
+                                    <View style={styles.capturedRow}>
+                                        {material.byBlack.map((c) => (
+                                            <Text key={c.type} style={styles.capturedPiece}>
+                                                {CAPTURED_SYMBOL[c.type]}
+                                                {c.count > 1 ? `×${c.count}` : ""}
+                                            </Text>
+                                        ))}
+                                        {material.advantage < 0 && (
+                                            <Text style={styles.capturedAdvantage}>
+                                                +{Math.abs(material.advantage)}
+                                            </Text>
+                                        )}
+                                    </View>
+                                )}
                             </View>
                         </View>
 
@@ -2080,9 +2231,12 @@ export default function GameScreen() {
                                 pieces={
                                     pieces
                                 }
-                                onPressSquare={
-                                    input.onPressSquare
-                                }
+                                onPressSquare={(square: string) => {
+                                    // FIX: nach Spielende (auch nach Schließen des Popups)
+                                    // dürfen keine Züge mehr gemacht werden.
+                                    if (gameEnded || endState) return;
+                                    input.onPressSquare(square);
+                                }}
                                 myColor={
                                     myColor
                                 }
@@ -2094,16 +2248,22 @@ export default function GameScreen() {
                                     !showPromotion &&
                                     game.turn() !== myColor
                                 }
-                                premove={premove}
-                                onPremove={handlePremove}
-                                onClearPremove={clearPremove}
+                                premoves={premoves}
+                                multiPremove
+                                onPremove={(from: string, to: string) => {
+                                    if (gameEnded || endState) return;
+                                    if (premovesRef.current.length >= MAX_PREMOVES) return;
+                                    setPremoves([...premovesRef.current, { from, to }]);
+                                }}
+                                onClearPremove={clearPremoves}
                             />
 
                             {/* BOTTOM BAR */}
                             <View
-                                style={
-                                    styles.bottomBar
-                                }
+                                style={[
+                                    styles.bottomBar,
+                                    { paddingBottom: 12 + insets.bottom },
+                                ]}
                             >
                                 <Pressable
                                     disabled={
@@ -2157,6 +2317,7 @@ export default function GameScreen() {
                                             true
                                         )
                                     }
+                                    style={styles.chatBtnRow}
                                 >
                                     <Text
                                         style={
@@ -2165,13 +2326,20 @@ export default function GameScreen() {
                                     >
                                         Chat
                                     </Text>
+                                    {unreadCount > 0 && (
+                                        <View style={styles.chatBadge}>
+                                            <Text style={styles.chatBadgeText}>
+                                                {unreadCount > 9 ? "9+" : unreadCount}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </Pressable>
                             </View>
 
                             {/* =============================
                                 END GAME POPUP
                             ============================= */}
-                            {endState && (
+                            {endState && endCardVisible && (
                                 <View
                                     style={
                                         styles.endOverlay
@@ -2183,6 +2351,14 @@ export default function GameScreen() {
                                             animatedCardStyle,
                                         ]}
                                     >
+                                        <Pressable
+                                            style={styles.endCardClose}
+                                            onPress={() => setEndCardVisible(false)}
+                                            hitSlop={12}
+                                        >
+                                            <Text style={styles.endCardCloseText}>×</Text>
+                                        </Pressable>
+
                                         {endState.type ===
                                             "win" && (
                                                 <>
@@ -2434,6 +2610,26 @@ const styles = StyleSheet.create({
         fontVariant: ["tabular-nums"],
     },
 
+    capturedRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 4,
+        flexWrap: "wrap",
+    },
+
+    capturedPiece: {
+        color: "#ddd",
+        fontSize: 13,
+        marginRight: 4,
+    },
+
+    capturedAdvantage: {
+        color: "#FFD700",
+        fontSize: 12,
+        fontWeight: "800",
+        marginLeft: 2,
+    },
+
     playerRow: {
         flexDirection: "row",
         alignItems: "center",
@@ -2519,6 +2715,28 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
 
+    chatBtnRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+    },
+
+    chatBadge: {
+        minWidth: 18,
+        height: 18,
+        paddingHorizontal: 4,
+        borderRadius: 9,
+        backgroundColor: "#E53935",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    chatBadgeText: {
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: "800",
+    },
+
     overlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.72)",
@@ -2557,6 +2775,22 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         gap: 12,
+    },
+
+    rematchButtons: {
+        width: "100%",
+        gap: 10,
+    },
+
+    declineLink: {
+        alignItems: "center",
+        paddingVertical: 10,
+    },
+
+    declineLinkText: {
+        color: "#999",
+        fontSize: 14,
+        fontWeight: "600",
     },
 
     cancelButton: {
@@ -2612,6 +2846,25 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 20,
         elevation: 12,
+    },
+
+    endCardClose: {
+        position: "absolute",
+        top: 10,
+        right: 14,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: "#222",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1,
+    },
+
+    endCardCloseText: {
+        color: "#ccc",
+        fontSize: 20,
+        lineHeight: 22,
     },
 
     winTitle: {

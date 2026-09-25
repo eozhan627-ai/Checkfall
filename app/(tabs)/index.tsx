@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import {
     Image,
     ImageBackground,
@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import StreakFlame from "../../components/StreakFlame";
 import { AccountType, getCurrentAccount } from "../../lib/account";
+import { getSocket } from "../../lib/socket";
 
 /**
  * Schlichte Outline-Icons (kein Fill), gebaut aus reinen View-Rahmen/Linien —
@@ -349,8 +350,36 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(true);
     const [dayStreak, setDayStreak] = useState(0);
 
+    // NEU: echte Anzahl online befindlicher Nutzer statt der festen
+    // "Player is currently online"-Zeile. Erwartet ein Server-Event
+    // "online_count" mit { count: number } (oder direkt einer Zahl) — falls
+    // dein Server das Event anders benennt, hier den Namen anpassen.
+    const [onlineCount, setOnlineCount] = useState<number | null>(null);
+
     const placeholder = require("../../assets/images/knight_black.png");
     const backgroundImage = require("../../assets/images/loginbackground.png");
+
+    useEffect(() => {
+        const socket = getSocket();
+
+        const handleOnlineCount = (data: any) => {
+            const count =
+                typeof data === "number" ? data : Number(data?.count);
+
+            if (Number.isFinite(count)) {
+                setOnlineCount(count);
+            }
+        };
+
+        socket.on("online_count", handleOnlineCount);
+
+        // Manche Server schicken die Zahl nur auf Anfrage.
+        socket.emit("get_online_count");
+
+        return () => {
+            socket.off("online_count", handleOnlineCount);
+        };
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
@@ -416,6 +445,13 @@ export default function HomeScreen() {
             : placeholder;
 
     const avatarBorderColor = getAvatarFrameColor(account?.vipTier);
+
+    const onlineStatusText =
+        onlineCount === null
+            ? "Verbinde..."
+            : onlineCount === 1
+                ? "1 Spieler online"
+                : `${onlineCount} Spieler online`;
 
     // ================================
     // ONLINE MATCHMAKING
@@ -515,7 +551,7 @@ export default function HomeScreen() {
                             <View style={styles.statusDot} />
 
                             <Text style={styles.statusText}>
-                                Player is currently online
+                                {onlineStatusText}
                             </Text>
                         </View>
 

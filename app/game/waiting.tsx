@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect } from "react";
 import {
+    Pressable,
     StyleSheet,
     Text,
     View,
@@ -166,6 +167,20 @@ export default function WaitingScreen() {
         };
     }, []);
 
+    // NEU: Suche abbrechen und zurück navigieren.
+    // WICHTIG: "cancel_find_match" ist der vermutete Event-Name — bitte an das
+    // tatsächliche Server-Event anpassen, falls es anders heißt (z.B. "leave_queue").
+    const handleCancel = () => {
+        const socket = getSocket();
+
+        socket.emit("cancel_find_match");
+        socket.off("game_start");
+        socket.off("waiting");
+        socket.off("matchmaking_error");
+
+        router.back();
+    };
+
     return (
         <SafeAreaView style={styles.container}>
 
@@ -199,6 +214,19 @@ export default function WaitingScreen() {
                     </Text>
 
                 </View>
+
+                {/* CANCEL */}
+                <Pressable
+                    onPress={handleCancel}
+                    style={({ pressed }) => [
+                        styles.cancelButton,
+                        pressed && styles.cancelButtonPressed,
+                    ]}
+                >
+                    <Text style={styles.cancelButtonText}>
+                        Abbrechen
+                    </Text>
+                </Pressable>
 
                 {/* INFO */}
                 <Text style={styles.info}>
@@ -292,6 +320,26 @@ const styles = StyleSheet.create({
         fontSize: 14,
 
         fontWeight: "600",
+    },
+
+    cancelButton: {
+        marginTop: 22,
+        paddingHorizontal: 26,
+        paddingVertical: 13,
+        borderRadius: 12,
+        backgroundColor: "#1e293b",
+        borderWidth: 1,
+        borderColor: "#c62828",
+    },
+
+    cancelButtonPressed: {
+        opacity: 0.75,
+    },
+
+    cancelButtonText: {
+        color: "#ff6b6b",
+        fontSize: 15,
+        fontWeight: "700",
     },
 
     info: {
