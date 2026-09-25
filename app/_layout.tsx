@@ -21,11 +21,15 @@ export default function Layout() {
   // =============================
   // WEB: HINTERGRUNDBILD-FIX
   // =============================
-  // React Native Web setzt flex:1 auf die Root-View, aber html/body im
-  // Browser haben ohne explizite Höhe keine Referenzgröße – dadurch
-  // rendert ImageBackground (z.B. auf iPad/Laptop) nur bis zur Höhe des
-  // sichtbaren Inhalts statt über den ganzen Viewport. Einmaliger,
-  // globaler CSS-Fix, betrifft nur Platform.OS === "web".
+  // GEÄNDERT: "html, body, #root, #root > div { height: 100% }" hat nicht
+  // zuverlässig funktioniert, weil React Navigation/Expo Router auf Web oft
+  // noch weitere, ungestylte <div>-Wrapper zwischen #root und dem
+  // eigentlichen Screen-Container einfügt - die Prozent-Höhe wird dort
+  // unterbrochen, wenn irgendein Zwischen-Div keine eigene Höhe bekommt.
+  // Robuster: #root per position:fixed direkt auf die volle Viewport-Fläche
+  // pinnen, unabhängig davon, wie tief darunter verschachtelt wird -
+  // flex:1 (das unser eigener Root-View schon mitbringt) füllt das dann
+  // zuverlässig aus.
   useEffect(() => {
     if (Platform.OS === "web") {
       const styleId = "povcheck-web-height-fix";
@@ -33,11 +37,18 @@ export default function Layout() {
         const style = document.createElement("style");
         style.id = styleId;
         style.innerHTML = `
-          html, body, #root, #root > div {
+          html, body {
             height: 100%;
-          }
-          body {
             margin: 0;
+          }
+          #root {
+            position: fixed;
+            inset: 0;
+            display: flex;
+          }
+          #root > div {
+            flex: 1;
+            display: flex;
           }
         `;
         document.head.appendChild(style);

@@ -7,8 +7,8 @@ import {
 } from "react-native";
 // Zusätzliche Pakete für Screenshot/Teilen-Funktion — falls noch nicht installiert:
 // npx expo install react-native-view-shot expo-sharing
-import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
+import { captureRef } from "react-native-view-shot";
 import { getCurrentAccount } from "../../lib/account";
 import {
     onAnalysisComplete, onAnalysisError,
@@ -63,9 +63,9 @@ type MoveClassification =
 type AnalysisMove = { moveNumber: number; san: string; evalCp: number | null; bestMove: string; classification: MoveClassification };
 
 type Analysis = {
-  depth: number; tier: string; moves: AnalysisMove[];
-  accuracy: { w: number | null; b: number | null };
-  counts: Record<"w" | "b", Partial<Record<MoveClassification, number>>>;
+    depth: number; tier: string; moves: AnalysisMove[];
+    accuracy: { w: number | null; b: number | null };
+    counts: Record<"w" | "b", Partial<Record<MoveClassification, number>>>;
 };
 
 const CLASSIFICATION_META: Record<MoveClassification, { label: string; icon: string; color: string }> = {
@@ -124,18 +124,18 @@ function buildReport(analysis: Analysis): string[] {
     };
 
     const lines: string[] = [];
-const { w: white, b: black } = analysis.accuracy;
-const wAcc = white ?? 0;
-const bAcc = black ?? 0;
+    const { w: white, b: black } = analysis.accuracy;
+    const wAcc = white ?? 0;
+    const bAcc = black ?? 0;
 
-if (wAcc >= bAcc + 5) lines.push(`Weiß spielte insgesamt präziser (${wAcc}% gegenüber ${bAcc}%).`);
-else if (bAcc >= wAcc + 5) lines.push(`Schwarz spielte insgesamt präziser (${bAcc}% gegenüber ${wAcc}%).`);
-else lines.push(`Beide Seiten spielten ähnlich genau (${wAcc}% zu ${bAcc}%).`);
+    if (wAcc >= bAcc + 5) lines.push(`Weiß spielte insgesamt präziser (${wAcc}% gegenüber ${bAcc}%).`);
+    else if (bAcc >= wAcc + 5) lines.push(`Schwarz spielte insgesamt präziser (${bAcc}% gegenüber ${wAcc}%).`);
+    else lines.push(`Beide Seiten spielten ähnlich genau (${wAcc}% zu ${bAcc}%).`);
 
-const w = worst(analysis.counts.w || {});
-const b = worst(analysis.counts.b || {});
-if (w) lines.push(`Größte Schwachstelle für Weiß: ${CLASSIFICATION_META[w.key].label} (${w.count}×).`);
-if (b) lines.push(`Größte Schwachstelle für Schwarz: ${CLASSIFICATION_META[b.key].label} (${b.count}×).`);
+    const w = worst(analysis.counts.w || {});
+    const b = worst(analysis.counts.b || {});
+    if (w) lines.push(`Größte Schwachstelle für Weiß: ${CLASSIFICATION_META[w.key].label} (${w.count}×).`);
+    if (b) lines.push(`Größte Schwachstelle für Schwarz: ${CLASSIFICATION_META[b.key].label} (${b.count}×).`);
 
     const brilliantTotal = (analysis.counts.w?.brilliant || 0) + (analysis.counts.b?.brilliant || 0);
     if (brilliantTotal > 0) {
@@ -510,13 +510,13 @@ export default function GameReview() {
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#ECEDEE" }]} />
                             <Text style={styles.accuracyLabel}>Weiß </Text>
-           <Text style={styles.accuracyValue}>{analysis.accuracy.w?.toFixed(1)}%</Text>
+                            <Text style={styles.accuracyValue}>{analysis.accuracy.w?.toFixed(1)}%</Text>
                         </View>
                         <View style={styles.accuracyDivider} />
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#4B5058" }]} />
                             <Text style={styles.accuracyLabel}>Schwarz </Text>
-             <Text style={styles.accuracyValue}>{analysis.accuracy.b?.toFixed(1)}%</Text>
+                            <Text style={styles.accuracyValue}>{analysis.accuracy.b?.toFixed(1)}%</Text>
                         </View>
                     </View>
 

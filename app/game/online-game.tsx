@@ -224,6 +224,11 @@ export default function GameScreen() {
     const [rematchWaiting, setRematchWaiting] = useState(false);
     const [showRematchOffer, setShowRematchOffer] = useState(false);
 
+    // NEU: Supabase-Game-ID der zuletzt gespeicherten Partie, damit der
+    // "Analyse"-Button direkt zur Game-Review-Ansicht verlinken kann.
+    // Bleibt null bei Gast-Accounts, weil dort nichts remote gespeichert wird.
+    const [lastGameId, setLastGameId] = useState<string | null>(null);
+
     const isLeaving = useRef(false);
     const showChatRef = useRef(false);
     const eloProcessed = useRef(false);
@@ -432,8 +437,15 @@ export default function GameScreen() {
 
             await updateAccount(acc.id, { rating: newRating });
 
-            // GEÄNDERT: pgn + opponentAuthId mitgeben
-            await saveGameToHistory("online", result, pgnOverride ?? game.pgn(), opponentAuthId);
+            // GEÄNDERT: pgn + opponentAuthId mitgeben, remoteId für den
+            // "Analyse"-Button merken (bleibt null bei Gast-Accounts).
+            const remoteId = await saveGameToHistory(
+                "online",
+                result,
+                pgnOverride ?? game.pgn(),
+                opponentAuthId
+            );
+            setLastGameId(remoteId);
 
             showEndPopupAfterDelay({ type: result, reason });
         } catch (error) {
@@ -689,6 +701,7 @@ export default function GameScreen() {
             setShowRematchOffer(false);
             setChatMessages([]);
             setUnreadCount(0);
+            setLastGameId(null); // NEU: Analyse-Button gehört zur vorigen Partie
 
             eloProcessed.current = false;
             isLeaving.current = false;
@@ -1057,6 +1070,10 @@ export default function GameScreen() {
             );
         };
 
+        // Das eigentliche Starten der neuen Partie passiert server-seitig
+        // über ein reguläres "game_start"-Event (siehe handleGameStart oben) -
+        // dafür ist hier kein eigener "rematch_accepted"-Handler nötig.
+
         socket.on(
             "rematch_requested",
             handleRematchRequested
@@ -1353,13 +1370,15 @@ export default function GameScreen() {
     // HISTORY
     // =============================
 
+    // GEÄNDERT: gibt jetzt die remoteId (Supabase-Game-ID) zurück, oder null,
+    // damit der "Analyse"-Button weiß, wohin er verlinken soll.
     async function saveGameToHistory(
         mode: "online",
         result: "win" | "loss" | "draw" | "aborted",
         pgn: string,
         opponentId: string | null,
         timestamp?: number
-    ) {
+    ): Promise<string | null> {
         const key = "game_history";
         const stored = await AsyncStorage.getItem(key);
         const history = stored ? JSON.parse(stored) : [];
@@ -1374,11 +1393,13 @@ export default function GameScreen() {
 
         await AsyncStorage.setItem(key, JSON.stringify(history));
 
+        let remoteId: string | null = null;
+
         try {
             const acc = await getCurrentAccount();
 
             if (acc && !acc.guest && acc.authId) {
-                const remoteId = await saveGameRecord({
+                remoteId = await saveGameRecord({
                     userId: acc.authId,
                     opponentId: opponentId ?? null, // bei bot-game.tsx einfach null lassen
                     mode,
@@ -1399,6 +1420,8 @@ export default function GameScreen() {
         } catch (error) {
             console.log("SAVE GAME RECORD ERROR:", error);
         }
+
+        return remoteId;
     }
 
     // =============================
@@ -2461,8 +2484,7 @@ export default function GameScreen() {
                                                 Deine Elo:{" "}
                                                 {
                                                     myRating
-                                                }
-                                            </Text>
+                                                }   </Text>
                                         </View>
 
                                         <View
@@ -2516,6 +2538,36 @@ export default function GameScreen() {
                                                         : "Revanche"}
                                                 </Text>
                                             </Pressable>
+
+                                            {/* NEU: Analyse-Button - nur sichtbar, wenn die
+                                                Partie remote gespeichert wurde (kein Gast-Account).
+                                                ACHTUNG: Route "/game/review" ist eine Annahme -
+                                                ggf. an den tatsächlichen Pfad deiner
+                                                Game-Review-Datei anpassen. */}
+                                            {lastGameId && (
+                                                <Pressable
+                                                    style={
+                                                        styles.secondaryBtn
+                                                    }
+                                                    onPress={() => {
+                                                        setEndState(
+                                                            null
+                                                        );
+                                                        router.push({
+                                                            pathname: "/game/review",
+                                                            params: { gameId: lastGameId },
+                                                        } as any);
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.btnText
+                                                        }
+                                                    >
+                                                        Analyse
+                                                    </Text>
+                                                </Pressable>
+                                            )}
 
                                             <Pressable
                                                 style={

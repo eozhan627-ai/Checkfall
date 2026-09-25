@@ -167,13 +167,12 @@ export default function WaitingScreen() {
         };
     }, []);
 
-    // NEU: Suche abbrechen und zurück navigieren.
-    // WICHTIG: "cancel_find_match" ist der vermutete Event-Name — bitte an das
-    // tatsächliche Server-Event anpassen, falls es anders heißt (z.B. "leave_queue").
+    // Suche abbrechen und zurück navigieren.
+    // Entspricht dem Server-Event "cancel_matchmaking" (siehe server.js).
     const handleCancel = () => {
         const socket = getSocket();
 
-        socket.emit("cancel_find_match");
+        socket.emit("cancel_matchmaking");
         socket.off("game_start");
         socket.off("waiting");
         socket.off("matchmaking_error");

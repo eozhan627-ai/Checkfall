@@ -23,7 +23,12 @@ import { saveGameRecord } from "../../lib/games";
 import Board from "./components/Board";
 import { useChessInput } from "./hooks/useChessInput";
 
-const BOARD_SIZE = Dimensions.get("window").width - 32; // nur noch für Popup-Positionierung gebraucht
+// GEÄNDERT: vorher ungedeckelt (Fensterbreite - 32), dadurch wurde das Brett
+// auf breiten Bildschirmen (Laptop/Web) riesig, weil <Board> ohne
+// begrenzenden Wrapper einfach 92% des verfügbaren Platzes eingenommen hat.
+// Jetzt genauso gedeckelt wie im Online-Spiel (online-game.tsx) und zusätzlich
+// unten als feste Breite um <Board> gelegt (siehe boardWrapper).
+const BOARD_SIZE = Math.min(Dimensions.get("window").width * 0.9, 520);
 
 const pieces: Record<string, any> = {
     wp: require("../../assets/images/pawn_white.png"),
@@ -845,27 +850,32 @@ export default function Playbot() {
                                 ))}
                         </ScrollView>
 
-                        {/* Geteilte Board-Komponente, jetzt mit Premove wie im Online-Spiel */}
-                        <Board
-                            board={displayBoard}
-                            selectedSquare={selectedSquare}
-                            legalMoves={legalMoves}
-                            lastMove={lastMove}
-                            checkSquare={kingInCheck}
-                            onPressSquare={onPressSquare}
-                            pieces={pieces}
-                            pieceToKey={pieceToKey}
-                            myColor={bottomColor}
-                            mode="bot"
-                            canPremove={canPremove}
-                            premoves={premoves}
-                            multiPremove
-                            onPremove={(from: string, to: string) => {
-                                if (premovesRef.current.length >= MAX_PREMOVES) return;
-                                setPremoves([...premovesRef.current, { from, to }]);
-                            }}
-                            onClearPremove={clearPremoves}
-                        />
+                        {/* GEÄNDERT: Wrapper mit fester Breite (wie im Online-Spiel), damit
+                            das Brett auf breiten Bildschirmen (Laptop/Web) nicht auf 92%
+                            der vollen Fensterbreite aufgeblasen wird. */}
+                        <View style={styles.boardWrapper}>
+                            {/* Geteilte Board-Komponente, jetzt mit Premove wie im Online-Spiel */}
+                            <Board
+                                board={displayBoard}
+                                selectedSquare={selectedSquare}
+                                legalMoves={legalMoves}
+                                lastMove={lastMove}
+                                checkSquare={kingInCheck}
+                                onPressSquare={onPressSquare}
+                                pieces={pieces}
+                                pieceToKey={pieceToKey}
+                                myColor={bottomColor}
+                                mode="bot"
+                                canPremove={canPremove}
+                                premoves={premoves}
+                                multiPremove
+                                onPremove={(from: string, to: string) => {
+                                    if (premovesRef.current.length >= MAX_PREMOVES) return;
+                                    setPremoves([...premovesRef.current, { from, to }]);
+                                }}
+                                onClearPremove={clearPremoves}
+                            />
+                        </View>
 
                         <View style={styles.bottomBar}>
                             <Pressable onPress={() => setShowLeaveModal(true)}>
@@ -1057,6 +1067,11 @@ export default function Playbot() {
 }
 
 const styles = StyleSheet.create({
+    // NEU: begrenzt & zentriert das Brett (gleicher Ansatz wie online-game.tsx)
+    boardWrapper: {
+        width: BOARD_SIZE,
+        alignSelf: "center",
+    },
     moveBar: {
         maxHeight: 40,
         marginBottom: 12,

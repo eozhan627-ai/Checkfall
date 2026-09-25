@@ -450,8 +450,8 @@ export default function HomeScreen() {
         onlineCount === null
             ? "Verbinde..."
             : onlineCount === 1
-                ? "1 Spieler online"
-                : `${onlineCount} Spieler online`;
+                ? "1 Spieler online   "
+                : `${onlineCount} Spieler online  `;
 
     // ================================
     // ONLINE MATCHMAKING

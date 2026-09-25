@@ -3,6 +3,7 @@ import {
     Animated,
     Image,
     PanResponder,
+    Platform,
     Pressable,
     StyleSheet,
     Text,
@@ -267,6 +268,25 @@ export default function Board({
         setDrag(null);
     };
 
+    // =========================================================
+    // NEU: Rechtsklick (Web/Laptop) bricht die Premove-Kette ab - wie
+    // in gängigen Schach-Apps üblich. Auf Touch-Geräten gibt es keinen
+    // Rechtsklick, dort bleibt das Antippen einer leeren Fläche der Weg.
+    // =========================================================
+    const handleContextMenu = (e: any) => {
+        if (Platform.OS !== "web") return;
+
+        // Verhindert, dass zusätzlich das native Browser-Kontextmenü aufgeht.
+        e?.preventDefault?.();
+
+        const { canPremove, onClearPremove } = latest.current;
+        if (!canPremove) return;
+
+        setPreSel(null);
+        onClearPremove?.();
+        resetDrag();
+    };
+
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => true,
@@ -510,6 +530,9 @@ export default function Board({
                 <View
                     style={StyleSheet.absoluteFill}
                     {...panResponder.panHandlers}
+                    {...(Platform.OS === "web"
+                        ? ({ onContextMenu: handleContextMenu } as any)
+                        : {})}
                 />
 
                 {/* Figur, die am Finger klebt (etwas über dem Finger, damit man sie sieht) */}
