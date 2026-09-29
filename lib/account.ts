@@ -12,6 +12,7 @@ export type AccountType = {
     clanId?: string;
     vipTier?: "none" | "silver" | "gold" | "diamond"; // GEÄNDERT (vorher isVip)
 };
+
 const ACCOUNTS_KEY = "@accounts";
 const CURRENT_KEY = "@current_account";
 

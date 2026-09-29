@@ -29,6 +29,24 @@ type BoardState = (Piece | null)[][];
 
 const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
+// Gleiche Scale/Offset-Werte wie in board.tsx, damit die Figuren identisch
+// groß wirken (Board dort verwendet lowercase Keys wie "wp"/"bk").
+const PIECE_SCALE: Record<string, number> = {
+    wp: 1.35, wn: 1.55, wb: 1.7, wr: 1.65, wq: 1.55, wk: 1.3,
+    bp: 1.3, bn: 1.2, bb: 1.3, br: 1.15, bq: 1.25, bk: 1.15,
+};
+const PIECE_OFFSET_Y: Record<string, number> = {
+    wb: -1.1, wr: -2, wq: -2, wp: 1.2,
+    bp: 2, bn: 2, br: 2, bq: 2, bb: 0.5,
+};
+const pieceTransform = (piece: Piece) => {
+    const key = piece.toLowerCase();
+    return [
+        { scale: PIECE_SCALE[key] ?? 1 },
+        { translateY: PIECE_OFFSET_Y[key] ?? 0 },
+    ];
+};
+
 const createInitialBoard = (): BoardState => [
     ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
     ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
@@ -192,7 +210,10 @@ export default function WaitingChessBoard() {
                                 {piece && !isMoving && (
                                     <Image
                                         source={piecesImages[piece]}
-                                        style={styles.piece}
+                                        style={[
+                                            styles.piece,
+                                            { transform: pieceTransform(piece) },
+                                        ]}
                                     />
                                 )}
                             </View>
@@ -218,7 +239,10 @@ export default function WaitingChessBoard() {
                             source={
                                 piecesImages[movingPiece.piece]
                             }
-                            style={styles.piece}
+                            style={[
+                                styles.piece,
+                                { transform: pieceTransform(movingPiece.piece) },
+                            ]}
                         />
                     </Animated.View>
                 )}
@@ -229,7 +253,7 @@ export default function WaitingChessBoard() {
                 <View style={styles.liveDot} />
 
                 <Text style={styles.liveText}>
-                    Partie läuft
+                    Live game
                 </Text>
             </View>
 
@@ -278,8 +302,8 @@ const styles = StyleSheet.create({
     },
 
     piece: {
-        width: "88%",
-        height: "88%",
+        width: "90%",
+        height: "90%",
         resizeMode: "contain",
     },
 

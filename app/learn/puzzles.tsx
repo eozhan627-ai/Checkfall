@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import puzzles from "../../assets/puzzle.json";
+import { getSolvedPuzzleIds, markPuzzleSolved } from "../../lib/puzzleStats";
 import PuzzleBoard from "../components/PuzzleBoard";
 
 type Puzzle = {
@@ -29,6 +30,7 @@ export default function PuzzlesScreen() {
     );
 
     const [puzzleIndex, setPuzzleIndex] = useState(0);
+    const [solvedCount, setSolvedCount] = useState(0);
 
     const puzzle = sortedPuzzles[puzzleIndex];
 
@@ -39,6 +41,19 @@ export default function PuzzlesScreen() {
     const [feedback, setFeedback] = useState<string | null>(null);
 
     const playerColor = game.turn();
+
+    // Beim Start: gelöste Puzzles laden und beim ersten ungelösten beginnen
+    useEffect(() => {
+        (async () => {
+            const ids = await getSolvedPuzzleIds();
+            setSolvedCount(ids.length);
+
+            const firstUnsolved = sortedPuzzles.findIndex(
+                (p) => !ids.includes(p.id)
+            );
+            if (firstUnsolved > 0) setPuzzleIndex(firstUnsolved);
+        })();
+    }, [sortedPuzzles]);
 
     useEffect(() => {
         setGame(new Chess(puzzle.fen));
@@ -65,6 +80,12 @@ export default function PuzzlesScreen() {
         setFeedback(
             `💡 Tipp: ${move.slice(0, 2)} → ${move.slice(2, 4)}`
         );
+    }
+
+    async function onSolved() {
+        setFeedback("🎉 Puzzle gelöst!");
+        const count = await markPuzzleSolved(puzzle.id);
+        setSolvedCount(count);
     }
 
     function onSquarePress(square: string) {
@@ -147,7 +168,7 @@ export default function PuzzlesScreen() {
 
         // Puzzle fertig
         if (nextMoveIndex >= puzzle.moves.length) {
-            setFeedback("🎉 Puzzle gelöst!");
+            onSolved();
             return;
         }
 
@@ -167,7 +188,7 @@ export default function PuzzlesScreen() {
                 </Text>
 
                 <Text style={styles.subtitle}>
-                    Puzzle {puzzleIndex + 1} / {sortedPuzzles.length}
+                    Puzzle {puzzleIndex + 1} / {sortedPuzzles.length} · Gelöst: {solvedCount}
                 </Text>
 
                 <Text style={styles.subtitle}>
@@ -183,7 +204,7 @@ export default function PuzzlesScreen() {
                 />
 
                 <Text style={styles.progress}>
-                    Zug {moveIndex + 1} / {puzzle.moves.length}
+                    Zug {Math.min(moveIndex + 1, puzzle.moves.length)} / {puzzle.moves.length}
                 </Text>
 
                 {feedback && (

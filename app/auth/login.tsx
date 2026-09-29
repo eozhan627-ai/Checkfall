@@ -2,11 +2,7 @@ import { makeRedirectUri } from "expo-auth-session";
 import { BlurView } from "expo-blur";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, {
-    useEffect,
-    useRef,
-    useState,
-} from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Alert,
     Animated,
@@ -20,125 +16,172 @@ import {
     View,
 } from "react-native";
 import {
-    createGuestAccount ,
+    createGuestAccount,
     getAccountByAuthId,
     getCurrentAccount,
     saveAccount,
 } from "../../lib/account";
 import { supabase } from "../../lib/supabase";
+
 WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginPage() {
     const router = useRouter();
-    const [error, setError] =
-        useState<string | null>(null);
-    const [loading, setLoading] =
-        useState(true);
-    const [googleLoading, setGoogleLoading] =
-        useState(false);
-    const [termsVisible, setTermsVisible] =
-        useState(false);
-    const [termsAccepted, setTermsAccepted] =
-        useState(false);
-    const [termsForGuest, setTermsForGuest] =
-        useState(false);
-    const backgroundImage = require(
-        "../../assets/images/loginbackground.png"
-    );
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [termsVisible, setTermsVisible] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [termsForGuest, setTermsForGuest] = useState(false);
+
+    // verhindert, dass resolveAccountAfterGoogleLogin doppelt läuft
+    // (getSession + onAuthStateChange können beide feuern)
+    const resolvingRef = useRef(false);
+
+    const backgroundImage = require("../../assets/images/loginbackground.png");
+
     // =============================
     // ANIMATIONS
     // =============================
-    const appear = useRef(
-        new Animated.Value(0)
-    ).current;
-    const scale = useRef(
-        new Animated.Value(0.96)
-    ).current;
-    const float = useRef(
-        new Animated.Value(0)
-    ).current;
-    const shake = useRef(
-        new Animated.Value(0)
-    ).current;
+    const appear = useRef(new Animated.Value(0)).current;
+    const scale = useRef(new Animated.Value(0.96)).current;
+    const float = useRef(new Animated.Value(0)).current;
+    const shake = useRef(new Animated.Value(0)).current;
+
     // =============================
     // START
     // =============================
     useEffect(() => {
-        checkCurrentAccount();
+        let unsubscribe: (() => void) | null = null;
+        let timeout: ReturnType<typeof setTimeout> | null = null;
+
+        checkCurrentAccount().then((cleanup) => {
+            if (cleanup) {
+                unsubscribe = cleanup.unsubscribe;
+                timeout = cleanup.timeout;
+            }
+        });
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+            if (timeout) clearTimeout(timeout);
+        };
     }, []);
+
     // =============================
     // ANDROID BACK
     // =============================
     useEffect(() => {
-        const subscription =
-            BackHandler.addEventListener(
-                "hardwareBackPress",
-                () => {
-                    return true;
-                }
-            );
+        const subscription = BackHandler.addEventListener(
+            "hardwareBackPress",
+            () => true
+        );
         return () => {
             subscription.remove();
         };
     }, []);
+
     // =============================
     // CHECK CURRENT ACCOUNT
     // =============================
-    async function checkCurrentAccount() {
+    async function checkCurrentAccount(): Promise<{
+        unsubscribe: () => void;
+        timeout: ReturnType<typeof setTimeout>;
+    } | void> {
         try {
-            console.log(
-                "LOGIN: checking local account..."
-            );
-            const acc =
-                await getCurrentAccount();
-            console.log(
-                "LOGIN: local account =",
-                acc
-            );
+            console.log("LOGIN: checking local account...");
+            const acc = await getCurrentAccount();
+            console.log("LOGIN: local account =", acc);
+
             if (acc) {
-                console.log(
-                    "LOGIN: existing account → /"
-                );
+                console.log("LOGIN: existing account → /");
                 router.replace("/");
                 return;
             }
-            console.log(
-                "LOGIN: no local account"
-            );
+            console.log("LOGIN: no local account");
 
             // =============================
             // WEB: RÜCKKEHR VON GOOGLE?
             // =============================
-            // Auf Web nutzen wir für Google-Login einen Full-Page-Redirect
-            // statt eines Popups (siehe handleGoogleLogin). Nach der
-            // Rückkehr von Google landet der Browser wieder hier, mit einer
-            // frischen Supabase-Session, aber ohne lokalen Account. Das holen
-            // wir hier nach.
-            if (Platform.OS === "web") {
+            if (Platform.OS === "web" && typeof window !== "undefined") {
+                const url = window.location.href;
+                const hash = window.location.hash || "";
+                const search = window.location.search || "";
+
+                // Fehler, die Supabase/Google in die URL schreiben
+                const urlParams = new URLSearchParams(
+                    hash.startsWith("#") ? hash.substring(1) : hash
+                );
+                const searchParams = new URLSearchParams(search);
+                const urlError =
+                    urlParams.get("error_description") ||
+                    searchParams.get("error_description");
+                if (urlError) {
+                    console.error("LOGIN (WEB): URL error:", urlError);
+                    setError(decodeURIComponent(urlError.replace(/\+/g, " ")));
+                    setLoading(false);
+                    return;
+                }
+
+                const returningFromGoogle =
+                    hash.includes("access_token") ||
+                    search.includes("code=") ||
+                    url.includes("access_token");
+
+                // getSession wartet bei detectSessionInUrl:true, bis die
+                // Tokens aus der URL verarbeitet wurden.
                 const {
                     data: { session },
                 } = await supabase.auth.getSession();
 
                 if (session?.user) {
-                    console.log(
-                        "LOGIN (WEB): Supabase-Session nach Google-Redirect gefunden"
-                    );
+                    console.log("LOGIN (WEB): Supabase-Session gefunden");
                     setGoogleLoading(true);
-                    await resolveAccountAfterGoogleLogin(
-                        session.user
-                    );
+                    await resolveAccountAfterGoogleLogin(session.user);
                     return;
+                }
+
+                // Rückkehr von Google, aber Session noch nicht da:
+                // kurz auf SIGNED_IN warten, sonst Login-Screen zeigen.
+                if (returningFromGoogle) {
+                    console.log("LOGIN (WEB): warte auf SIGNED_IN...");
+                    setGoogleLoading(true);
+
+                    const { data: sub } = supabase.auth.onAuthStateChange(
+                        (event, newSession) => {
+                            if (event === "SIGNED_IN" && newSession?.user) {
+                                sub.subscription.unsubscribe();
+                                resolveAccountAfterGoogleLogin(newSession.user);
+                            }
+                        }
+                    );
+
+                    const timeout = setTimeout(() => {
+                        sub.subscription.unsubscribe();
+                        if (!resolvingRef.current) {
+                            console.log("LOGIN (WEB): Timeout, keine Session");
+                            setGoogleLoading(false);
+                            setError(
+                                "Google login did not complete. Please try again."
+                            );
+                            setLoading(false);
+                        }
+                    }, 6000);
+
+                    return {
+                        unsubscribe: () => sub.subscription.unsubscribe(),
+                        timeout,
+                    };
                 }
             }
 
             setLoading(false);
         } catch (e) {
-            console.error(
-                "ACCOUNT CHECK ERROR:",
-                e
-            );
+            console.error("ACCOUNT CHECK ERROR:", e);
             setLoading(false);
         }
     }
+
     // =============================
     // ANIMATION
     // =============================
@@ -171,6 +214,7 @@ export default function LoginPage() {
             ).start();
         });
     }, []);
+
     // =============================
     // SHAKE
     // =============================
@@ -194,11 +238,13 @@ export default function LoginPage() {
             }),
         ]).start();
     }
+
     function resetError() {
         if (error) {
             setError(null);
         }
     }
+
     // =============================
     // TERMS
     // =============================
@@ -217,55 +263,40 @@ export default function LoginPage() {
         setTermsVisible(false);
         handleGoogleLogin();
     }
+
     function acceptGuestTerms() {
         setTermsAccepted(true);
         setTermsVisible(false);
         handleGuest();
     }
+
     // =============================
     // GOOGLE: ACCOUNT NACH LOGIN AUFLÖSEN
     // =============================
-    // Gemeinsame Logik für Native (nach manuellem Token-Exchange) und Web
-    // (nach Full-Page-Redirect, siehe checkCurrentAccount):
     // 1. Gibt es lokal schon einen Account zu dieser authId?
     // 2. Sonst: gibt es ein Supabase-Profil dazu (anderes Gerät)?
     // 3. Sonst: neuer User → Onboarding.
-    async function resolveAccountAfterGoogleLogin(
-        user: any
-    ) {
+    async function resolveAccountAfterGoogleLogin(user: any) {
+        if (resolvingRef.current) {
+            return;
+        }
+        resolvingRef.current = true;
+
         try {
-            console.log(
-                "GOOGLE USER ID:",
-                user.id
-            );
-            console.log(
-                "GOOGLE USER EMAIL:",
-                user.email
-            );
+            console.log("GOOGLE USER ID:", user.id);
+            console.log("GOOGLE USER EMAIL:", user.email);
 
             // 1. LOCAL ACCOUNT CHECK
-            console.log(
-                "GOOGLE: checking local account..."
-            );
-            const existingLocalAccount =
-                await getAccountByAuthId(
-                    user.id
-                );
+            const existingLocalAccount = await getAccountByAuthId(user.id);
 
             if (existingLocalAccount) {
-                console.log(
-                    "GOOGLE: LOCAL ACCOUNT FOUND"
-                );
+                console.log("GOOGLE: LOCAL ACCOUNT FOUND");
                 await saveAccount({
-                    username:
-                        existingLocalAccount.username,
+                    username: existingLocalAccount.username,
                     guest: false,
                     authId: user.id,
-                    avatar:
-                        existingLocalAccount.avatar,
-                    rating:
-                        existingLocalAccount.rating ??
-                        1000,
+                    avatar: existingLocalAccount.avatar,
+                    rating: existingLocalAccount.rating ?? 1000,
                 });
                 setGoogleLoading(false);
                 router.replace("/");
@@ -273,17 +304,10 @@ export default function LoginPage() {
             }
 
             // 2. SUPABASE PROFILE CHECK
-            console.log(
-                "GOOGLE: checking Supabase profile..."
-            );
-            const {
-                data: profile,
-                error: profileError,
-            } = await supabase
+            console.log("GOOGLE: checking Supabase profile...");
+            const { data: profile, error: profileError } = await supabase
                 .from("profiles")
-                .select(
-                    "id, username, rating, avatar"
-                )
+                .select("id, username, rating, avatar")
                 .eq("id", user.id)
                 .maybeSingle();
 
@@ -293,54 +317,36 @@ export default function LoginPage() {
 
             // 3. EXISTING SUPABASE PROFILE
             if (profile) {
-                console.log(
-                    "GOOGLE: SUPABASE PROFILE FOUND"
-                );
-                console.log(
-                    "GOOGLE: restoring profile locally..."
-                );
+                console.log("GOOGLE: SUPABASE PROFILE FOUND");
                 await saveAccount({
                     username: profile.username,
                     guest: false,
                     authId: user.id,
-                    avatar:
-                        profile.avatar ??
-                        undefined,
+                    avatar: profile.avatar ?? undefined,
                     rating:
-                        typeof profile.rating ===
-                            "number"
+                        typeof profile.rating === "number"
                             ? profile.rating
                             : 1000,
                 });
-                console.log(
-                    "GOOGLE: profile restored, going directly to app"
-                );
                 setGoogleLoading(false);
                 router.replace("/");
                 return;
             }
 
             // 4. REALLY NEW ACCOUNT
-            console.log(
-                "GOOGLE: NO LOCAL ACCOUNT, NO SUPABASE PROFILE → onboarding"
-            );
+            console.log("GOOGLE: NEW USER → onboarding");
             setGoogleLoading(false);
-            router.replace(
-                "/auth/onboarding"
-            );
+            router.replace("/auth/onboarding");
         } catch (e: any) {
-            console.error(
-                "GOOGLE ACCOUNT RESOLVE ERROR:",
-                e
-            );
+            console.error("GOOGLE ACCOUNT RESOLVE ERROR:", e);
+            resolvingRef.current = false;
             setGoogleLoading(false);
-            setError(
-                e?.message ||
-                "Google login failed."
-            );
+            setLoading(false);
+            setError(e?.message || "Google login failed.");
             triggerShake();
         }
     }
+
     // =============================
     // GOOGLE LOGIN
     // =============================
@@ -348,47 +354,29 @@ export default function LoginPage() {
         try {
             resetError();
             setGoogleLoading(true);
-            console.log(
-                "================================="
-            );
-            console.log(
-                "GOOGLE LOGIN START"
-            );
-            console.log(
-                "================================="
-            );
+            console.log("=================================");
+            console.log("GOOGLE LOGIN START");
+            console.log("=================================");
 
             // ---------------------------------
             // WEB: FULL-PAGE-REDIRECT
             // ---------------------------------
-            // Kein Popup mehr auf Web: iOS Safari (v.a. iPad) blockiert
-            // bzw. beendet Popup-Fenster oft, bevor die Tokens
-            // zurückkommen – das war vermutlich der Grund für
-            // "Verbindung zum Server kann nicht hergestellt werden".
-            // Nach der Rückkehr von Google übernimmt checkCurrentAccount().
+            // Rückkehr direkt auf /auth/login, damit checkCurrentAccount()
+            // die Session sofort verarbeitet (nicht erst über die Root-Seite).
+            // Diese URL MUSS in Supabase unter Authentication →
+            // URL Configuration → Redirect URLs eingetragen sein.
             if (Platform.OS === "web") {
-                const webRedirectTo =
-                    makeRedirectUri({
-                        isTripleSlashed: false,
+                const webRedirectTo = `${window.location.origin}/auth/login`;
+
+                console.log("GOOGLE WEB REDIRECT:", webRedirectTo);
+
+                const { error: oauthError } =
+                    await supabase.auth.signInWithOAuth({
+                        provider: "google",
+                        options: {
+                            redirectTo: webRedirectTo,
+                        },
                     });
-
-                console.log(
-                    "GOOGLE WEB REDIRECT:",
-                    webRedirectTo
-                );
-
-                const {
-                    error: oauthError,
-                } =
-                    await supabase.auth.signInWithOAuth(
-                        {
-                            provider: "google",
-                            options: {
-                                redirectTo:
-                                    webRedirectTo,
-                            },
-                        }
-                    );
 
                 if (oauthError) {
                     throw oauthError;
@@ -401,226 +389,139 @@ export default function LoginPage() {
             // ---------------------------------
             // NATIVE (iOS / Android App)
             // ---------------------------------
-            const redirectTo =
-                makeRedirectUri({
-                    scheme: "povcheck",
-                    path: "/auth/callback",
-                    isTripleSlashed: false,
+            const redirectTo = makeRedirectUri({
+                scheme: "povcheck",
+                path: "/auth/callback",
+                isTripleSlashed: false,
+            });
+            console.log("GOOGLE REDIRECT:", redirectTo);
+
+            const { data, error: oauthError } =
+                await supabase.auth.signInWithOAuth({
+                    provider: "google",
+                    options: {
+                        redirectTo,
+                        skipBrowserRedirect: true,
+                    },
                 });
-            console.log(
-                "GOOGLE REDIRECT:",
-                redirectTo
-            );
-            const {
-                data,
-                error: oauthError,
-            } =
-                await supabase.auth.signInWithOAuth(
-                    {
-                        provider: "google",
-                        options: {
-                            redirectTo,
-                            skipBrowserRedirect:
-                                true,
-                        },
-                    }
-                );
-            console.log(
-                "GOOGLE: signInWithOAuth finished"
-            );
-            console.log(
-                "GOOGLE OAUTH ERROR:",
-                oauthError
-            );
+            console.log("GOOGLE OAUTH ERROR:", oauthError);
+
             if (oauthError) {
                 throw oauthError;
             }
             if (!data?.url) {
-                throw new Error(
-                    "No Google authentication URL received."
-                );
+                throw new Error("No Google authentication URL received.");
             }
-            const result =
-                await WebBrowser.openAuthSessionAsync(
-                    data.url,
-                    redirectTo
-                );
-            console.log(
-                "GOOGLE RESULT:",
-                result
+
+            const result = await WebBrowser.openAuthSessionAsync(
+                data.url,
+                redirectTo
             );
-            if (
-                result.type !== "success" ||
-                typeof result.url !== "string"
-            ) {
-                console.log(
-                    "GOOGLE: authentication cancelled."
-                );
+            console.log("GOOGLE RESULT:", result);
+
+            if (result.type !== "success" || typeof result.url !== "string") {
+                console.log("GOOGLE: authentication cancelled.");
                 setGoogleLoading(false);
                 return;
             }
-            const callbackUrl =
-                result.url;
-            console.log(
-                "GOOGLE CALLBACK RECEIVED"
-            );
-            const hashIndex =
-                callbackUrl.indexOf("#");
+
+            const callbackUrl = result.url;
+            const hashIndex = callbackUrl.indexOf("#");
             if (hashIndex === -1) {
                 throw new Error(
                     "Google authentication returned without authentication tokens."
                 );
             }
-            const hash =
-                callbackUrl.substring(
-                    hashIndex + 1
-                );
-            const hashParams =
-                new URLSearchParams(hash);
-            const accessToken =
-                hashParams.get(
-                    "access_token"
-                );
-            const refreshToken =
-                hashParams.get(
-                    "refresh_token"
-                );
+
+            const hashParams = new URLSearchParams(
+                callbackUrl.substring(hashIndex + 1)
+            );
+            const accessToken = hashParams.get("access_token");
+            const refreshToken = hashParams.get("refresh_token");
+
             console.log(
                 "GOOGLE ACCESS TOKEN:",
-                accessToken
-                    ? "FOUND"
-                    : "MISSING"
+                accessToken ? "FOUND" : "MISSING"
             );
             console.log(
                 "GOOGLE REFRESH TOKEN:",
-                refreshToken
-                    ? "FOUND"
-                    : "MISSING"
+                refreshToken ? "FOUND" : "MISSING"
             );
-            if (
-                !accessToken ||
-                !refreshToken
-            ) {
+
+            if (!accessToken || !refreshToken) {
                 const callbackError =
-                    hashParams.get(
-                        "error_description"
-                    ) ||
-                    hashParams.get(
-                        "error"
-                    );
+                    hashParams.get("error_description") ||
+                    hashParams.get("error");
                 throw new Error(
                     callbackError ||
                     "Google authentication did not return valid session tokens."
                 );
             }
-            const {
-                data: sessionData,
-                error: sessionError,
-            } =
-                await supabase.auth.setSession(
-                    {
-                        access_token:
-                            accessToken,
-                        refresh_token:
-                            refreshToken,
-                    }
-                );
+
+            const { data: sessionData, error: sessionError } =
+                await supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
+                });
             console.log(
                 "GOOGLE SESSION:",
-                sessionData.session
-                    ? "SESSION CREATED"
-                    : "NO SESSION"
+                sessionData.session ? "SESSION CREATED" : "NO SESSION"
             );
             if (sessionError) {
                 throw sessionError;
             }
-            const {
-                data: userData,
-                error: userError,
-            } =
+
+            const { data: userData, error: userError } =
                 await supabase.auth.getUser();
             if (userError) {
                 throw userError;
             }
-            const user =
-                userData.user;
+
+            const user = userData.user;
             if (!user) {
                 throw new Error(
                     "Google login completed, but no user was found."
                 );
             }
 
-            await resolveAccountAfterGoogleLogin(
-                user
-            );
+            await resolveAccountAfterGoogleLogin(user);
         } catch (e: any) {
-            console.error(
-                "================================="
-            );
-            console.error(
-                "GOOGLE LOGIN ERROR:",
-                e
-            );
-            console.error(
-                "================================="
-            );
+            console.error("GOOGLE LOGIN ERROR:", e);
             setGoogleLoading(false);
-            setError(
-                e?.message ||
-                "Google login failed."
-            );
+            setError(e?.message || "Google login failed.");
             triggerShake();
         }
     }
+
     // =============================
     // GUEST
     // =============================
     async function handleGuest() {
         try {
             resetError();
-
             console.log("GUEST LOGIN START");
 
             const account = await createGuestAccount();
-
-            console.log(
-                "GUEST CREATED:",
-                account.username
-            );
-
-            console.log(
-                "GUEST → SKILL LEVEL"
-            );
+            console.log("GUEST CREATED:", account.username);
 
             router.replace("/auth/skillLevel");
         } catch (e) {
-            console.error(
-                "GUEST LOGIN ERROR:",
-                e
-            );
-
-            Alert.alert(
-                "Error",
-                "Could not continue as guest."
-            );
+            console.error("GUEST LOGIN ERROR:", e);
+            Alert.alert("Error", "Could not continue as guest.");
         }
     }
+
     // =============================
     // LOADING
     // =============================
     if (loading) {
         return (
             <View style={styles.loading}>
-                <Text
-                    style={
-                        styles.loadingText
-                    }
-                >
-                    Loading...
-                </Text>
+                <Text style={styles.loadingText}>Loading...</Text>
             </View>
         );
     }
+
     // =============================
     // UI
     // =============================
@@ -635,35 +536,19 @@ export default function LoginPage() {
                 <Animated.View
                     style={{
                         opacity: appear,
-                        transform: [
-                            {
-                                scale,
-                            },
-                        ],
+                        transform: [{ scale }],
                         width: "100%",
-                        alignItems:
-                            "center",
+                        alignItems: "center",
                     }}
                 >
                     <Animated.View
                         style={{
                             transform: [
                                 {
-                                    translateY:
-                                        float.interpolate(
-                                            {
-                                                inputRange:
-                                                    [
-                                                        0,
-                                                        1,
-                                                    ],
-                                                outputRange:
-                                                    [
-                                                        0,
-                                                        -6,
-                                                    ],
-                                            }
-                                        ),
+                                    translateY: float.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [0, -6],
+                                    }),
                                 },
                             ],
                         }}
@@ -672,156 +557,86 @@ export default function LoginPage() {
                             style={{
                                 transform: [
                                     {
-                                        translateX:
-                                            shake.interpolate(
-                                                {
-                                                    inputRange:
-                                                        [
-                                                            -1,
-                                                            1,
-                                                        ],
-                                                    outputRange:
-                                                        [
-                                                            -8,
-                                                            8,
-                                                        ],
-                                                }
-                                            ),
+                                        translateX: shake.interpolate({
+                                            inputRange: [-1, 1],
+                                            outputRange: [-8, 8],
+                                        }),
                                     },
                                 ],
                                 width: "100%",
-                                alignItems:
-                                    "center",
+                                alignItems: "center",
                             }}
                         >
                             <BlurView
                                 intensity={35}
                                 tint="dark"
-                                style={
-                                    styles.card
-                                }
+                                style={styles.card}
                             >
                                 {/* LOGO */}
-                                <Text
-                                    style={
-                                        styles.logo
-                                    }
-                                >
+                                <Text style={styles.logo}>
                                     POV
-                                    <Text
-                                        style={
-                                            styles.logoAccent
-                                        }
-                                    >
+                                    <Text style={styles.logoAccent}>
                                         Check
                                     </Text>
                                 </Text>
-                                <Text
-                                    style={
-                                        styles.subtitle
-                                    }
-                                >
+                                <Text style={styles.subtitle}>
                                     Play. Learn. Improve.
                                 </Text>
+
                                 {/* GOOGLE */}
                                 <Pressable
                                     style={[
                                         styles.googleButton,
-                                        googleLoading &&
-                                        styles.disabled,
+                                        googleLoading && styles.disabled,
                                     ]}
-                                    onPress={
-                                        openTerms
-                                    }
-                                    disabled={
-                                        googleLoading
-                                    }
+                                    onPress={openTerms}
+                                    disabled={googleLoading}
                                 >
-                                    <Text
-                                        style={
-                                            styles.googleIcon
-                                        }
-                                    >
-                                        G
-                                    </Text>
-                                    <Text
-                                        style={
-                                            styles.googleText
-                                        }
-                                    >
+                                    <Text style={styles.googleIcon}>G</Text>
+                                    <Text style={styles.googleText}>
                                         {googleLoading
                                             ? "Connecting..."
                                             : "Continue with Google"}
                                     </Text>
                                 </Pressable>
+
                                 {/* ERROR */}
                                 {error && (
-                                    <Text
-                                        style={
-                                            styles.error
-                                        }
-                                    >
-                                        {error}
-                                    </Text>
+                                    <Text style={styles.error}>{error}</Text>
                                 )}
+
                                 {/* DIVIDER */}
-                                <View
-                                    style={
-                                        styles.dividerRow
-                                    }
-                                >
-                                    <View
-                                        style={
-                                            styles.divider
-                                        }
-                                    />
-                                    <Text
-                                        style={
-                                            styles.orText
-                                        }
-                                    >
-                                        or
-                                    </Text>
-                                    <View
-                                        style={
-                                            styles.divider
-                                        }
-                                    />
+                                <View style={styles.dividerRow}>
+                                    <View style={styles.divider} />
+                                    <Text style={styles.orText}>or</Text>
+                                    <View style={styles.divider} />
                                 </View>
+
                                 {/* GUEST */}
                                 <Pressable
-                                    style={
-                                        styles.guestButton}
-                                    onPress={
-                                        openGuestTerms
-                                    }
+                                    style={styles.guestButton}
+                                    onPress={openGuestTerms}
                                 >
-                                    <Text
-                                        style={
-                                            styles.guestText
-                                        }
-                                    >
+                                    <Text style={styles.guestText}>
                                         Continue as guest
                                     </Text>
                                 </Pressable>
+
                                 {/* TERMS */}
                                 <View style={styles.termsContainer}>
                                     <Text style={styles.terms}>
                                         By continuing, you agree to our
                                     </Text>
-
                                     <Pressable onPress={openTerms}>
                                         <Text style={styles.termsLink}>
-                                            Terms of Service  </Text>
+                                            Terms of Service
+                                        </Text>
                                     </Pressable>
-
-                                    <Text style={styles.terms}>
-                                        and
-                                    </Text>
-
+                                    <Text style={styles.terms}>and</Text>
                                     <Pressable onPress={openTerms}>
                                         <Text style={styles.termsLink}>
-                                            Privacy Policy. </Text>
+                                            Privacy Policy.
+                                        </Text>
                                     </Pressable>
                                 </View>
                             </BlurView>
@@ -829,6 +644,7 @@ export default function LoginPage() {
                     </Animated.View>
                 </Animated.View>
             </View>
+
             {/* ================================= */}
             {/* TERMS MODAL */}
             {/* ================================= */}
@@ -836,121 +652,56 @@ export default function LoginPage() {
                 visible={termsVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() =>
-                    setTermsVisible(false)
-                }
+                onRequestClose={() => setTermsVisible(false)}
             >
-                <View
-                    style={
-                        styles.modalOverlay
-                    }
-                >
-                    <View
-                        style={
-                            styles.termsModal
-                        }
-                    >
-                        <Text
-                            style={
-                                styles.modalTitle
-                            }
-                        >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.termsModal}>
+                        <Text style={styles.modalTitle}>
                             Welcome to POVCheck
                         </Text>
-                        <Text
-                            style={
-                                styles.modalSubtitle
-                            }
-                        >
-                            Before continuing, please
-                            review and accept our Terms
-                            of Service and Privacy Policy.
+                        <Text style={styles.modalSubtitle}>
+                            Before continuing, please review and accept our
+                            Terms of Service and Privacy Policy.
                         </Text>
+
                         <Pressable
-                            style={
-                                styles.modalDocument
-                            }
-                            onPress={() =>
-                                router.push(
-                                    "/terms"
-                                )
-                            }
+                            style={styles.modalDocument}
+                            onPress={() => router.push("/terms")}
                         >
-                            <Text
-                                style={
-                                    styles.modalDocumentTitle
-                                }
-                            >
+                            <Text style={styles.modalDocumentTitle}>
                                 Terms of Service
                             </Text>
-                            <Text
-                                style={
-                                    styles.modalDocumentArrow
-                                }
-                            >
-                                ›
-                            </Text>
+                            <Text style={styles.modalDocumentArrow}>›</Text>
                         </Pressable>
+
                         <Pressable
-                            style={
-                                styles.modalDocument
-                            }
-                            onPress={() =>
-                                router.push(
-                                    "/privacypolicy"
-                                )
-                            }
+                            style={styles.modalDocument}
+                            onPress={() => router.push("/privacypolicy")}
                         >
-                            <Text
-                                style={
-                                    styles.modalDocumentTitle
-                                }
-                            >
+                            <Text style={styles.modalDocumentTitle}>
                                 Privacy Policy
                             </Text>
-                            <Text
-                                style={
-                                    styles.modalDocumentArrow
-                                }
-                            >
-                                ›
-                            </Text>
+                            <Text style={styles.modalDocumentArrow}>›</Text>
                         </Pressable>
+
                         <Pressable
-                            style={
-                                styles.acceptButton
-                            }
+                            style={styles.acceptButton}
                             onPress={
                                 termsForGuest
                                     ? acceptGuestTerms
                                     : acceptTerms
                             }
                         >
-                            <Text
-                                style={
-                                    styles.acceptText
-                                }
-                            >
+                            <Text style={styles.acceptText}>
                                 Agree & Continue
                             </Text>
                         </Pressable>
+
                         <Pressable
-                            style={
-                                styles.cancelButton
-                            }
-                            onPress={() =>
-                                setTermsVisible(
-                                    false
-                                )
-                            }
+                            style={styles.cancelButton}
+                            onPress={() => setTermsVisible(false)}
                         >
-                            <Text
-                                style={
-                                    styles.cancelText
-                                }
-                            >
-                                Cancel
-                            </Text>
+                            <Text style={styles.cancelText}>Cancel</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -958,6 +709,7 @@ export default function LoginPage() {
         </ImageBackground>
     );
 }
+
 // =============================
 // STYLES
 // =============================
@@ -969,15 +721,12 @@ const styles = StyleSheet.create({
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor:
-            "rgba(0,0,0,0.55)",
+        backgroundColor: "rgba(0,0,0,0.55)",
     },
     root: {
         flex: 1,
-        justifyContent:
-            "center",
-        alignItems:
-            "center",
+        justifyContent: "center",
+        alignItems: "center",
         paddingHorizontal: 20,
     },
     card: {
@@ -988,8 +737,7 @@ const styles = StyleSheet.create({
         paddingVertical: 34,
         overflow: "hidden",
         borderWidth: 1,
-        borderColor:
-            "rgba(255,255,255,0.15)",
+        borderColor: "rgba(255,255,255,0.15)",
     },
     logo: {
         fontSize: 31,
@@ -1039,8 +787,7 @@ const styles = StyleSheet.create({
     divider: {
         flex: 1,
         height: 1,
-        backgroundColor:
-            "rgba(255,255,255,0.10)",
+        backgroundColor: "rgba(255,255,255,0.10)",
     },
     orText: {
         color: "#777",
@@ -1078,8 +825,7 @@ const styles = StyleSheet.create({
         color: "#aaa",
         fontSize: 11,
         lineHeight: 15,
-        textDecorationLine:
-            "underline",
+        textDecorationLine: "underline",
         marginRight: 4,
     },
     termsContainer: {
@@ -1092,22 +838,17 @@ const styles = StyleSheet.create({
     loading: {
         flex: 1,
         backgroundColor: "#000",
-        justifyContent:
-            "center",
-        alignItems:
-            "center",
+        justifyContent: "center",
+        alignItems: "center",
     },
     loadingText: {
         color: "#fff",
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor:
-            "rgba(0,0,0,0.72)",
-        justifyContent:
-            "center",
-        alignItems:
-            "center",
+        backgroundColor: "rgba(0,0,0,0.72)",
+        justifyContent: "center",
+        alignItems: "center",
         paddingHorizontal: 22,
     },
     termsModal: {
@@ -1117,8 +858,7 @@ const styles = StyleSheet.create({
         padding: 24,
         backgroundColor: "#111",
         borderWidth: 1,
-        borderColor:
-            "rgba(255,255,255,0.12)",
+        borderColor: "rgba(255,255,255,0.12)",
     },
     modalTitle: {
         color: "#fff",
@@ -1135,15 +875,12 @@ const styles = StyleSheet.create({
     modalDocument: {
         height: 58,
         borderRadius: 15,
-        backgroundColor:
-            "rgba(255,255,255,0.055)",
+        backgroundColor: "rgba(255,255,255,0.055)",
         borderWidth: 1,
-        borderColor:
-            "rgba(255,255,255,0.08)",
+        borderColor: "rgba(255,255,255,0.08)",
         flexDirection: "row",
         alignItems: "center",
-        justifyContent:
-            "space-between",
+        justifyContent: "space-between",
         paddingHorizontal: 17,
         marginBottom: 10,
     },
@@ -1161,8 +898,7 @@ const styles = StyleSheet.create({
         borderRadius: 15,
         backgroundColor: "#8FAE7C",
         alignItems: "center",
-        justifyContent:
-            "center",
+        justifyContent: "center",
         marginTop: 12,
     },
     acceptText: {
@@ -1173,8 +909,7 @@ const styles = StyleSheet.create({
     cancelButton: {
         height: 45,
         alignItems: "center",
-        justifyContent:
-            "center",
+        justifyContent: "center",
     },
     cancelText: {
         color: "#777",

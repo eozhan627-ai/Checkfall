@@ -167,8 +167,8 @@ export default function WaitingScreen() {
         };
     }, []);
 
-    // Suche abbrechen und zurück navigieren.
-    // Entspricht dem Server-Event "cancel_matchmaking" (siehe server.js).
+    // Cancel search and navigate back.
+    // Matches the server event "cancel_matchmaking" (see server.js).
     const handleCancel = () => {
         const socket = getSocket();
 
@@ -192,13 +192,12 @@ export default function WaitingScreen() {
 
                 {/* TITLE */}
                 <Text style={styles.title}>
-                    Gegner wird gesucht
+                    Finding an opponent
                 </Text>
 
                 {/* SUBTITLE */}
                 <Text style={styles.subtitle}>
-                    Wir suchen einen passenden Gegner für dich.
-                </Text>
+                    We're finding a suitable opponent for you.   </Text>
 
                 {/* CHESS BOARD */}
                 <WaitingChessBoard />
@@ -209,7 +208,7 @@ export default function WaitingScreen() {
                     <View style={styles.statusDot} />
 
                     <Text style={styles.statusText}>
-                        Suche nach einem Gegner...
+                        Searching for an opponent...
                     </Text>
 
                 </View>
@@ -223,14 +222,14 @@ export default function WaitingScreen() {
                     ]}
                 >
                     <Text style={styles.cancelButtonText}>
-                        Abbrechen
+                        Cancel
                     </Text>
                 </Pressable>
 
                 {/* INFO */}
                 <Text style={styles.info}>
-                    Das Match startet automatisch,
-                    sobald ein Gegner gefunden wurde.
+                    The match will start automatically
+                    once an opponent has been found.
                 </Text>
 
             </View>

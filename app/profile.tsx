@@ -1,28 +1,46 @@
 import VipBadge from "@/components/VipBadge";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
     Alert,
-    ImageBackground, Linking, Pressable,
+    ImageBackground,
+    Linking,
+    Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
-    useWindowDimensions,
-    View
+    View,
 } from "react-native";
 import ProfileAvatar from "../components/ProfileAvatar";
 import {
     AccountType,
     getCurrentAccount,
+    logoutAccount,
     updateAccount,
 } from "../lib/account";
+import { getSolvedPuzzleCount } from "../lib/puzzleStats";
 import { supabase } from "../lib/supabase";
+
+const DONATION_URL = "https://paypal.me/businessacc263";
+
+// Alert.alert ohne/mit Buttons funktioniert auf Web nicht zuverlässig.
+// Diese Hilfe zeigt Meldungen auf allen Plattformen an.
+function showMessage(title: string, message: string) {
+    if (Platform.OS === "web") {
+        if (typeof window !== "undefined") {
+            window.alert(`${title}\n\n${message}`);
+        }
+        return;
+    }
+    Alert.alert(title, message);
+}
+
 export default function Profile() {
-    const { width } = useWindowDimensions();
     const [account, setAccount] = useState<AccountType | null>(null);
     const [username, setUsername] = useState("");
     const [editingName, setEditingName] = useState(false);
@@ -33,75 +51,130 @@ export default function Profile() {
         puzzles: 0,
         rating: 1000,
     });
+
     const params = useLocalSearchParams();
     const externalName = params.name as string | undefined;
     const externalAvatar = params.avatar as string | undefined;
     const externalUserId = params.userId as string | undefined;
+    const externalRating = params.rating as string | undefined;
     const isForeignProfile = !!externalUserId;
-    const externalRating = params.rating as string | undefined; // neu
+
     const backgroundImage = require("../assets/images/profilebackground.png");
-    const isVip = !isForeignProfile && !!account?.vipTier && account.vipTier !== "none"; // NEU
-    useEffect(() => {
-        if (isForeignProfile) {
-            setStats((prev) => ({
-                ...prev,
-                rating: externalRating ? Number(externalRating) || 1000 : 1000,
-            }));
-            setLoading(false);
-            return;
-        }
-        (async () => {
-            const acc = await getCurrentAccount();
-            if (acc) {
-                setAccount(acc);
-                setUsername(acc.username);
-                const storedHistory = await AsyncStorage.getItem("game_history");
-                const history = storedHistory
-                    ? JSON.parse(storedHistory)
-                    : [];
-                const onlineGames = history.filter(
-                    (game: any) => game.mode === "online"
-                );
-                const wins = onlineGames.filter(
-                    (game: any) => game.result === "win"
-                ).length;
-                setStats({
-                    games: onlineGames.length,
-                    wins,
-                    puzzles: 0,
-                    rating: acc.rating ?? 1000,
-                });
+    const isVip =
+        !isForeignProfile && !!account?.vipTier && account.vipTier !== "none";
+
+    // Läuft bei jedem Öffnen des Screens, damit z.B. neu gelöste Puzzles sofort zählen
+    useFocusEffect(
+        useCallback(() => {
+            if (isForeignProfile) {
+                (async () => {
+                    const { data, error } = await supabase
+                        .from("profiles")
+                        .select("rating, games_played, wins, puzzles_solved")
+                        .eq("id", externalUserId)
+                        .maybeSingle();
+
+                    if (error) console.log("FOREIGN STATS ERROR:", error);
+
+                    setStats({
+                        games: data?.games_played ?? 0,
+                        wins: data?.wins ?? 0,
+                        puzzles: data?.puzzles_solved ?? 0,
+                        rating:
+                            data?.rating ??
+                            (externalRating ? Number(externalRating) || 1000 : 1000),
+                    });
+                    setLoading(false);
+                })();
+                return;
             }
-            setLoading(false);
-        })();
-    }, [isForeignProfile]);
+
+            (async () => {
+                const acc = await getCurrentAccount();
+                if (acc) {
+                    setAccount(acc);
+                    setUsername((prev) => prev || acc.username);
+
+                    const storedHistory = await AsyncStorage.getItem("game_history");
+                    const history = storedHistory ? JSON.parse(storedHistory) : [];
+                    const onlineGames = history.filter(
+                        (game: any) => game.mode === "online"
+                    );
+                    const wins = onlineGames.filter(
+                        (game: any) => game.result === "win"
+                    ).length;
+                    const puzzles = await getSolvedPuzzleCount();
+
+                    setStats({
+                        games: onlineGames.length,
+                        wins,
+                        puzzles,
+                        rating: acc.rating ?? 1000,
+                    });
+
+                    // Eigene Stats hochladen, damit Freunde sie sehen können
+                    if (acc.authId) {
+                        const { error } = await supabase
+                            .from("profiles")
+                            .update({
+                                games_played: onlineGames.length,
+                                wins,
+                                puzzles_solved: puzzles,
+                            })
+                            .eq("id", acc.authId);
+                        if (error) console.log("STATS SYNC ERROR:", error);
+                    }
+                }
+                setLoading(false);
+            })();
+        }, [isForeignProfile, externalRating, externalUserId])
+    );
+
     const changeAvatar = async () => {
         if (!account?.id) return;
+
         const { status } =
             await ImagePicker.requestMediaLibraryPermissionsAsync();
+
         if (status !== "granted") {
-            Alert.alert(
+            showMessage(
                 "Berechtigung benötigt",
                 "Bitte erlaube den Zugriff auf deine Fotos."
             );
             return;
         }
-        const result =
-            await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [1, 1],
-                quality: 0.8,
-            });
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+
         if (result.canceled) return;
+
         const asset = result.assets[0];
         const formData = new FormData();
         formData.append("userId", account.id);
-        formData.append("avatar", {
-            uri: asset.uri,
-            type: asset.mimeType || "image/jpeg",
-            name: asset.fileName || "avatar.jpg",
-        } as any);
+
+        if (Platform.OS === "web") {
+            // Auf Web ist asset.uri eine blob:/data:-URL. Ein Objekt mit
+            // {uri,type,name} wie auf Native wird hier nicht akzeptiert,
+            // deshalb die echte Datei als Blob anhängen.
+            const blob = await (await fetch(asset.uri)).blob();
+            formData.append(
+                "avatar",
+                blob,
+                asset.fileName || "avatar.jpg"
+            );
+        } else {
+            formData.append("avatar", {
+                uri: asset.uri,
+                type: asset.mimeType || "image/jpeg",
+                name: asset.fileName || "avatar.jpg",
+            } as any);
+        }
+
         try {
             const res = await fetch(
                 "https://checkfall-server-clean-1.onrender.com/upload-avatar",
@@ -111,14 +184,14 @@ export default function Profile() {
                 }
             );
             const data = await res.json();
+
             if (!res.ok) {
-                throw new Error(
-                    data?.error || `Upload failed: ${res.status}`
-                );
+                throw new Error(data?.error || `Upload failed: ${res.status}`);
             }
             if (!data.url) {
                 throw new Error("Server returned no avatar URL");
             }
+
             const updated = await updateAccount(account.id, {
                 avatar: data.url,
             });
@@ -127,13 +200,12 @@ export default function Profile() {
             }
         } catch (error) {
             console.log("AVATAR ERROR:", error);
-            Alert.alert(
+            showMessage(
                 "Fehler",
                 "Das Profilbild konnte nicht gespeichert werden."
             );
         }
     };
-    const DONATION_URL = "https://paypal.me/businessacc263"; // ← hier deinen echten Link eintragen
 
     const openDonation = async () => {
         try {
@@ -141,15 +213,17 @@ export default function Profile() {
             if (supported) {
                 await Linking.openURL(DONATION_URL);
             } else {
-                Alert.alert("Fehler", "Der Link konnte nicht geöffnet werden.");
+                showMessage("Fehler", "Der Link konnte nicht geöffnet werden.");
             }
         } catch (error) {
             console.log("DONATION LINK ERROR:", error);
-            Alert.alert("Fehler", "Der Link konnte nicht geöffnet werden.");
+            showMessage("Fehler", "Der Link konnte nicht geöffnet werden.");
         }
     };
+
     const saveUsername = async () => {
         if (!account || !username.trim()) return;
+
         const updated = await updateAccount(account.id, {
             username: username.trim(),
         });
@@ -158,74 +232,63 @@ export default function Profile() {
         }
         setEditingName(false);
     };
-    const logout = async () => {
-        Alert.alert(
-            "Abmelden",
-            "Möchtest du dich wirklich abmelden?",
-            [
-                {
-                    text: "Abbrechen",
-                    style: "cancel",
-                },
-                {
-                    text: "Abmelden",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            console.log("LOGOUT: starting...");
-                            // Supabase-Session beenden
-                            const { error } =
-                                await supabase.auth.signOut();
-                            if (error) {
-                                console.error(
-                                    "LOGOUT: Supabase signOut error:",
-                                    error
-                                );
-                                throw error;
-                            }
-                            console.log(
-                                "LOGOUT: Supabase session cleared"
-                            );
-                            // Lokales POVCheck-Konto löschen
-                            await AsyncStorage.removeItem(
-                                "@current_account"
-                            );
-                            console.log(
-                                "LOGOUT: local account cleared"
-                            );
-                            // Zur Login-Seite
-                            router.replace("/auth/login");
-                        } catch (error) {
-                            console.error(
-                                "LOGOUT ERROR:",
-                                error
-                            );
-                            Alert.alert(
-                                "Fehler",
-                                "Du konntest nicht abgemeldet werden."
-                            );
-                        }
-                    },
-                },
-            ]
-        );
+
+    // =============================
+    // LOGOUT
+    // =============================
+    const performLogout = async () => {
+        try {
+            // beendet die Supabase-Session und entfernt @current_account
+            await logoutAccount();
+        } catch (error) {
+            console.error("LOGOUT ERROR:", error);
+        }
+
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+            // Harter Reload, damit kein alter Zustand im Speicher bleibt
+            window.location.replace("/auth/login");
+        } else {
+            router.replace("/auth/login");
+        }
     };
+
+    const logout = () => {
+        // Alert.alert mit Buttons zeigt auf Web/iPad-Safari nichts an,
+        // deshalb dort window.confirm.
+        if (Platform.OS === "web") {
+            if (
+                typeof window !== "undefined" &&
+                window.confirm("Möchtest du dich wirklich abmelden?")
+            ) {
+                performLogout();
+            }
+            return;
+        }
+
+        Alert.alert("Abmelden", "Möchtest du dich wirklich abmelden?", [
+            { text: "Abbrechen", style: "cancel" },
+            {
+                text: "Abmelden",
+                style: "destructive",
+                onPress: performLogout,
+            },
+        ]);
+    };
+
     if (loading) {
         return (
             <View style={styles.loading}>
-                <Text style={styles.loadingText}>
-                    Profil wird geladen...
-                </Text>
+                <Text style={styles.loadingText}>Profil wird geladen...</Text>
             </View>
         );
     }
+
     const displayedName = isForeignProfile
         ? externalName || "Spieler"
         : account?.username || "Spieler";
-    const displayedAvatar = isForeignProfile
-        ? externalAvatar
-        : account?.avatar;
-    const avatarUri = displayedAvatar || "";
+    const avatarUri =
+        (isForeignProfile ? externalAvatar : account?.avatar) || "";
+
     return (
         <ImageBackground
             source={backgroundImage}
@@ -233,6 +296,7 @@ export default function Profile() {
             resizeMode="cover"
         >
             <View style={styles.darkOverlay} />
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.container}
@@ -245,11 +309,10 @@ export default function Profile() {
                     >
                         <Text style={styles.backText}>‹</Text>
                     </Pressable>
-                    <Text style={styles.headerTitle}>
-                        Profile
-                    </Text>
+                    <Text style={styles.headerTitle}>Profile</Text>
                     <View style={{ width: 42 }} />
                 </View>
+
                 {/* PROFILE HERO */}
                 <View style={styles.profileHero}>
                     <View style={styles.avatarContainer}>
@@ -271,19 +334,11 @@ export default function Profile() {
                                 size={150}
                             />
                         </TouchableOpacity>
-                        {!isForeignProfile && (
-                            <View style={styles.cameraBadge}>
-                                <Text style={styles.cameraText}>
-                                    ✎
-                                </Text>
-                            </View>
-                        )}
                     </View>
+
                     {/* USERNAME */}
                     {isForeignProfile ? (
-                        <Text style={styles.username}>
-                            {displayedName}
-                        </Text>
+                        <Text style={styles.username}>{displayedName}</Text>
                     ) : editingName ? (
                         <View style={styles.editNameRow}>
                             <TextInput
@@ -298,153 +353,86 @@ export default function Profile() {
                                 onPress={saveUsername}
                                 style={styles.saveButton}
                             >
-                                <Text style={styles.saveText}>
-                                    ✓
-                                </Text>
+                                <Text style={styles.saveText}>✓</Text>
                             </Pressable>
                         </View>
                     ) : (
-                        <Pressable
-                            onPress={() => setEditingName(true)}
-                        >
-                            <Text style={styles.username}>
-                                {displayedName}
-                            </Text>
+                        <Pressable onPress={() => setEditingName(true)}>
+                            <Text style={styles.username}>{displayedName}</Text>
                         </Pressable>
                     )}
-                    {!isForeignProfile && account?.vipTier && account.vipTier !== "none" && (
+
+                    {isVip && account?.vipTier && account.vipTier !== "none" && (
                         <View style={{ marginTop: 8 }}>
                             <VipBadge tier={account.vipTier} />
                         </View>
                     )}
                 </View>
+
                 {/* STATS */}
                 <View style={styles.statsContainer}>
-                    <Stat
-                        value={stats.games.toString()}
-                        label="Games"
-                    />
+                    <Stat value={stats.games.toString()} label="Games" />
                     <View style={styles.statDivider} />
-                    <Stat
-                        value={stats.wins.toString()}
-                        label="Wins"
-                    />
+                    <Stat value={stats.wins.toString()} label="Wins" />
                     <View style={styles.statDivider} />
-                    <Stat
-                        value={stats.puzzles.toString()}
-                        label="Puzzles"
-                    />
+                    <Stat value={stats.puzzles.toString()} label="Puzzles" />
                 </View>
+
                 {/* CHESS RATING */}
                 <View style={styles.ratingCard}>
                     <View>
-                        <Text style={styles.smallLabel}>
-                            Chess rating
-                        </Text>
+                        <Text style={styles.smallLabel}>Chess rating</Text>
                         <Text style={styles.rating}>
                             {stats.rating.toString()}
                         </Text>
                     </View>
                     <View style={styles.ratingBadge}>
-                        <Text style={styles.ratingBadgeText}>
-                            ♔
-                        </Text>
+                        <Text style={styles.ratingBadgeText}>♔</Text>
                     </View>
                 </View>
-                {/* ACCOUNT / ACTIONS */}
+
+                {/* ACTIONS */}
                 {!isForeignProfile && (
                     <>
-                        <Text style={styles.sectionTitle}>
-                            Account
-                        </Text>
                         <View style={styles.card}>
-                            <ProfileAction
-                                icon="◎"
-                                title="Profilbild ändern"
-                                subtitle="Wähle ein neues Profilbild"
-                                onPress={changeAvatar}
-                            />
-                            <View style={styles.separator} />
-                            <ProfileAction
-                                icon="✎"
-                                title="Username bearbeiten"
-                                subtitle="Ändere deinen Anzeigenamen"
-                                onPress={() =>
-                                    setEditingName(true)
-                                }
-                            />
-                            {/* NEU: VIP-Abo verwalten, nur für bestehende Abonnenten.
-                                War vorher eine eigene Karte auf dem Homescreen. */}
                             {isVip && (
                                 <>
-                                    <View style={styles.separator} />
                                     <ProfileAction
                                         icon="♛"
                                         title="VIP-Abo verwalten"
                                         subtitle="Tarif wechseln oder kündigen"
                                         onPress={() => router.push("/vip")}
                                     />
+                                    <View style={styles.separator} />
                                 </>
                             )}
+                            <ProfileAction
+                                icon="♥"
+                                title="POVCheck unterstützen"
+                                subtitle="Hilf mit, die App am Laufen zu halten"
+                                onPress={openDonation}
+                            />
                         </View>
-                        <View style={styles.separator} />
-                        <ProfileAction
-                            icon="♥"
-                            title="POVCheck unterstützen"
-                            subtitle="Hilf mit, die App am Laufen zu halten"
-                            onPress={openDonation}
-                        />
-                        {/* LOGOUT */}
-                        <Pressable
-                            style={styles.logoutButton}
-                            onPress={logout}
-                        >
-                            <Text style={styles.logoutText}>
-                                Abmelden
-                            </Text>
+
+                        <Pressable style={styles.logoutButton} onPress={logout}>
+                            <Text style={styles.logoutText}>Abmelden</Text>
                         </Pressable>
                     </>
                 )}
-                {isForeignProfile && (
-                    <>
-                        <Text style={styles.sectionTitle}>
-                            Player
-                        </Text>
-                        <View style={styles.card}>
-                            <ProfileAction
-                                icon="♟"
-                                title="Schachprofil"
-                                subtitle="Spielstatistiken und Rating"
-                                onPress={() => { }}
-                            />
-                        </View>
-                    </>
-                )}
-                <Text style={styles.version}>
-                    POVCheck
-                </Text>
             </ScrollView>
         </ImageBackground>
     );
 }
-function Stat({
-    value,
-    label,
-}: {
-    value: string;
-    label: string;
-}) {
+
+function Stat({ value, label }: { value: string; label: string }) {
     return (
         <View style={styles.stat}>
-            <Text style={styles.statValue}>
-                {value}
-            </Text>
-            <Text style={styles.statLabel}>
-                {label}
-            </Text>
+            <Text style={styles.statValue}>{value}</Text>
+            <Text style={styles.statLabel}>{label}</Text>
         </View>
     );
 }
+
 function ProfileAction({
     icon,
     title,
@@ -465,24 +453,17 @@ function ProfileAction({
             ]}
         >
             <View style={styles.actionIcon}>
-                <Text style={styles.actionIconText}>
-                    {icon}
-                </Text>
+                <Text style={styles.actionIconText}>{icon}</Text>
             </View>
             <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>
-                    {title}
-                </Text>
-                <Text style={styles.actionSubtitle}>
-                    {subtitle}
-                </Text>
+                <Text style={styles.actionTitle}>{title}</Text>
+                <Text style={styles.actionSubtitle}>{subtitle}</Text>
             </View>
-            <Text style={styles.chevron}>
-                ›
-            </Text>
+            <Text style={styles.chevron}>›</Text>
         </Pressable>
     );
 }
+
 const styles = StyleSheet.create({
     background: {
         flex: 1,
@@ -506,6 +487,7 @@ const styles = StyleSheet.create({
         paddingBottom: 60,
         alignItems: "center",
     },
+
     /* HEADER */
     header: {
         width: "100%",
@@ -536,6 +518,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
     },
+
     /* HERO */
     profileHero: {
         alignItems: "center",
@@ -543,26 +526,7 @@ const styles = StyleSheet.create({
         paddingBottom: 28,
     },
     avatarContainer: {
-        position: "relative",
         marginBottom: 18,
-    },
-    cameraBadge: {
-        position: "absolute",
-        right: 0,
-        bottom: 5,
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: "#7C9473",
-        justifyContent: "center",
-        alignItems: "center",
-        borderWidth: 3,
-        borderColor: "#16130F",
-    },
-    cameraText: {
-        color: "#14201A",
-        fontSize: 17,
-        fontWeight: "700",
     },
     username: {
         color: "#F8F4EE",
@@ -598,6 +562,7 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: "700",
     },
+
     /* STATS */
     statsContainer: {
         width: "90%",
@@ -631,13 +596,14 @@ const styles = StyleSheet.create({
         height: 38,
         backgroundColor: "rgba(245,237,226,0.09)",
     },
+
     /* RATING */
     ratingCard: {
         width: "90%",
         maxWidth: 430,
         borderRadius: 20,
         padding: 20,
-        marginBottom: 30,
+        marginBottom: 20,
         backgroundColor: "#201B16",
         borderWidth: 1,
         borderColor: "rgba(245,237,226,0.09)",
@@ -669,15 +635,8 @@ const styles = StyleSheet.create({
         color: "#7C9473",
         fontSize: 26,
     },
-    /* SECTIONS */
-    sectionTitle: {
-        width: "90%",
-        maxWidth: 430,
-        color: "rgba(245,239,230,0.85)",
-        fontSize: 15,
-        fontWeight: "600",
-        marginBottom: 12,
-    },
+
+    /* CARD / ACTIONS */
     card: {
         width: "90%",
         maxWidth: 430,
@@ -741,18 +700,10 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(255,60,60,0.08)",
         justifyContent: "center",
         alignItems: "center",
-        marginTop: 5,
     },
     logoutText: {
         color: "#ff6b6b",
         fontSize: 14,
         fontWeight: "600",
-    },
-    version: {
-        marginTop: 30,
-        color: "rgba(245,239,230,0.28)",
-        fontSize: 11,
-        letterSpacing: 1,
-        fontWeight: "500",
     },
 });

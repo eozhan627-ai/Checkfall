@@ -5,7 +5,6 @@ import {
     ActivityIndicator, Dimensions, Image, PanResponder, Pressable, ScrollView,
     StyleSheet, Text, View,
 } from "react-native";
-// Zusätzliche Pakete für Screenshot/Teilen-Funktion — falls noch nicht installiert:
 // npx expo install react-native-view-shot expo-sharing
 import * as Sharing from "expo-sharing";
 import { captureRef } from "react-native-view-shot";
@@ -20,6 +19,7 @@ import { supabase } from "../../lib/supabase";
 
 const BOARD_SIZE = Math.min(Dimensions.get("window").width - 80, 380);
 const SQUARE_SIZE = BOARD_SIZE / 8;
+const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
 const COLORS = {
     bg: "#0D0F13",
@@ -32,11 +32,15 @@ const COLORS = {
     accent: "#7C9473",
     accentSoft: "rgba(124,148,115,0.14)",
     accentBorder: "rgba(124,148,115,0.45)",
-    boardLight: "#E9E2D0",
-    boardDark: "#4B5C46",
-    evalTrack: "#E9E2D0",
+    // Brett – identisch zum Spielbrett
+    boardLight: "#e7d5b7",
+    boardDark: "#b58863",
+    lastTo: "#6bb6ff",
+    lastFrom: "#4da3ff",
+    selected: "#4da3ff",
+    check: "#ff4d4d",
+    evalTrack: "#ECEDEE",
     evalFill: "#20242B",
-    selected: "rgba(124,148,115,0.55)",
 };
 
 const pieces: Record<string, any> = {
@@ -54,36 +58,120 @@ const pieces: Record<string, any> = {
     bk: require("../../assets/images/king_black.png"),
 };
 
+const PIECE_SCALE: Record<string, number> = {
+    wp: 1.35, wn: 1.55, wb: 1.7, wr: 1.65, wq: 1.55, wk: 1.3,
+    bp: 1.3, bn: 1.2, bb: 1.3, br: 1.15, bq: 1.25, bk: 1.15,
+};
+const PIECE_SHIFT: Record<string, number> = {
+    wb: -1.1, wr: -2, wq: -2, wp: 1.2, bp: 2, bn: 2, br: 2, bq: 2, bb: 0.5,
+};
+const pieceTransform = (key: string) => [
+    { scale: PIECE_SCALE[key] ?? 1 },
+    { translateY: PIECE_SHIFT[key] ?? 0 },
+];
+
 const pieceToKey = (piece: any) => (piece ? `${piece.color}${piece.type}` : null);
 
-type MoveClassification =
-    | "brilliant" | "great" | "good" | "inaccuracy" | "mistake" | "blunder"
-    | "missed_win" | "precise_defense" | "only_move" | "slip";
+// ───────────────────────── Zugbewertung ─────────────────────────
+// Nur die gängigen Kategorien. Die Bewertung wird hier aus den Engine-Werten
+// berechnet (Gewinnwahrscheinlichkeit), damit Statistik, Genauigkeit und
+// Kurzreport immer zusammenpassen.
 
-type AnalysisMove = { moveNumber: number; san: string; evalCp: number | null; bestMove: string; classification: MoveClassification };
+type MoveClassification = "brilliant" | "best" | "good" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
+
+type AnalysisMove = { moveNumber: number; san: string; evalCp: number | null; bestMove: string; classification?: string };
 
 type Analysis = {
     depth: number; tier: string; moves: AnalysisMove[];
-    accuracy: { w: number | null; b: number | null };
-    counts: Record<"w" | "b", Partial<Record<MoveClassification, number>>>;
+    accuracy?: { w: number | null; b: number | null };
 };
 
 const CLASSIFICATION_META: Record<MoveClassification, { label: string; icon: string; color: string }> = {
-    brilliant: { label: "Brillant", icon: "★★", color: "#3FB6DE" },
-    great: { label: "Starker Zug", icon: "★", color: "#6C8CFF" },
-    good: { label: "Gut", icon: "✓", color: "#7C9473" },
+    brilliant: { label: "Brillant", icon: "!!", color: "#3FB6DE" },
+    best: { label: "Bester Zug", icon: "★", color: "#7C9473" },
+    good: { label: "Gut", icon: "✓", color: "#9BB58F" },
     inaccuracy: { label: "Ungenauigkeit", icon: "?!", color: "#D2B45A" },
     mistake: { label: "Fehler", icon: "?", color: "#E0914D" },
     blunder: { label: "Patzer", icon: "??", color: "#DD6259" },
-    missed_win: { label: "Gewinn verpasst", icon: "⚡", color: "#B37FE0" },
-    precise_defense: { label: "Präzise Verteidigung", icon: "🛡", color: "#57BDA0" },
-    only_move: { label: "Einziger Zug", icon: "‼", color: "#8B93E8" },
-    slip: { label: "Kleiner Ausrutscher", icon: "~", color: "#C99C64" },
+    missed_win: { label: "Gewinn verpasst", icon: "✗", color: "#B37FE0" },
 };
+const CLASS_ORDER: MoveClassification[] = ["brilliant", "best", "good", "inaccuracy", "mistake", "blunder", "missed_win"];
+const NEG_KEYS: MoveClassification[] = ["blunder", "mistake", "inaccuracy", "missed_win"];
+// "Gut" bekommt kein Badge auf dem Brett, damit es ruhig bleibt
+const BADGE_HIDDEN: MoveClassification[] = ["good"];
 
-// Kleines, bewusst schlankes Eröffnungslexikon (Startzüge -> Name).
-// Deckt die geläufigsten Eröffnungen ab; für vollständige ECO-Abdeckung
-// empfiehlt sich später ein richtiges ECO-Paket statt dieser festen Tabelle.
+const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+const moveAccuracy = (loss: number) => Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * loss) - 3.1669));
+const round1 = (n: number) => Math.round(n * 10) / 10;
+const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+function evalSeries(moves: AnalysisMove[]): number[] {
+    const out: number[] = [];
+    let prev = 0;
+    for (const m of moves) {
+        prev = m.evalCp ?? prev;
+        out.push(prev);
+    }
+    return out;
+}
+
+function moverStats(evals: number[], i: number) {
+    const isWhite = i % 2 === 0;
+    const prevCp = i === 0 ? 0 : evals[i - 1];
+    const curCp = evals[i];
+    const before = isWhite ? winPct(prevCp) : 100 - winPct(prevCp);
+    const after = isWhite ? winPct(curCp) : 100 - winPct(curCp);
+    return { before, after, loss: Math.max(0, before - after) };
+}
+
+function computeAccuracy(moves: AnalysisMove[]): { w: number | null; b: number | null } {
+    const evals = evalSeries(moves);
+    const sum = { w: 0, b: 0 };
+    const cnt = { w: 0, b: 0 };
+    moves.forEach((_, i) => {
+        const side = i % 2 === 0 ? "w" : "b";
+        sum[side] += moveAccuracy(moverStats(evals, i).loss);
+        cnt[side] += 1;
+    });
+    return {
+        w: cnt.w ? round1(sum.w / cnt.w) : null,
+        b: cnt.b ? round1(sum.b / cnt.b) : null,
+    };
+}
+
+type Ply = { from: string; to: string; uci: string; san: string; sacrifice: boolean };
+
+function classifyMoves(moves: AnalysisMove[], plies: Ply[]): MoveClassification[] {
+    const evals = evalSeries(moves);
+    return moves.map((m, i) => {
+        const { before, after, loss } = moverStats(evals, i);
+        const ply = plies[i];
+        const isBest = !!ply && !!m.bestMove && m.bestMove.slice(0, 4) === ply.uci.slice(0, 4);
+
+        // Gewinn verpasst: klar gewonnen gewesen, danach nur noch Vorteil/Remis
+        if (before >= 80 && after <= 65 && loss >= 12 && loss < 30) return "missed_win";
+        if (loss > 20) return "blunder";
+        if (loss > 10) return "mistake";
+        if (loss > 5) return "inaccuracy";
+
+        // Brillant: echtes Figurenopfer + (nahezu) bester Zug + nicht ohnehin schon gewonnen/verloren
+        if (ply?.sacrifice && loss <= 2 && before < 85 && after >= 45) return "brilliant";
+
+        if (isBest || loss <= 0.5) return "best";
+        return "good";
+    });
+}
+
+function computeCounts(classes: MoveClassification[]) {
+    const counts: Record<"w" | "b", Partial<Record<MoveClassification, number>>> = { w: {}, b: {} };
+    classes.forEach((c, i) => {
+        const side = i % 2 === 0 ? "w" : "b";
+        counts[side][c] = (counts[side][c] || 0) + 1;
+    });
+    return counts;
+}
+
+// ───────────────────────── Eröffnung ─────────────────────────
 const OPENING_BOOK: Record<string, string> = {
     "e4 e5": "Offenes Spiel",
     "e4 e5 Nf3 Nc6 Bb5": "Spanische Partie (Ruy López)",
@@ -111,57 +199,93 @@ function detectOpening(sanHistory: string[]): string | null {
     return null;
 }
 
-function buildReport(analysis: Analysis): string[] {
-    const negKeys: MoveClassification[] = ["blunder", "mistake", "inaccuracy", "missed_win", "slip"];
-    const worst = (counts: Partial<Record<MoveClassification, number>>) => {
+// ───────────────────────── Kurzreport ─────────────────────────
+function buildReport(acc: { w: number | null; b: number | null }, counts: ReturnType<typeof computeCounts>): string[] {
+    const worst = (c: Partial<Record<MoveClassification, number>>) => {
         let bestKey: MoveClassification | null = null;
         let bestVal = 0;
-        for (const k of negKeys) {
-            const v = counts[k] || 0;
+        for (const k of NEG_KEYS) {
+            const v = c[k] || 0;
             if (v > bestVal) { bestVal = v; bestKey = k; }
         }
         return bestKey ? { key: bestKey, count: bestVal } : null;
     };
 
     const lines: string[] = [];
-    const { w: white, b: black } = analysis.accuracy;
-    const wAcc = white ?? 0;
-    const bAcc = black ?? 0;
+    const wAcc = acc.w ?? 0;
+    const bAcc = acc.b ?? 0;
+    const fmt = (n: number) => n.toFixed(1);
 
-    if (wAcc >= bAcc + 5) lines.push(`Weiß spielte insgesamt präziser (${wAcc}% gegenüber ${bAcc}%).`);
-    else if (bAcc >= wAcc + 5) lines.push(`Schwarz spielte insgesamt präziser (${bAcc}% gegenüber ${wAcc}%).`);
-    else lines.push(`Beide Seiten spielten ähnlich genau (${wAcc}% zu ${bAcc}%).`);
+    if (wAcc >= bAcc + 5) lines.push(`Weiß spielte insgesamt präziser (${fmt(wAcc)}% gegenüber ${fmt(bAcc)}%).`);
+    else if (bAcc >= wAcc + 5) lines.push(`Schwarz spielte insgesamt präziser (${fmt(bAcc)}% gegenüber ${fmt(wAcc)}%).`);
+    else lines.push(`Beide Seiten spielten ähnlich genau (${fmt(wAcc)}% zu ${fmt(bAcc)}%).`);
 
-    const w = worst(analysis.counts.w || {});
-    const b = worst(analysis.counts.b || {});
+    const w = worst(counts.w);
+    const b = worst(counts.b);
     if (w) lines.push(`Größte Schwachstelle für Weiß: ${CLASSIFICATION_META[w.key].label} (${w.count}×).`);
     if (b) lines.push(`Größte Schwachstelle für Schwarz: ${CLASSIFICATION_META[b.key].label} (${b.count}×).`);
 
-    const brilliantTotal = (analysis.counts.w?.brilliant || 0) + (analysis.counts.b?.brilliant || 0);
-    if (brilliantTotal > 0) {
-        lines.push(`Die Partie enthält ${brilliantTotal} brillante${brilliantTotal > 1 ? "" : "n"} Zug${brilliantTotal > 1 ? "e" : ""}.`);
-    }
+    const brilliantTotal = (counts.w.brilliant || 0) + (counts.b.brilliant || 0);
+    if (brilliantTotal === 1) lines.push("Die Partie enthält einen brillanten Zug.");
+    else if (brilliantTotal > 1) lines.push(`Die Partie enthält ${brilliantTotal} brillante Züge.`);
 
     return lines;
 }
 
-function squareCenter(square: string) {
+// ───────────────────────── Brett-Helfer ─────────────────────────
+function squareCenter(square: string, flipped: boolean) {
     const file = square.charCodeAt(0) - 97;
     const rank = parseInt(square[1], 10);
-    const col = file;
-    const row = 8 - rank;
+    const col = flipped ? 7 - file : file;
+    const row = flipped ? rank - 1 : 8 - rank;
     return { x: col * SQUARE_SIZE + SQUARE_SIZE / 2, y: row * SQUARE_SIZE + SQUARE_SIZE / 2 };
 }
 
-// Nimmt an, dass bestMove im UCI-Format vorliegt (z. B. "e2e4"), wie es
-// Stockfish typischerweise liefert. Andere Formate (SAN) werden ignoriert,
-// der Pfeil wird dann einfach nicht gezeichnet.
-function parseUci(uci: string): { from: string; to: string } | null {
-    const m = /^([a-h][1-8])([a-h][1-8])/.exec(uci);
+function parseUci(uci: string): { from: string; to: string; promotion?: string } | null {
+    const m = /^([a-h][1-8])([a-h][1-8])([qrbn])?/.exec(uci);
     if (!m) return null;
-    return { from: m[1], to: m[2] };
+    return { from: m[1], to: m[2], promotion: m[3] };
 }
 
+function findCheckedKing(game: Chess): string | null {
+    if (!game.inCheck()) return null;
+    const turn = game.turn();
+    const b = game.board();
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            const p = b[r][c];
+            if (p && p.type === "k" && p.color === turn) return `${FILES[c]}${8 - r}`;
+        }
+    }
+    return null;
+}
+
+function formatEval(cp: number) {
+    const v = Math.abs(cp) / 100;
+    const s = v >= 10 ? v.toFixed(0) : v.toFixed(1);
+    return `${cp > 0 ? "+" : cp < 0 ? "−" : ""}${s}`;
+}
+
+// Prüft, ob der letzte Zug ein echtes Figurenopfer war (Basis für "Brillant")
+function isSacrifice(game: Chess, last: any): boolean {
+    try {
+        if (!last || last.piece === "p" || last.piece === "k") return false;
+        const movedValue = PIECE_VALUE[last.piece];
+        const capturedValue = last.captured ? PIECE_VALUE[last.captured] : 0;
+        const replies = game.moves({ verbose: true }).filter((m: any) => m.to === last.to && m.captured);
+        if (replies.length === 0) return false;
+        const cheapest = replies.reduce((a: any, b: any) => (PIECE_VALUE[a.piece] <= PIECE_VALUE[b.piece] ? a : b));
+        const probe = new Chess(game.fen());
+        probe.move(cheapest.san);
+        const recapture = probe.moves({ verbose: true }).some((m: any) => m.to === last.to && m.captured);
+        const net = movedValue - (recapture ? PIECE_VALUE[cheapest.piece] : 0) - capturedValue;
+        return net >= 2;
+    } catch {
+        return false;
+    }
+}
+
+// ───────────────────────── Screen ─────────────────────────
 export default function GameReview() {
     const params = useLocalSearchParams();
     const gameId = params.gameId as string;
@@ -171,9 +295,13 @@ export default function GameReview() {
     const [status, setStatus] = useState<"loading" | "not_vip" | "analyzing" | "ready" | "error">("loading");
     const [progress, setProgress] = useState({ done: 0, total: 0 });
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [flipped, setFlipped] = useState(false);
+    const [showBest, setShowBest] = useState(false);
 
     const [mode, setMode] = useState<"review" | "sandbox">("review");
     const [sandboxFen, setSandboxFen] = useState<string | null>(null);
+    const [sandboxHistory, setSandboxHistory] = useState<string[]>([]);
+    const [sandboxLast, setSandboxLast] = useState<{ from: string; to: string } | null>(null);
     const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
 
     const [isPlaying, setIsPlaying] = useState(false);
@@ -191,11 +319,7 @@ export default function GameReview() {
                 .eq("id", gameId)
                 .single();
 
-            if (error || !data) {
-                setStatus("error");
-                return;
-            }
-
+            if (error || !data) { setStatus("error"); return; }
             setPgn(data.pgn);
 
             if (data.analyzed && data.analysis) {
@@ -205,13 +329,9 @@ export default function GameReview() {
             }
 
             const acc = await getCurrentAccount();
-            if (!acc || !acc.vipTier || acc.vipTier === "none") {
-                setStatus("not_vip");
-                return;
-            }
+            if (!acc || !acc.vipTier || acc.vipTier === "none") { setStatus("not_vip"); return; }
 
             setStatus("analyzing");
-
             try {
                 const socket = getSocket();
                 await requestGameAnalysis(socket, gameId);
@@ -223,113 +343,118 @@ export default function GameReview() {
 
     useEffect(() => {
         const socket = getSocket();
-
         const offProgress = onAnalysisProgress(socket, (data) => {
             if (data.gameId !== gameId) return;
             setProgress({ done: data.progress, total: data.total });
         });
-
         const offComplete = onAnalysisComplete(socket, (data) => {
             if (data.gameId !== gameId) return;
             setAnalysis(data.analysis);
             setStatus("ready");
         });
-
         const offError = onAnalysisError(socket, (data) => {
             if (data.gameId !== gameId) return;
             setStatus("error");
         });
-
-        return () => {
-            offProgress();
-            offComplete();
-            offError();
-        };
+        return () => { offProgress(); offComplete(); offError(); };
     }, [gameId]);
 
-    const { positions, fens } = useMemo(() => {
-        if (!pgn) return { positions: [] as any[], fens: [] as string[] };
+    // Stellungen, Zug-Infos (von/nach/UCI/Opfer) und Schach-Felder je Halbzug
+    const { positions, fens, plies, checks } = useMemo(() => {
+        const empty = { positions: [] as any[], fens: [] as string[], plies: [] as Ply[], checks: [] as (string | null)[] };
+        if (!pgn) return empty;
+        try {
+            const source = new Chess();
+            source.loadPgn(pgn);
+            const verbose = source.history({ verbose: true }) as any[];
 
-        const source = new Chess();
-        source.loadPgn(pgn);
-        const sanMoves = source.history();
+            const replay = new Chess();
+            const boards = [replay.board()];
+            const fensOut = [replay.fen()];
+            const checksOut: (string | null)[] = [null];
+            const pliesOut: Ply[] = [];
 
-        const replay = new Chess();
-        const boardsResult = [replay.board()];
-        const fensResult = [replay.fen()];
-
-        for (const san of sanMoves) {
-            replay.move(san);
-            boardsResult.push(replay.board());
-            fensResult.push(replay.fen());
+            for (const mv of verbose) {
+                const done: any = replay.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+                boards.push(replay.board());
+                fensOut.push(replay.fen());
+                checksOut.push(findCheckedKing(replay));
+                pliesOut.push({
+                    from: mv.from,
+                    to: mv.to,
+                    uci: `${mv.from}${mv.to}${mv.promotion ?? ""}`,
+                    san: mv.san,
+                    sacrifice: isSacrifice(replay, done),
+                });
+            }
+            return { positions: boards, fens: fensOut, plies: pliesOut, checks: checksOut };
+        } catch {
+            return empty;
         }
-
-        return { positions: boardsResult, fens: fensResult };
     }, [pgn]);
 
     const openingName = useMemo(() => {
-        if (!pgn) return null;
-        try {
-            const g = new Chess();
-            g.loadPgn(pgn);
-            return detectOpening(g.history());
-        } catch {
-            return null;
-        }
-    }, [pgn]);
+        if (plies.length === 0) return null;
+        return detectOpening(plies.map((p) => p.san));
+    }, [plies]);
+
+    const classes = useMemo(() => (analysis ? classifyMoves(analysis.moves, plies) : []), [analysis, plies]);
+    const counts = useMemo(() => computeCounts(classes), [classes]);
+    const accuracy = useMemo(() => (analysis ? computeAccuracy(analysis.moves) : { w: null, b: null }), [analysis]);
+    const evals = useMemo(() => (analysis ? evalSeries(analysis.moves) : []), [analysis]);
+    const reportLines = useMemo(() => (analysis ? buildReport(accuracy, counts) : []), [analysis, accuracy, counts]);
 
     const turningPoints = useMemo(() => {
         if (!analysis) return [] as { index: number; delta: number }[];
         let prevEval = 0;
-        const deltas = analysis.moves.map((m, i) => {
-            const cur = m.evalCp ?? prevEval;
+        const deltas = evals.map((cur, i) => {
             const delta = Math.abs(cur - prevEval);
             prevEval = cur;
             return { index: i, delta };
         });
-        return deltas
-            .filter((d) => d.delta >= 150)
-            .sort((a, b) => b.delta - a.delta)
-            .slice(0, 3)
-            .sort((a, b) => a.index - b.index);
-    }, [analysis]);
-
-    const reportLines = useMemo(() => (analysis ? buildReport(analysis) : []), [analysis]);
+        return deltas.filter((d) => d.delta >= 150).sort((a, b) => b.delta - a.delta).slice(0, 3).sort((a, b) => a.index - b.index);
+    }, [analysis, evals]);
 
     const sandboxGameObj = useMemo(() => {
         if (!sandboxFen) return null;
         const g = new Chess();
-        try {
-            g.load(sandboxFen);
-        } catch {
-            return null;
-        }
+        try { g.load(sandboxFen); } catch { return null; }
         return g;
     }, [sandboxFen]);
+
+    // Bester Zug (SAN) zum aktuellen Halbzug – aus der Stellung VOR dem Zug
+    const bestInfo = useMemo(() => {
+        if (!analysis || currentIndex === 0) return null;
+        const mv = analysis.moves[currentIndex - 1];
+        const parsed = mv?.bestMove ? parseUci(mv.bestMove) : null;
+        if (!parsed || !fens[currentIndex - 1]) return null;
+        try {
+            const g = new Chess(fens[currentIndex - 1]);
+            const res = g.move({ from: parsed.from, to: parsed.to, promotion: parsed.promotion });
+            return res ? { ...parsed, san: res.san } : null;
+        } catch { return null; }
+    }, [analysis, currentIndex, fens]);
+
+    useEffect(() => { setShowBest(false); }, [currentIndex, mode]);
 
     useEffect(() => {
         if (!isPlaying || !analysis) return;
         const id = setInterval(() => {
             setCurrentIndex((i) => {
-                if (i >= analysis.moves.length) {
-                    setIsPlaying(false);
-                    return i;
-                }
+                if (i >= analysis.moves.length) { setIsPlaying(false); return i; }
                 return i + 1;
             });
         }, 900 / playSpeed);
         return () => clearInterval(id);
     }, [isPlaying, playSpeed, analysis]);
 
-    // Verlauf über mehrere Partien. ANNAHME: Spalten "white_id" / "black_id"
-    // in der "games"-Tabelle — bitte an das tatsächliche Supabase-Schema anpassen.
+    // Verlauf: ANNAHME Spalten "white_id" / "black_id" – ggf. ans Schema anpassen
     useEffect(() => {
         if (status !== "ready") return;
         (async () => {
             try {
                 const acc = await getCurrentAccount();
                 if (!acc?.id) return;
-
                 const { data } = await supabase
                     .from("games")
                     .select("id, created_at, analysis")
@@ -337,23 +462,21 @@ export default function GameReview() {
                     .eq("analyzed", true)
                     .order("created_at", { ascending: false })
                     .limit(8);
-
                 if (data) {
                     const parsed = data
-                        .map((g: any) => ({
-                            id: g.id,
-                            date: g.created_at,
-                            accuracy: g.analysis?.accuracy
-                                ? Math.round((g.analysis.accuracy.white + g.analysis.accuracy.black) / 2)
-                                : null,
-                        }))
+                        .map((g: any) => {
+                            const acc2 = g.analysis?.moves ? computeAccuracy(g.analysis.moves) : null;
+                            return {
+                                id: g.id,
+                                date: g.created_at,
+                                accuracy: acc2 && acc2.w != null && acc2.b != null ? Math.round((acc2.w + acc2.b) / 2) : null,
+                            };
+                        })
                         .filter((g: any) => g.accuracy !== null)
                         .reverse();
                     setRecentGames(parsed as any);
                 }
-            } catch {
-                // Verlauf ist ein optionales Extra — bei Fehler einfach ausblenden
-            }
+            } catch { /* optional */ }
         })();
     }, [status]);
 
@@ -374,47 +497,59 @@ export default function GameReview() {
         const fen = fens[currentIndex] ?? fens[0];
         if (!fen) return;
         setSandboxFen(fen);
+        setSandboxHistory([]);
+        setSandboxLast(null);
         setSelectedSquare(null);
+        setIsPlaying(false);
         setMode("sandbox");
     }
 
     function exitSandbox() {
         setMode("review");
         setSandboxFen(null);
+        setSandboxHistory([]);
+        setSandboxLast(null);
         setSelectedSquare(null);
     }
 
     function handleSandboxSquarePress(square: string) {
         if (!sandboxGameObj) return;
+        const piece = sandboxGameObj.get(square as any);
 
         if (!selectedSquare) {
-            const piece = sandboxGameObj.get(square as any);
-            if (piece) setSelectedSquare(square);
+            if (piece && piece.color === sandboxGameObj.turn()) setSelectedSquare(square);
             return;
         }
-
-        if (selectedSquare === square) {
-            setSelectedSquare(null);
-            return;
-        }
+        if (selectedSquare === square) { setSelectedSquare(null); return; }
+        // anderes eigenes Stück antippen = Auswahl wechseln
+        if (piece && piece.color === sandboxGameObj.turn()) { setSelectedSquare(square); return; }
 
         try {
             const move = sandboxGameObj.move({ from: selectedSquare, to: square, promotion: "q" } as any);
-            if (move) setSandboxFen(sandboxGameObj.fen());
-        } catch {
-            // ungültiger Zug — einfach ignorieren
-        }
+            if (move) {
+                setSandboxHistory((h) => [...h, sandboxFen as string]);
+                setSandboxLast({ from: move.from, to: move.to });
+                setSandboxFen(sandboxGameObj.fen());
+            }
+        } catch { /* ungültiger Zug */ }
         setSelectedSquare(null);
+    }
+
+    function undoSandbox() {
+        setSandboxHistory((h) => {
+            if (h.length === 0) return h;
+            setSandboxFen(h[h.length - 1]);
+            setSandboxLast(null);
+            setSelectedSquare(null);
+            return h.slice(0, -1);
+        });
     }
 
     async function handleShare() {
         try {
             const uri = await captureRef(shareRef, { format: "png", quality: 0.92 });
-            const available = await Sharing.isAvailableAsync();
-            if (available) await Sharing.shareAsync(uri);
-        } catch {
-            // Teilen ist ein optionales Extra — bei Fehler (z. B. Paket fehlt) einfach nichts tun
-        }
+            if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
+        } catch { /* optional */ }
     }
 
     if (status === "loading" || status === "analyzing") {
@@ -422,8 +557,7 @@ export default function GameReview() {
             <View style={styles.center}>
                 <ActivityIndicator color={COLORS.accent} size="large" />
                 {status === "analyzing" && (
-                    <Text style={styles.loadingText}>
-                        Partie wird analysiert · {progress.done}/{progress.total || "?"}  </Text>
+                    <Text style={styles.loadingText}>Partie wird analysiert · {progress.done}/{progress.total || "?"}</Text>
                 )}
             </View>
         );
@@ -432,9 +566,7 @@ export default function GameReview() {
     if (status === "not_vip") {
         return (
             <View style={styles.center}>
-                <View style={styles.vipBadge}>
-                    <Text style={styles.vipBadgeText}>VIP</Text>
-                </View>
+                <View style={styles.vipBadge}><Text style={styles.vipBadgeText}>VIP</Text></View>
                 <Text style={styles.emptyTitle}>Nur für VIP-Mitglieder</Text>
                 <Text style={styles.emptyText}>Die Stockfish-Analyse steht exklusiv VIP-Konten zur Verfügung.</Text>
                 <Pressable onPress={() => router.push("/vip")} style={({ pressed }) => [styles.vipButton, pressed && styles.vipButtonPressed]}>
@@ -453,45 +585,61 @@ export default function GameReview() {
         );
     }
 
-    const board = mode === "sandbox" && sandboxGameObj ? sandboxGameObj.board() : positions[currentIndex] ?? positions[0];
+    // ── Abgeleitete Werte für das Rendern ──
+    const total = analysis.moves.length;
+    const isSandbox = mode === "sandbox" && !!sandboxGameObj;
+    const showingBest = mode === "review" && showBest && !!bestInfo && currentIndex > 0;
+
+    const board = isSandbox
+        ? sandboxGameObj!.board()
+        : positions[showingBest ? currentIndex - 1 : currentIndex] ?? positions[0];
+
+    const playedPly = currentIndex > 0 ? plies[currentIndex - 1] : null;
     const currentMove = currentIndex > 0 ? analysis.moves[currentIndex - 1] : null;
-    const evalCp = currentMove?.evalCp ?? 0;
-    const clampedEval = Math.max(-500, Math.min(500, evalCp));
-    const whiteFraction = 0.5 + clampedEval / 1000;
+    const currentClass = currentIndex > 0 ? classes[currentIndex - 1] : null;
+    const currentMeta = currentClass ? CLASSIFICATION_META[currentClass] : null;
 
-    const whiteCounts = analysis.counts.w || {};
-    const blackCounts = analysis.counts.b || {};
-    const maxCount = Math.max(1, ...Object.values(whiteCounts), ...Object.values(blackCounts));
+    const lastMove = isSandbox ? sandboxLast : showingBest ? null : playedPly ? { from: playedPly.from, to: playedPly.to } : null;
+    const checkSquare = isSandbox ? findCheckedKing(sandboxGameObj!) : checks[showingBest ? currentIndex - 1 : currentIndex] ?? null;
 
-    const bestMoveArrow = (() => {
-        if (mode !== "review" || !currentMove?.bestMove) return null;
-        const parsed = parseUci(currentMove.bestMove);
-        if (!parsed) return null;
-        const from = squareCenter(parsed.from);
-        const to = squareCenter(parsed.to);
+    const legalTargets = new Set<string>();
+    if (isSandbox && selectedSquare) {
+        (sandboxGameObj!.moves({ square: selectedSquare as any, verbose: true }) as any[]).forEach((m) => legalTargets.add(m.to));
+    }
+
+    const evalCp = currentIndex > 0 ? evals[currentIndex - 1] ?? 0 : 0;
+    const whiteFraction = winPct(Math.max(-1000, Math.min(1000, evalCp))) / 100;
+
+    const whiteCounts = counts.w;
+    const blackCounts = counts.b;
+    const maxCount = Math.max(1, ...Object.values(whiteCounts).map(Number), ...Object.values(blackCounts).map(Number));
+
+    const arrow = (() => {
+        if (!showingBest || !bestInfo) return null;
+        const from = squareCenter(bestInfo.from, flipped);
+        const to = squareCenter(bestInfo.to, flipped);
         const dx = to.x - from.x;
         const dy = to.y - from.y;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx);
-        return { from, to, length, angle };
+        return {
+            length: Math.sqrt(dx * dx + dy * dy),
+            angle: Math.atan2(dy, dx),
+            mid: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 },
+        };
     })();
 
     const maxRecentAccuracy = Math.max(1, ...recentGames.map((g) => g.accuracy));
+    const showBestButton = !!currentClass && !["best", "brilliant"].includes(currentClass) && !!bestInfo;
 
     return (
         <View style={styles.screen}>
             <View style={styles.header}>
-                <Pressable onPress={() => router.back()} style={styles.iconButton}>
-                    <Text style={styles.backText}>‹</Text>
-                </Pressable>
+                <Pressable onPress={() => router.back()} style={styles.iconButton}><Text style={styles.backText}>‹</Text></Pressable>
                 <Text style={styles.headerTitle}>Partieanalyse</Text>
-                <Pressable onPress={handleShare} style={styles.iconButton}>
-                    <Text style={styles.shareText}>↗</Text>
-                </Pressable>
+                <Pressable onPress={handleShare} style={styles.iconButton}><Text style={styles.shareText}>↗</Text></Pressable>
             </View>
 
             <View style={styles.modeTabs}>
-                <Pressable onPress={() => setMode("review")} style={[styles.modeTab, mode === "review" && styles.modeTabActive]}>
+                <Pressable onPress={exitSandbox} style={[styles.modeTab, mode === "review" && styles.modeTabActive]}>
                     <Text style={[styles.modeTabText, mode === "review" && styles.modeTabTextActive]}>Analyse</Text>
                 </Pressable>
                 <Pressable onPress={enterSandbox} style={[styles.modeTab, mode === "sandbox" && styles.modeTabActive]}>
@@ -500,7 +648,7 @@ export default function GameReview() {
             </View>
 
             <ScrollView contentContainerStyle={{ alignItems: "center", paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-                <View ref={shareRef} collapsable={false} style={{ alignItems: "center" }}>
+                <View ref={shareRef} collapsable={false} style={{ alignItems: "center", backgroundColor: COLORS.bg, paddingBottom: 4 }}>
                     <View style={styles.engineRow}>
                         <Text style={styles.engineText}>{analysis.tier} · Tiefe {analysis.depth}</Text>
                         {openingName && mode === "review" && <Text style={styles.openingText}>{openingName}</Text>}
@@ -509,93 +657,73 @@ export default function GameReview() {
                     <View style={styles.accuracyRow}>
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#ECEDEE" }]} />
-                            <Text style={styles.accuracyLabel}>Weiß </Text>
-                            <Text style={styles.accuracyValue}>{analysis.accuracy.w?.toFixed(1)}%</Text>
+                            <Text style={styles.accuracyLabel}>Weiß</Text>
+                            <Text style={styles.accuracyValue}>{accuracy.w != null ? accuracy.w.toFixed(1) : "–"}%</Text>
                         </View>
                         <View style={styles.accuracyDivider} />
                         <View style={styles.accuracyCard}>
                             <View style={[styles.accuracyDot, { backgroundColor: "#4B5058" }]} />
-                            <Text style={styles.accuracyLabel}>Schwarz </Text>
-                            <Text style={styles.accuracyValue}>{analysis.accuracy.b?.toFixed(1)}%</Text>
+                            <Text style={styles.accuracyLabel}>Schwarz</Text>
+                            <Text style={styles.accuracyValue}>{accuracy.b != null ? accuracy.b.toFixed(1) : "–"}%</Text>
                         </View>
                     </View>
 
                     <View style={styles.boardRow}>
                         {mode === "review" && (
-                            <View style={styles.evalBarVertical}>
-                                <View style={[styles.evalBarBlack, { height: `${(1 - whiteFraction) * 100}%` }]} />
-                                <View style={styles.evalBarMidline} />
+                            <View style={styles.evalWrap}>
+                                <View style={[styles.evalBarVertical, { justifyContent: flipped ? "flex-end" : "flex-start" }]}>
+                                    <View style={[styles.evalBarBlack, { height: `${(1 - whiteFraction) * 100}%` }]} />
+                                    <View style={styles.evalBarMidline} />
+                                </View>
                             </View>
                         )}
 
                         <View style={styles.boardFrame} {...(mode === "review" ? panResponder.panHandlers : {})}>
                             <View style={{ width: BOARD_SIZE, height: BOARD_SIZE }}>
                                 <View style={styles.board}>
-                                    {board.map((row: any[], rowIndex: number) =>
-                                        row.map((piece, colIndex) => {
-                                            const isDark = (rowIndex + colIndex) % 2 === 1;
+                                    {Array.from({ length: 8 }).map((_, r) =>
+                                        Array.from({ length: 8 }).map((__, c) => {
+                                            const br = flipped ? 7 - r : r;
+                                            const bc = flipped ? 7 - c : c;
+                                            const piece = board[br][bc];
                                             const key = pieceToKey(piece);
-                                            const file = String.fromCharCode(97 + colIndex);
-                                            const rank = 8 - rowIndex;
-                                            const square = `${file}${rank}`;
-                                            const isSelected = mode === "sandbox" && selectedSquare === square;
+                                            const square = `${FILES[bc]}${8 - br}`;
+                                            const isDark = (br + bc) % 2 === 1;
+
+                                            const isCheckSq = checkSquare === square;
+                                            const isLastTo = lastMove?.to === square;
+                                            const isLastFrom = lastMove?.from === square;
+                                            const isSelected = isSandbox && selectedSquare === square;
+                                            const isLegal = legalTargets.has(square);
+
+                                            const bg = isCheckSq ? COLORS.check
+                                                : isLastTo ? COLORS.lastTo
+                                                : isLastFrom ? COLORS.lastFrom
+                                                : isSelected ? COLORS.selected
+                                                : isDark ? COLORS.boardDark : COLORS.boardLight;
+
+                                            const showBadge = !!currentClass && !showingBest && !isSandbox && isLastTo && !BADGE_HIDDEN.includes(currentClass);
+                                            const labelColor = isDark ? "#e5e7eb" : "#334155";
 
                                             return (
                                                 <Pressable
-                                                    key={`${rowIndex}-${colIndex}`}
-                                                    disabled={mode !== "sandbox"}
+                                                    key={square}
+                                                    disabled={!isSandbox}
                                                     onPress={() => handleSandboxSquarePress(square)}
-                                                    style={[
-                                                        styles.square,
-                                                        { backgroundColor: isDark ? COLORS.boardDark : COLORS.boardLight },
-                                                        isSelected && { backgroundColor: COLORS.selected },
-                                                    ]}
+                                                    style={[styles.square, { backgroundColor: bg }]}
                                                 >
                                                     {key && (
-                                                        <Image
-                                                            source={pieces[key]}
-                                                            style={[
-                                                                styles.piece,
-                                                                {
-                                                                    transform: [
-                                                                        {
-                                                                            scale:
-                                                                                key === "wp" ? 1.35 :
-                                                                                    key === "wn" ? 1.55 :
-                                                                                        key === "wb" ? 1.7 :
-                                                                                            key === "wr" ? 1.65 :
-                                                                                                key === "wq" ? 1.55 :
-                                                                                                    key === "wk" ? 1.30 :
+                                                        <Image source={pieces[key]} style={[styles.piece, { transform: pieceTransform(key) }]} resizeMode="contain" />
+                                                    )}
+                                                    {isLegal && <View style={key ? styles.dotCapture : styles.dot} />}
 
-                                                                                                        key === "bp" ? 1.3 :
-                                                                                                            key === "bn" ? 1.20 :
-                                                                                                                key === "bb" ? 1.3 :
-                                                                                                                    key === "br" ? 1.15 :
-                                                                                                                        key === "bq" ? 1.25 :
-                                                                                                                            key === "bk" ? 1.15 :
+                                                    {c === 0 && <Text style={[styles.coordLabel, { top: 2, left: 2, color: labelColor }]}>{8 - br}</Text>}
+                                                    {r === 7 && <Text style={[styles.coordLabel, { bottom: 2, right: 3, color: labelColor }]}>{FILES[bc]}</Text>}
 
-                                                                                                                                1
-                                                                        },
-                                                                        {
-                                                                            translateY:
-                                                                                key === "wb" ? -1.1 :
-                                                                                    key === "wr" ? -2 :
-                                                                                        key === "wq" ? -2 :
-                                                                                            key === "wp" ? 1.2 :
-
-                                                                                                key === "bp" ? 2 :
-                                                                                                    key === "bn" ? 2 :
-                                                                                                        key === "br" ? 2 :
-                                                                                                            key === "bq" ? 2 :
-                                                                                                                key === "bb" ? 0.5 :
-
-                                                                                                                    0
-                                                                        }
-                                                                    ]
-                                                                }
-                                                            ]}
-                                                            resizeMode="contain"
-                                                        />
+                                                    {showBadge && currentMeta && (
+                                                        <View style={[styles.badge, { backgroundColor: currentMeta.color }]}>
+                                                            <Text style={styles.badgeText}>{currentMeta.icon}</Text>
+                                                        </View>
                                                     )}
                                                 </Pressable>
                                             );
@@ -603,34 +731,23 @@ export default function GameReview() {
                                     )}
                                 </View>
 
-                                {bestMoveArrow && (
+                                {arrow && (
                                     <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
                                         <View
                                             style={{
                                                 position: "absolute",
-                                                left: bestMoveArrow.from.x,
-                                                top: bestMoveArrow.from.y - 2,
-                                                width: bestMoveArrow.length,
-                                                height: 4,
-                                                backgroundColor: COLORS.accent,
-                                                opacity: 0.85,
-                                                borderRadius: 2,
-                                                transform: [{ rotate: `${bestMoveArrow.angle}rad` }],
-                                                // @ts-ignore — transformOrigin wird ab RN 0.71 unterstützt
-                                                transformOrigin: "0% 50%",
+                                                left: arrow.mid.x - arrow.length / 2,
+                                                top: arrow.mid.y - 7,
+                                                width: arrow.length,
+                                                height: 14,
+                                                justifyContent: "center",
+                                                transform: [{ rotate: `${arrow.angle}rad` }],
+                                                opacity: 0.9,
                                             }}
-                                        />
-                                        <View
-                                            style={{
-                                                position: "absolute",
-                                                left: bestMoveArrow.to.x - 5,
-                                                top: bestMoveArrow.to.y - 5,
-                                                width: 10,
-                                                height: 10,
-                                                borderRadius: 5,
-                                                backgroundColor: COLORS.accent,
-                                            }}
-                                        />
+                                        >
+                                            <View style={{ position: "absolute", left: 0, width: Math.max(0, arrow.length - 12), height: 6, backgroundColor: COLORS.accent, borderRadius: 3 }} />
+                                            <View style={styles.arrowHead} />
+                                        </View>
                                     </View>
                                 )}
                             </View>
@@ -639,20 +756,17 @@ export default function GameReview() {
 
                     {mode === "review" && (
                         <View style={styles.classificationBanner}>
-                            {currentMove ? (
+                            {currentMove && currentMeta ? (
                                 <>
-                                    <View style={[styles.classificationStripe, { backgroundColor: CLASSIFICATION_META[currentMove.classification].color }]} />
-                                    <View style={[styles.classificationIconWrap, { backgroundColor: `${CLASSIFICATION_META[currentMove.classification].color}22` }]}>
-                                        <Text style={[styles.classificationIcon, { color: CLASSIFICATION_META[currentMove.classification].color }]}>
-                                            {CLASSIFICATION_META[currentMove.classification].icon}
-                                        </Text>
+                                    <View style={[styles.classificationStripe, { backgroundColor: currentMeta.color }]} />
+                                    <View style={[styles.classificationIconWrap, { backgroundColor: `${currentMeta.color}22` }]}>
+                                        <Text style={[styles.classificationIcon, { color: currentMeta.color }]}>{currentMeta.icon}</Text>
                                     </View>
-                                    <View>
-                                        <Text style={styles.classificationSan}>{currentMove.san}</Text>
-                                        <Text style={[styles.classificationLabel, { color: CLASSIFICATION_META[currentMove.classification].color }]}>
-                                            {CLASSIFICATION_META[currentMove.classification].label}
-                                        </Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.classificationSan}>{currentIndex % 2 === 1 ? `${Math.ceil(currentIndex / 2)}.` : `${Math.ceil(currentIndex / 2)}...`} {currentMove.san}</Text>
+                                        <Text style={[styles.classificationLabel, { color: currentMeta.color }]}>{currentMeta.label}</Text>
                                     </View>
+                                    <Text style={styles.evalText}>{formatEval(evalCp)}</Text>
                                 </>
                             ) : (
                                 <>
@@ -664,20 +778,55 @@ export default function GameReview() {
                     )}
                 </View>
 
+                {mode === "review" && showBestButton && bestInfo && (
+                    <Pressable onPress={() => setShowBest((s) => !s)} style={[styles.bestButton, showBest && styles.bestButtonActive]}>
+                        <Text style={[styles.bestButtonText, showBest && { color: "#12151B" }]}>
+                            {showBest ? "Zurück zum gespielten Zug" : `Besser wäre ${bestInfo.san} gewesen – zeigen`}
+                        </Text>
+                    </Pressable>
+                )}
+
                 {mode === "sandbox" ? (
                     <View style={styles.sandboxControls}>
-                        <Text style={styles.sandboxHint}>Sandbox-Modus · eigene Züge ohne Engine-Bewertung</Text>
+                        <Text style={styles.sandboxHint}>Sandbox · eigene Züge ohne Engine-Bewertung</Text>
                         <View style={styles.sandboxButtonsRow}>
-                            <Pressable onPress={() => setSandboxFen(fens[currentIndex] ?? fens[0])} style={styles.navButton}>
+                            <Pressable onPress={undoSandbox} style={[styles.navButton, sandboxHistory.length === 0 && { opacity: 0.4 }]}>
+                                <Text style={styles.navButtonText}>Zug zurück</Text>
+                            </Pressable>
+                            <Pressable onPress={() => { setSandboxFen(fens[currentIndex] ?? fens[0]); setSandboxHistory([]); setSandboxLast(null); setSelectedSquare(null); }} style={styles.navButton}>
                                 <Text style={styles.navButtonText}>Zurücksetzen</Text>
                             </Pressable>
-                            <Pressable onPress={exitSandbox} style={[styles.navButton, { backgroundColor: COLORS.accent }]}>
-                                <Text style={[styles.navButtonText, { color: "#12151B" }]}>Zurück zur Analyse</Text>
+                            <Pressable onPress={() => setFlipped((f) => !f)} style={styles.navButton}>
+                                <Text style={styles.navButtonText}>⇅</Text>
                             </Pressable>
                         </View>
+                        <Pressable onPress={exitSandbox} style={[styles.navButton, { backgroundColor: COLORS.accent, borderColor: COLORS.accent }]}>
+                            <Text style={[styles.navButtonText, { color: "#12151B" }]}>Zurück zur Analyse</Text>
+                        </Pressable>
                     </View>
                 ) : (
                     <>
+                        {/* Bewertungsverlauf: antippen springt zum Zug */}
+                        <View style={styles.graphPanel}>
+                            <View style={styles.graphHeader}>
+                                <Text style={styles.reportTitle}>Bewertungsverlauf</Text>
+                                <Pressable onPress={() => setFlipped((f) => !f)}><Text style={styles.flipText}>Brett drehen ⇅</Text></Pressable>
+                            </View>
+                            <View style={styles.graphBars}>
+                                {evals.map((cp, i) => {
+                                    const wp = winPct(Math.max(-1000, Math.min(1000, cp)));
+                                    const cls = classes[i];
+                                    const hot = cls === "blunder" || cls === "mistake" || cls === "missed_win";
+                                    return (
+                                        <Pressable key={i} onPress={() => { setIsPlaying(false); setCurrentIndex(i + 1); }} style={[styles.graphCol, currentIndex === i + 1 && styles.graphColActive]}>
+                                            <View style={{ height: `${100 - wp}%`, backgroundColor: COLORS.evalFill }} />
+                                            {hot && <View style={[styles.graphMark, { backgroundColor: CLASSIFICATION_META[cls].color }]} />}
+                                        </Pressable>
+                                    );
+                                })}
+                            </View>
+                        </View>
+
                         {turningPoints.length > 0 && (
                             <ScrollView horizontal style={styles.turningList} contentContainerStyle={{ paddingHorizontal: 12 }} showsHorizontalScrollIndicator={false}>
                                 <Text style={styles.turningLabel}>Wendepunkte</Text>
@@ -696,11 +845,9 @@ export default function GameReview() {
                             <Pressable onPress={() => setCurrentIndex(0)} style={[styles.moveChip, currentIndex === 0 && styles.moveChipActive]}>
                                 <Text style={[styles.moveChipText, currentIndex === 0 && styles.moveChipTextActive]}>Start</Text>
                             </Pressable>
-
                             {analysis.moves.map((m, i) => {
-                                const meta = CLASSIFICATION_META[m.classification];
+                                const meta = CLASSIFICATION_META[classes[i]];
                                 const isActive = currentIndex === i + 1;
-
                                 return (
                                     <Pressable
                                         key={i}
@@ -714,22 +861,13 @@ export default function GameReview() {
                         </ScrollView>
 
                         <View style={styles.navRow}>
-                            <Pressable
-                                onPress={() => { setIsPlaying(false); setCurrentIndex((i) => Math.max(0, i - 1)); }}
-                                style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]}
-                            >
+                            <Pressable onPress={() => { setIsPlaying(false); setCurrentIndex((i) => Math.max(0, i - 1)); }} style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]}>
                                 <Text style={styles.navButtonText}>‹  Zurück</Text>
                             </Pressable>
-                            <Pressable
-                                onPress={() => { if (currentIndex >= analysis.moves.length) setCurrentIndex(0); setIsPlaying((p) => !p); }}
-                                style={({ pressed }) => [styles.playButton, pressed && styles.navButtonPressed]}
-                            >
+                            <Pressable onPress={() => { if (currentIndex >= total) setCurrentIndex(0); setIsPlaying((p) => !p); }} style={({ pressed }) => [styles.playButton, pressed && styles.navButtonPressed]}>
                                 <Text style={styles.playButtonText}>{isPlaying ? "❚❚" : "▶"}</Text>
                             </Pressable>
-                            <Pressable
-                                onPress={() => { setIsPlaying(false); setCurrentIndex((i) => Math.min(analysis.moves.length, i + 1)); }}
-                                style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]}
-                            >
+                            <Pressable onPress={() => { setIsPlaying(false); setCurrentIndex((i) => Math.min(total, i + 1)); }} style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]}>
                                 <Text style={styles.navButtonText}>Weiter  ›</Text>
                             </Pressable>
                         </View>
@@ -740,7 +878,7 @@ export default function GameReview() {
                                     <Text style={[styles.speedChipText, playSpeed === s && styles.speedChipTextActive]}>{s}×</Text>
                                 </Pressable>
                             ))}
-                            <Text style={styles.navIndex}>{currentIndex} / {analysis.moves.length}</Text>
+                            <Text style={styles.navIndex}>{currentIndex} / {total}</Text>
                         </View>
 
                         {reportLines.length > 0 && (
@@ -761,12 +899,11 @@ export default function GameReview() {
                                 </View>
                             </View>
 
-                            {(Object.keys(CLASSIFICATION_META) as MoveClassification[]).map((key) => {
+                            {CLASS_ORDER.map((key) => {
                                 const meta = CLASSIFICATION_META[key];
                                 const w = whiteCounts[key] || 0;
                                 const b = blackCounts[key] || 0;
                                 if (w === 0 && b === 0) return null;
-
                                 return (
                                     <View key={key} style={styles.statsRow}>
                                         <View style={[styles.statsIconWrap, { backgroundColor: `${meta.color}1F` }]}>
@@ -833,7 +970,7 @@ const styles = StyleSheet.create({
     engineText: { color: COLORS.textTertiary, fontSize: 11.5, letterSpacing: 0.2 },
     openingText: { color: COLORS.accent, fontSize: 11.5, fontWeight: "600" },
 
-    accuracyRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 20, overflow: "hidden" },
+    accuracyRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 20, overflow: "hidden", width: BOARD_SIZE + 24 },
     accuracyCard: { flex: 1, alignItems: "center", paddingVertical: 14, gap: 3 },
     accuracyDivider: { width: 1, alignSelf: "stretch", backgroundColor: COLORS.border },
     accuracyDot: { width: 6, height: 6, borderRadius: 3, marginBottom: 2 },
@@ -841,6 +978,7 @@ const styles = StyleSheet.create({
     accuracyValue: { color: COLORS.textPrimary, fontSize: 22, fontWeight: "700" },
 
     boardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+    evalWrap: { alignItems: "center" },
     evalBarVertical: { width: 12, height: BOARD_SIZE, borderRadius: 6, backgroundColor: COLORS.evalTrack, overflow: "hidden" },
     evalBarBlack: { width: "100%", backgroundColor: COLORS.evalFill },
     evalBarMidline: { position: "absolute", top: "50%", width: "100%", height: 1, backgroundColor: "rgba(0,0,0,0.15)" },
@@ -848,20 +986,39 @@ const styles = StyleSheet.create({
     board: { width: BOARD_SIZE, height: BOARD_SIZE, flexDirection: "row", flexWrap: "wrap", borderRadius: 8, overflow: "hidden" },
     square: { width: SQUARE_SIZE, height: SQUARE_SIZE, justifyContent: "center", alignItems: "center" },
     piece: { width: SQUARE_SIZE * 0.9, height: SQUARE_SIZE * 0.9 },
+    coordLabel: { position: "absolute", fontSize: 9, fontWeight: "700" },
+    dot: { position: "absolute", width: SQUARE_SIZE * 0.3, height: SQUARE_SIZE * 0.3, borderRadius: SQUARE_SIZE * 0.15, backgroundColor: "rgba(0,0,0,0.25)" },
+    dotCapture: { position: "absolute", width: SQUARE_SIZE * 0.9, height: SQUARE_SIZE * 0.9, borderRadius: SQUARE_SIZE * 0.45, borderWidth: 3, borderColor: "rgba(0,0,0,0.25)" },
+    badge: { position: "absolute", top: -1, right: -1, minWidth: 18, height: 18, paddingHorizontal: 3, borderRadius: 9, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.25)" },
+    badgeText: { color: "#12151B", fontSize: 9, fontWeight: "900" },
+    arrowHead: { position: "absolute", right: 0, width: 0, height: 0, borderTopWidth: 8, borderBottomWidth: 8, borderLeftWidth: 14, borderTopColor: "transparent", borderBottomColor: "transparent", borderLeftColor: COLORS.accent },
 
     classificationBanner: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 18, paddingVertical: 12, paddingRight: 16, borderRadius: 14, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, width: BOARD_SIZE + 24, overflow: "hidden" },
     classificationStripe: { width: 4, alignSelf: "stretch" },
-    classificationIconWrap: { width: 34, height: 34, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+    classificationIconWrap: { minWidth: 34, height: 34, paddingHorizontal: 4, borderRadius: 10, justifyContent: "center", alignItems: "center" },
     classificationIcon: { fontSize: 15, fontWeight: "800" },
     classificationSan: { color: COLORS.textPrimary, fontSize: 15, fontWeight: "600" },
     classificationLabel: { fontSize: 12.5, fontWeight: "600", marginTop: 1 },
     classificationLabelIdle: { color: COLORS.textSecondary, fontSize: 13.5, marginLeft: 4 },
+    evalText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700", fontVariant: ["tabular-nums"] },
 
-    sandboxControls: { width: BOARD_SIZE + 24, marginTop: 18, alignItems: "center", gap: 10 },
+    bestButton: { marginTop: 12, width: BOARD_SIZE + 24, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: COLORS.accentBorder, backgroundColor: COLORS.accentSoft, alignItems: "center" },
+    bestButtonActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
+    bestButtonText: { color: COLORS.accent, fontSize: 13, fontWeight: "600" },
+
+    sandboxControls: { width: BOARD_SIZE + 24, marginTop: 18, alignItems: "center", gap: 12 },
     sandboxHint: { color: COLORS.textSecondary, fontSize: 12.5, textAlign: "center" },
-    sandboxButtonsRow: { flexDirection: "row", gap: 12 },
+    sandboxButtonsRow: { flexDirection: "row", gap: 10 },
 
-    turningList: { marginTop: 4, maxHeight: 40, width: BOARD_SIZE + 24 },
+    graphPanel: { width: BOARD_SIZE + 24, marginTop: 16, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, padding: 14 },
+    graphHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+    flipText: { color: COLORS.accent, fontSize: 12, fontWeight: "600" },
+    graphBars: { flexDirection: "row", height: 56, borderRadius: 6, overflow: "hidden", backgroundColor: COLORS.evalTrack },
+    graphCol: { flex: 1, height: "100%" },
+    graphColActive: { backgroundColor: COLORS.accent },
+    graphMark: { position: "absolute", bottom: 0, left: 0, right: 0, height: 3 },
+
+    turningList: { marginTop: 14, maxHeight: 40, width: BOARD_SIZE + 24 },
     turningLabel: { color: COLORS.textTertiary, fontSize: 12, alignSelf: "center", marginRight: 8 },
     turningChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: COLORS.accentSoft, borderWidth: 1, borderColor: COLORS.accentBorder, marginRight: 7, justifyContent: "center" },
     turningChipText: { color: COLORS.accent, fontSize: 12, fontWeight: "600" },
@@ -896,7 +1053,7 @@ const styles = StyleSheet.create({
     statsHeaderLegend: { flexDirection: "row", gap: 14 },
     statsHeaderLegendText: { color: COLORS.textTertiary, fontSize: 11, width: 28, textAlign: "right" },
     statsRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
-    statsIconWrap: { width: 28, height: 28, borderRadius: 8, justifyContent: "center", alignItems: "center", marginRight: 10 },
+    statsIconWrap: { minWidth: 28, height: 28, paddingHorizontal: 3, borderRadius: 8, justifyContent: "center", alignItems: "center", marginRight: 10 },
     statsIcon: { fontSize: 12, fontWeight: "800" },
     statsLabelWrap: { flex: 1, gap: 4 },
     statsLabel: { color: COLORS.textPrimary, fontSize: 12.5, fontWeight: "500" },

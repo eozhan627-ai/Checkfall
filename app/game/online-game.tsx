@@ -41,7 +41,7 @@ const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const BOARD_SIZE = Math.min(Dimensions.get("window").width * 0.9, 520);
 const SQUARE_SIZE = BOARD_SIZE / 8;
 
-// Wie im Bot-Spiel: so viele Premoves können maximal hintereinander vorgemerkt werden.
+// Same as in the bot game: this many premoves can be queued in a row at most.
 const MAX_PREMOVES = 8;
 
 const pieces: Record<string, any> = {
@@ -63,10 +63,10 @@ const toSquare = (row: number, col: number) => `${FILES[col]}${8 - row}`;
 const pieceToKey = (piece: any) => (piece ? `${piece.color}${piece.type}` : null);
 
 // =============================
-// MATERIAL / GESCHLAGENE FIGUREN
+// MATERIAL / CAPTURED PIECES
 // =============================
-// Zeigt an, wer wie viele Figuren welchen Typs geschlagen hat und wer im
-// Materialwert vorne liegt (z.B. "+1" nach einem geschlagenen Bauern).
+// Shows who has captured how many pieces of which type and who is
+// ahead on material (e.g. "+1" after a pawn has been captured).
 const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 const CAPTURED_SYMBOL: Record<string, string> = {
     p: "♟",
@@ -78,10 +78,10 @@ const CAPTURED_SYMBOL: Record<string, string> = {
 const STARTING_COUNTS: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1 };
 
 type CapturedInfo = {
-    // von Weiß geschlagene (also fehlende schwarze) Figuren
+    // pieces captured by White (i.e. missing Black pieces)
     byWhite: { type: string; count: number }[];
     byBlack: { type: string; count: number }[];
-    advantage: number; // positiv = Weiß vorne, negativ = Schwarz vorne
+    advantage: number; // positive = White ahead, negative = Black ahead
 };
 
 const getMaterialInfo = (g: Chess): CapturedInfo => {
@@ -190,8 +190,8 @@ export default function GameScreen() {
     const [opponentName, setOpponentName] = useState("");
     const [opponentAvatar, setOpponentAvatar] = useState("");
 
-    // NEU: authId des Gegners (bleibt über Sessions/Geräte hinweg gleich,
-    // im Gegensatz zur Socket-id) + Freundschaftsstatus dazu.
+    // NEW: opponent's authId (stays the same across sessions/devices,
+    // unlike the socket id) + the friendship status for it.
     const [opponentAuthId, setOpponentAuthId] = useState<string | null>(
         getParam("opponentAuthId") || null
     );
@@ -211,8 +211,8 @@ export default function GameScreen() {
 
     const [endState, setEndState] =
         useState<EndState | null>(null);
-    // NEU: erlaubt es, die Endergebnis-Karte wegzutippen, um die Endstellung
-    // (z.B. wie man schachmatt gesetzt wurde) anzusehen, ohne endState zu verlieren.
+    // NEW: lets the user swipe away the result card to view the final
+    // position (e.g. how checkmate was delivered) without losing endState.
     const [endCardVisible, setEndCardVisible] = useState(true);
 
     const [showChat, setShowChat] = useState(false);
@@ -224,16 +224,16 @@ export default function GameScreen() {
     const [rematchWaiting, setRematchWaiting] = useState(false);
     const [showRematchOffer, setShowRematchOffer] = useState(false);
 
-    // NEU: Supabase-Game-ID der zuletzt gespeicherten Partie, damit der
-    // "Analyse"-Button direkt zur Game-Review-Ansicht verlinken kann.
-    // Bleibt null bei Gast-Accounts, weil dort nichts remote gespeichert wird.
+    // NEW: Supabase game ID of the most recently saved game, so the
+    // "Analysis" button can link directly to the game review view.
+    // Stays null for guest accounts, since nothing is saved remotely there.
     const [lastGameId, setLastGameId] = useState<string | null>(null);
 
     const isLeaving = useRef(false);
     const showChatRef = useRef(false);
     const eloProcessed = useRef(false);
-    // NEU: damit der Timer-Interval (wird nur einmal registriert) weiß,
-    // ob das Spiel inzwischen vorbei ist, ohne die Uhr weiterlaufen zu lassen.
+    // NEW: so the timer interval (registered only once) knows whether the
+    // game has ended in the meantime, without letting the clock keep running.
     const gameEndedRef = useRef(false);
     const endPopupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const scrollRef = useRef<ScrollView>(null);
@@ -242,10 +242,10 @@ export default function GameScreen() {
     // =============================
     // PREMOVE (State + Refs)
     // =============================
-    // Refs, weil die Socket-Handler nur einmal registriert werden und sonst
-    // veraltete Werte (myColor, roomId, checkGameState) sehen würden.
-    // Wie im Bot-Spiel: eine Kette aus mehreren Premoves statt nur einem
-    // einzelnen vorgemerkten Zug.
+    // Refs, because the socket handlers are only registered once and would
+    // otherwise see stale values (myColor, roomId, checkGameState).
+    // Same as in the bot game: a chain of multiple premoves instead of just
+    // a single queued move.
     const [premoves, setPremovesState] = useState<{ from: string; to: string }[]>([]);
     const premovesRef = useRef<{ from: string; to: string }[]>([]);
     const gameRef = useRef(game);
@@ -312,7 +312,7 @@ export default function GameScreen() {
 
     useEffect(() => {
         const interval = setInterval(() => {
-            // NEU: nach Spielende (Sieg/Niederlage/Remis) nicht mehr weiterzählen
+            // NEW: stop counting once the game has ended (win/loss/draw)
             if (gameEndedRef.current) return;
 
             const sync = clockSync.current;
@@ -366,7 +366,7 @@ export default function GameScreen() {
     const formatTime = (milliseconds: number) => {
         const clamped = Math.max(0, milliseconds);
 
-        // Unter 20 Sekunden: eine Nachkommastelle für mehr Präzision.
+        // Under 20 seconds: one decimal place for extra precision.
         if (clamped < 20000) {
             return (clamped / 1000).toFixed(1);
         }
@@ -421,7 +421,7 @@ export default function GameScreen() {
         if (!myColor) return;
 
         eloProcessed.current = true;
-        clearPremoves(); // NEU: Premove-Kette bei Partieende verwerfen
+        clearPremoves(); // NEW: discard the premove chain once the game ends
         setGameEnded(true);
 
         try {
@@ -437,12 +437,12 @@ export default function GameScreen() {
 
             await updateAccount(acc.id, { rating: newRating });
 
-            // GEÄNDERT: pgn + opponentAuthId mitgeben, remoteId für den
-            // "Analyse"-Button merken (bleibt null bei Gast-Accounts).
+            // CHANGED: also pass pgn + opponentAuthId, remember the remoteId
+            // for the "Analysis" button (stays null for guest accounts).
             const remoteId = await saveGameToHistory(
                 "online",
                 result,
-                pgnOverride ?? game.pgn(),
+                pgnOverride ?? gameRef.current.pgn(),
                 opponentAuthId
             );
             setLastGameId(remoteId);
@@ -469,11 +469,11 @@ export default function GameScreen() {
     checkGameStateRef.current = checkGameState;
 
     // =============================
-    // PREMOVE (Ausführung)
+    // PREMOVE (execution)
     // =============================
 
-    // Eigene Uhr sofort anhalten, die des Gegners starten
-    // (der Server schickt gleich danach die exakten Zeiten und korrigiert).
+    // Stop our own clock immediately and start the opponent's
+    // (the server sends the exact times right after and corrects it).
     const switchClockLocally = () => {
         const s = clockSync.current;
         const elapsed = Math.max(0, Date.now() - s.receivedAt);
@@ -495,9 +495,9 @@ export default function GameScreen() {
         setActiveColor(next);
     };
 
-    // GEÄNDERT: spielt nur noch den ERSTEN Premove der Kette. Die restlichen
-    // bleiben stehen und werden nach dem jeweils nächsten Gegner-Zug
-    // nacheinander abgearbeitet - genau wie im Bot-Spiel.
+    // CHANGED: only plays the FIRST premove of the chain now. The rest
+    // stay queued and get processed one after another following each
+    // subsequent opponent move — exactly like in the bot game.
     const playPremove = (base: Chess) => {
         const queue = premovesRef.current;
         if (queue.length === 0) return;
@@ -508,20 +508,20 @@ export default function GameScreen() {
         let move: any = null;
 
         try {
-            // Umwandlung: automatisch Dame
+            // Promotion: automatically queen
             move = next.move({ from: pm.from, to: pm.to, promotion: "q" });
         } catch {
             move = null;
         }
 
         if (!move) {
-            // Ist ein Premove ungültig, sind auch die folgenden hinfällig
-            console.log("⚠️ PREMOVE INVALID, Kette verworfen:", pm);
+            // If a premove is invalid, the following ones are void too
+            console.log("⚠️ PREMOVE INVALID, chain discarded:", pm);
             setPremoves([]);
             return;
         }
 
-        // Rest der Kette bleibt stehen und wird nach dem nächsten Gegner-Zug gespielt
+        // The rest of the chain stays queued and is played after the next opponent move
         setPremoves(rest);
         gameRef.current = next;
         setGame(next);
@@ -591,20 +591,20 @@ export default function GameScreen() {
                 setMyAvatar(whiteAvatar || "");
                 setOpponentName(blackName);
                 setOpponentAvatar(blackAvatar || "");
-                setOpponentAuthId(getParam("blackAuthId") || null); // NEU
+                setOpponentAuthId(getParam("blackAuthId") || null); // NEW
             } else {
                 setMyName(blackName);
                 setMyAvatar(blackAvatar || "");
                 setOpponentName(whiteName);
                 setOpponentAvatar(whiteAvatar || "");
-                setOpponentAuthId(getParam("whiteAuthId") || null); // NEU
+                setOpponentAuthId(getParam("whiteAuthId") || null); // NEW
             }
         };
 
         const handleGameStart = (data: any) => {
             if (!data?.roomId) return;
 
-            // This also handles Revanche without navigating away.
+            // This also handles a rematch without navigating away.
             setRoomId(data.roomId);
 
             const nextWhite =
@@ -632,10 +632,10 @@ export default function GameScreen() {
             setMyColor(color);
 
             setWhiteName(
-                String(data.whiteName || "Weiß")
+                String(data.whiteName || "White")
             );
             setBlackName(
-                String(data.blackName || "Schwarz")
+                String(data.blackName || "Black")
             );
             setWhiteAvatar(
                 String(data.whiteAvatar || "")
@@ -665,8 +665,8 @@ export default function GameScreen() {
 
             setOpponentName(
                 color === "w"
-                    ? String(data.blackName || "Gegner")
-                    : String(data.whiteName || "Gegner")
+                    ? String(data.blackName || "Opponent")
+                    : String(data.whiteName || "Opponent")
             );
 
             setOpponentAvatar(
@@ -675,7 +675,7 @@ export default function GameScreen() {
                     : String(data.whiteAvatar || "")
             );
 
-            // NEU: authId des Gegners für dauerhaftes "Freund hinzufügen"
+            // NEW: opponent's authId for persistent "add friend"
             setOpponentAuthId(
                 color === "w"
                     ? (data.blackAuthId || null)
@@ -686,8 +686,8 @@ export default function GameScreen() {
                 data.fen || "startpos"
             );
 
-            gameRef.current = nextGame; // NEU
-            clearPremoves(); // NEU
+            gameRef.current = nextGame; // NEW
+            clearPremoves(); // NEW
 
             setGame(nextGame);
             setMoveHistory([]);
@@ -701,7 +701,7 @@ export default function GameScreen() {
             setShowRematchOffer(false);
             setChatMessages([]);
             setUnreadCount(0);
-            setLastGameId(null); // NEU: Analyse-Button gehört zur vorigen Partie
+            setLastGameId(null); // NEW: the Analysis button belongs to the previous game
 
             eloProcessed.current = false;
             isLeaving.current = false;
@@ -734,7 +734,7 @@ export default function GameScreen() {
     }, []);
 
     // =============================
-    // FRIENDS: STATUS LADEN
+    // FRIENDS: LOAD STATUS
     // =============================
 
     useEffect(() => {
@@ -762,8 +762,8 @@ export default function GameScreen() {
             setFriendStatus("pending_sent");
         } catch (error: any) {
             Alert.alert(
-                "Nicht möglich",
-                error?.message || "Anfrage konnte nicht gesendet werden."
+                "Not possible",
+                error?.message || "The request could not be sent."
             );
         }
     };
@@ -851,8 +851,9 @@ export default function GameScreen() {
 
             if (!from || !to) return;
 
-            // GEÄNDERT: Stellung synchron über gameRef berechnen (statt setGame-Updater),
-            // damit der Premove sofort mit der neuen Stellung gespielt werden kann.
+            // CHANGED: compute the position synchronously via gameRef (instead
+            // of the setGame updater), so the premove can be played immediately
+            // with the new position.
             const newGame = cloneWithHistory(gameRef.current);
             let result: any = null;
 
@@ -890,7 +891,7 @@ export default function GameScreen() {
                 to: result.to,
             });
 
-            // NEU: (nächsten) Premove der Kette sofort abfeuern
+            // NEW: fire off the (next) premove of the chain immediately
             playPremove(newGame);
         };
 
@@ -916,12 +917,12 @@ export default function GameScreen() {
 
         const handleDrawOffer = (data: any) => {
             Alert.alert(
-                "Remis angeboten",
-                `${data?.name || "Dein Gegner"
-                } möchte Remis.`,
+                "Draw offered",
+                `${data?.name || "Your opponent"
+                } wants a draw.`,
                 [
                     {
-                        text: "Ablehnen",
+                        text: "Decline",
                         style: "cancel",
                         onPress: () =>
                             socket.emit(
@@ -933,7 +934,7 @@ export default function GameScreen() {
                             ),
                     },
                     {
-                        text: "Annehmen",
+                        text: "Accept",
                         onPress: () =>
                             socket.emit(
                                 "answer_draw",
@@ -949,8 +950,8 @@ export default function GameScreen() {
 
         const handleDrawDeclined = () => {
             Alert.alert(
-                "Remis abgelehnt",
-                "Dein Gegner möchte weiterspielen."
+                "Draw declined",
+                "Your opponent wants to keep playing."
             );
         };
 
@@ -990,7 +991,7 @@ export default function GameScreen() {
                 message,
             ]);
 
-            // NEU: ungelesene Nachrichten zählen, solange der Chat nicht offen ist.
+            // NEW: count unread messages while the chat is not open.
             if (!showChatRef.current) {
                 setUnreadCount((c) => c + 1);
             }
@@ -1053,8 +1054,8 @@ export default function GameScreen() {
             setRematchWaiting(false);
 
             Alert.alert(
-                "Revanche abgelehnt",
-                "Dein Gegner möchte keine Revanche."
+                "Rematch declined",
+                "Your opponent doesn't want a rematch."
             );
         };
 
@@ -1064,15 +1065,15 @@ export default function GameScreen() {
             setRematchWaiting(false);
 
             Alert.alert(
-                "Revanche nicht möglich",
+                "Rematch not possible",
                 data?.message ||
-                "Dein Gegner ist nicht mehr online."
+                "Your opponent is no longer online."
             );
         };
 
-        // Das eigentliche Starten der neuen Partie passiert server-seitig
-        // über ein reguläres "game_start"-Event (siehe handleGameStart oben) -
-        // dafür ist hier kein eigener "rematch_accepted"-Handler nötig.
+        // The actual start of the new game happens server-side via a regular
+        // "game_start" event (see handleGameStart above) - so no separate
+        // "rematch_accepted" handler is needed here.
 
         socket.on(
             "rematch_requested",
@@ -1215,7 +1216,7 @@ export default function GameScreen() {
     // =============================
     const handlePromotion = (piece: "q" | "r" | "b" | "n") => {
         if (!promotionMove) return;
-        const newGame = cloneWithHistory(game); // GEÄNDERT (vorher: new Chess(game.fen()))
+        const newGame = cloneWithHistory(game); // CHANGED (previously: new Chess(game.fen()))
         const move = newGame.move({
             from: promotionMove.from,
             to: promotionMove.to,
@@ -1331,8 +1332,8 @@ export default function GameScreen() {
         ).start();
     }, [endState]);
 
-    // NEU: Android-Zurück-Taste schließt zuerst nur die Endergebnis-Karte
-    // (Stellung ansehen), statt gar nichts zu tun oder den Screen zu verlassen.
+    // NEW: Android back button first only closes the result card (to view
+    // the position), instead of doing nothing or leaving the screen.
     useEffect(() => {
         const onBackPress = () => {
             if (endState && endCardVisible) {
@@ -1359,7 +1360,7 @@ export default function GameScreen() {
         };
     }, []);
 
-    // Spiel vorbei -> Premove-Kette verwerfen (analog Bot-Spiel)
+    // Game over -> discard premove chain (same as bot game)
     useEffect(() => {
         if (gameEnded || !!endState) {
             clearPremoves();
@@ -1370,8 +1371,8 @@ export default function GameScreen() {
     // HISTORY
     // =============================
 
-    // GEÄNDERT: gibt jetzt die remoteId (Supabase-Game-ID) zurück, oder null,
-    // damit der "Analyse"-Button weiß, wohin er verlinken soll.
+    // CHANGED: now returns the remoteId (Supabase game ID), or null, so the
+    // "Analysis" button knows where to link to.
     async function saveGameToHistory(
         mode: "online",
         result: "win" | "loss" | "draw" | "aborted",
@@ -1388,7 +1389,7 @@ export default function GameScreen() {
             mode,
             result,
             timestamp: timestamp ?? Date.now(),
-            remoteId: null, // NEU, wird gleich befüllt falls Sync klappt
+            remoteId: null, // NEW, filled in shortly if the sync succeeds
         });
 
         await AsyncStorage.setItem(key, JSON.stringify(history));
@@ -1401,13 +1402,13 @@ export default function GameScreen() {
             if (acc && !acc.guest && acc.authId) {
                 remoteId = await saveGameRecord({
                     userId: acc.authId,
-                    opponentId: opponentId ?? null, // bei bot-game.tsx einfach null lassen
+                    opponentId: opponentId ?? null, // just leave null in bot-game.tsx
                     mode,
                     result,
                     pgn,
                 });
 
-                // NEU: remoteId nachträglich in denselben History-Eintrag schreiben
+                // NEW: write the remoteId into the same history entry afterwards
                 if (remoteId) {
                     const updatedHistory = history.map((item: any) =>
                         item.timestamp === (timestamp ?? history[0].timestamp)
@@ -1503,7 +1504,7 @@ export default function GameScreen() {
                                     styles.title
                                 }
                             >
-                                Partie verlassen?
+                                Leave game?
                             </Text>
 
                             <Text
@@ -1511,10 +1512,9 @@ export default function GameScreen() {
                                     styles.text
                                 }
                             >
-                                Wenn du die Partie
-                                verlässt, wird sie
-                                als Niederlage
-                                gewertet.
+                                If you leave the game,
+                                it will be counted
+                                as a loss.
                             </Text>
 
                             <View
@@ -1537,7 +1537,7 @@ export default function GameScreen() {
                                             styles.cancelButtonText
                                         }
                                     >
-                                        Abbrechen
+                                        Cancel
                                     </Text>
                                 </Pressable>
 
@@ -1556,7 +1556,7 @@ export default function GameScreen() {
                                             styles.leaveButtonText
                                         }
                                     >
-                                        Aufgeben
+                                        Resign
                                     </Text>
                                 </Pressable>
                             </View>
@@ -1592,7 +1592,7 @@ export default function GameScreen() {
                                     styles.title
                                 }
                             >
-                                Revanche?
+                                Rematch?
                             </Text>
 
                             <Text
@@ -1600,9 +1600,9 @@ export default function GameScreen() {
                                     styles.text
                                 }
                             >
-                                Dein Gegner möchte
-                                eine neue Partie
-                                gegen dich spielen.
+                                Your opponent wants
+                                to play a new game
+                                against you.
                             </Text>
 
                             <View style={styles.rematchButtons}>
@@ -1619,7 +1619,7 @@ export default function GameScreen() {
                                             styles.btnText
                                         }
                                     >
-                                        Spielen
+                                        Play
                                     </Text>
                                 </Pressable>
 
@@ -1636,7 +1636,7 @@ export default function GameScreen() {
                                             styles.declineLinkText
                                         }
                                     >
-                                        Nein, danke
+                                        No, thanks
                                     </Text>
                                 </Pressable>
                             </View>
@@ -1691,7 +1691,7 @@ export default function GameScreen() {
                                     >
                                         {
                                             opponentName ||
-                                            "Gegner"
+                                            "Opponent"
                                         }
                                     </Text>
                                 </View>
@@ -1735,8 +1735,8 @@ export default function GameScreen() {
                                             styles.emptyChat
                                         }
                                     >
-                                        Noch keine
-                                        Nachrichten.
+                                        No messages
+                                        yet.
                                     </Text>
                                 ) : (
                                     chatMessages.map(
@@ -1800,7 +1800,7 @@ export default function GameScreen() {
                                     onChangeText={
                                         setChatInput
                                     }
-                                    placeholder="Nachricht..."
+                                    placeholder="Message..."
                                     placeholderTextColor="#888"
                                     maxLength={
                                         300
@@ -1827,7 +1827,7 @@ export default function GameScreen() {
                                             styles.chatSendText
                                         }
                                     >
-                                        Senden
+                                        Send
                                     </Text>
                                 </Pressable>
                             </View>
@@ -1860,7 +1860,7 @@ export default function GameScreen() {
                                     styles.title
                                 }
                             >
-                                Wähle Umwandlung
+                                Choose promotion
                             </Text>
 
                             <View
@@ -1875,19 +1875,19 @@ export default function GameScreen() {
                                     [
                                         [
                                             "q",
-                                            "Dame",
+                                            "Queen",
                                         ],
                                         [
                                             "r",
-                                            "Turm",
+                                            "Rook",
                                         ],
                                         [
                                             "b",
-                                            "Läufer",
+                                            "Bishop",
                                         ],
                                         [
                                             "n",
-                                            "Springer",
+                                            "Knight",
                                         ],
                                     ] as const
                                 ).map(
@@ -1937,7 +1937,7 @@ export default function GameScreen() {
                                             "center",
                                     }}
                                 >
-                                    Abbrechen
+                                    Cancel
                                 </Text>
                             </Pressable>
                         </View>
@@ -1955,8 +1955,7 @@ export default function GameScreen() {
                                 styles.waitText
                             }
                         >
-                            Warte auf Verbindung...
-                        </Text>
+                            Waiting for connection...  </Text>
                     </View>
                 ) : (
                     <View
@@ -1982,7 +1981,7 @@ export default function GameScreen() {
                                         styles.clockLabel
                                     }
                                 >
-                                    ⚪ {whiteName || "Weiß"}
+                                    ⚪ {whiteName || "White"}
                                 </Text>
                                 <Text
                                     style={
@@ -2022,7 +2021,7 @@ export default function GameScreen() {
                                         styles.clockLabel
                                     }
                                 >
-                                    ⚫ {blackName || "Schwarz"}
+                                    ⚫ {blackName || "Black"}
                                 </Text>
                                 <Text
                                     style={
@@ -2109,7 +2108,7 @@ export default function GameScreen() {
                                         {opponentRating}
                                     </Text>
 
-                                    {/* NEU: Freund-hinzufügen-Button */}
+                                    {/* NEW: add-friend button */}
                                     {opponentAuthId &&
                                         friendStatus === "none" && (
                                             <Pressable
@@ -2123,7 +2122,7 @@ export default function GameScreen() {
                                                         styles.addFriendBtnText
                                                     }
                                                 >
-                                                    + Freund
+                                                    + Friend
                                                 </Text>
                                             </Pressable>
                                         )}
@@ -2131,21 +2130,21 @@ export default function GameScreen() {
                                     {opponentAuthId &&
                                         friendStatus === "pending_sent" && (
                                             <Text style={styles.friendPending}>
-                                                Anfrage gesendet
+                                                Request sent
                                             </Text>
                                         )}
 
                                     {opponentAuthId &&
                                         friendStatus === "pending_received" && (
                                             <Text style={styles.friendPending}>
-                                                Hat dich angefragt
+                                                Sent you a request
                                             </Text>
                                         )}
 
                                     {opponentAuthId &&
                                         friendStatus === "friends" && (
                                             <Text style={styles.friendPending}>
-                                                ✓ Befreundet
+                                                ✓ Friends
                                             </Text>
                                         )}
                                 </View>
@@ -2255,8 +2254,8 @@ export default function GameScreen() {
                                     pieces
                                 }
                                 onPressSquare={(square: string) => {
-                                    // FIX: nach Spielende (auch nach Schließen des Popups)
-                                    // dürfen keine Züge mehr gemacht werden.
+                                    // FIX: no more moves allowed once the game
+                                    // has ended (even after closing the popup).
                                     if (gameEnded || endState) return;
                                     input.onPressSquare(square);
                                 }}
@@ -2303,7 +2302,7 @@ export default function GameScreen() {
                                             styles.bottomBtn
                                         }
                                     >
-                                        Aufgeben
+                                        Resign
                                     </Text>
                                 </Pressable>
 
@@ -2320,8 +2319,8 @@ export default function GameScreen() {
                                         );
 
                                         Alert.alert(
-                                            "Remis angeboten",
-                                            "Dein Gegner erhält die Remis-Anfrage."
+                                            "Draw offered",
+                                            "Your opponent will receive the draw request."
                                         );
                                     }}
                                 >
@@ -2330,7 +2329,7 @@ export default function GameScreen() {
                                             styles.bottomBtn
                                         }
                                     >
-                                        Remis
+                                        Draw
                                     </Text>
                                 </Pressable>
 
@@ -2374,6 +2373,20 @@ export default function GameScreen() {
                                             animatedCardStyle,
                                         ]}
                                     >
+                                        <View
+                                            style={[
+                                                styles.endCardAccent,
+                                                {
+                                                    backgroundColor:
+                                                        endState.type === "win"
+                                                            ? "#4ADE80"
+                                                            : endState.type === "loss"
+                                                                ? "#F87171"
+                                                                : "#64748B",
+                                                },
+                                            ]}
+                                        />
+
                                         <Pressable
                                             style={styles.endCardClose}
                                             onPress={() => setEndCardVisible(false)}
@@ -2390,7 +2403,7 @@ export default function GameScreen() {
                                                             styles.winTitle
                                                         }
                                                     >
-                                                        Sieg!
+                                                        Victory!
                                                     </Text>
 
                                                     <Text
@@ -2400,17 +2413,16 @@ export default function GameScreen() {
                                                     >
                                                         {endState.reason ===
                                                             "checkmate"
-                                                            ? "Du hast deinen Gegner schachmatt gesetzt."
+                                                            ? "You checkmated your opponent."
                                                             : endState.reason ===
                                                                 "timeout"
-                                                                ? "Die Zeit deines Gegners ist abgelaufen."
+                                                                ? "Your opponent's time ran out."
                                                                 : endState.reason ===
                                                                     "resign"
-                                                                    ? "Dein Gegner hat aufgegeben."
+                                                                    ? "Your opponent resigned."
                                                                     : endState.reason ===
                                                                         "disconnect"
-                                                                        ? "Dein Gegner hat die Verbindung verloren."
-                                                                        : ""}
+                                                                        ? "Your opponent lost connection. " : ""}
                                                     </Text>
                                                 </>
                                             )}
@@ -2423,7 +2435,7 @@ export default function GameScreen() {
                                                             styles.loseTitle
                                                         }
                                                     >
-                                                        Niederlage
+                                                        Defeat
                                                     </Text>
 
                                                     <Text
@@ -2433,16 +2445,16 @@ export default function GameScreen() {
                                                     >
                                                         {endState.reason ===
                                                             "checkmate"
-                                                            ? "Du wurdest schachmatt gesetzt."
+                                                            ? "You were checkmated."
                                                             : endState.reason ===
                                                                 "timeout"
-                                                                ? "Deine Zeit ist abgelaufen."
+                                                                ? "Your time ran out."
                                                                 : endState.reason ===
                                                                     "resign"
-                                                                    ? "Du hast die Partie aufgegeben."
+                                                                    ? "You resigned the game."
                                                                     : endState.reason ===
                                                                         "disconnect"
-                                                                        ? "Die Verbindung wurde getrennt."
+                                                                        ? "The connection was lost."
                                                                         : ""}
                                                     </Text>
                                                 </>
@@ -2456,7 +2468,7 @@ export default function GameScreen() {
                                                             styles.drawTitle
                                                         }
                                                     >
-                                                        🤝 Remis
+                                                        Draw
                                                     </Text>
 
                                                     <Text
@@ -2464,9 +2476,8 @@ export default function GameScreen() {
                                                             styles.subText
                                                         }
                                                     >
-                                                        Die Partie endet
-                                                        im
-                                                        Unentschieden.
+                                                        The game ends
+                                                        in a draw.
                                                     </Text>
                                                 </>
                                             )}
@@ -2481,40 +2492,51 @@ export default function GameScreen() {
                                                     styles.ratingText
                                                 }
                                             >
-                                                Deine Elo:{" "}
+                                                Your Elo:{" "}
                                                 {
                                                     myRating
                                                 }   </Text>
                                         </View>
 
+                                        <Pressable
+                                            style={
+                                                styles.primaryBtn
+                                            }
+                                            onPress={async () => {
+                                                setEndState(
+                                                    null
+                                                );
+
+                                                // FIX: waiting.tsx braucht name/avatar/rating
+                                                // als Params, sonst wird find_match nie gesendet.
+                                                // Rating frisch aus dem Account holen, weil es
+                                                // nach der Partie neu berechnet wurde.
+                                                const acc = await getCurrentAccount();
+
+                                                router.replace({
+                                                    pathname: "/game/waiting",
+                                                    params: {
+                                                        name: myName,
+                                                        avatar: myAvatar,
+                                                        rating: String(acc?.rating ?? myRating),
+                                                    },
+                                                } as any);
+                                            }}
+                                        >
+                                            <Text
+                                                style={
+                                                    styles.btnText
+                                                }
+                                            >
+                                                New Game
+                                            </Text>
+                                        </Pressable>
+
                                         <View
                                             style={
-                                                styles.endButtons
+                                                styles.secondaryRow
                                             }
                                         >
-                                            <Pressable
-                                                style={
-                                                    styles.primaryBtn
-                                                }
-                                                onPress={() => {
-                                                    setEndState(
-                                                        null
-                                                    );
-
-                                                    router.replace(
-                                                        "/game/waiting"
-                                                    );
-                                                }}
-                                            >
-                                                <Text
-                                                    style={
-                                                        styles.btnText
-                                                    }
-                                                >
-                                                    Neue Partie
-                                                </Text>
-                                            </Pressable>
-
                                             <Pressable
                                                 style={[
                                                     styles.secondaryBtn,
@@ -2530,20 +2552,20 @@ export default function GameScreen() {
                                             >
                                                 <Text
                                                     style={
-                                                        styles.btnText
+                                                        styles.secondaryBtnText
                                                     }
                                                 >
                                                     {rematchWaiting
-                                                        ? "Warte auf Gegner..."
-                                                        : "Revanche"}
+                                                        ? "Waiting..."
+                                                        : "Rematch"}
                                                 </Text>
                                             </Pressable>
 
-                                            {/* NEU: Analyse-Button - nur sichtbar, wenn die
-                                                Partie remote gespeichert wurde (kein Gast-Account).
-                                                ACHTUNG: Route "/game/review" ist eine Annahme -
-                                                ggf. an den tatsächlichen Pfad deiner
-                                                Game-Review-Datei anpassen. */}
+                                            {/* NEW: Analysis button - only visible if the
+                                                game was saved remotely (not a guest account).
+                                                NOTE: route "/game/review" is an assumption -
+                                                adjust to the actual path of your
+                                                game review file if needed. */}
                                             {lastGameId && (
                                                 <Pressable
                                                     style={
@@ -2561,10 +2583,10 @@ export default function GameScreen() {
                                                 >
                                                     <Text
                                                         style={
-                                                            styles.btnText
+                                                            styles.secondaryBtnText
                                                         }
                                                     >
-                                                        Analyse
+                                                        Analysis
                                                     </Text>
                                                 </Pressable>
                                             )}
@@ -2584,7 +2606,7 @@ export default function GameScreen() {
                                             >
                                                 <Text
                                                     style={
-                                                        styles.btnText
+                                                        styles.secondaryBtnText
                                                     }
                                                 >
                                                     Home
@@ -2711,7 +2733,7 @@ const styles = StyleSheet.create({
         marginTop: 1,
     },
 
-    // NEU: Freund-hinzufügen-Button beim Gegner
+    // NEW: add-friend button next to the opponent
     addFriendBtn: {
         marginTop: 6,
         alignSelf: "flex-start",
@@ -2882,83 +2904,96 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         zIndex: 999,
-        backgroundColor: "rgba(0,0,0,0.18)",
+        backgroundColor: "rgba(0,0,0,0.55)",
         borderRadius: 18,
     },
 
     endCard: {
-        width: "85%",
+        width: "88%",
         maxWidth: 380,
-        backgroundColor: "#111",
-        borderRadius: 24,
-        padding: 24,
-        borderWidth: 1,
-        borderColor: "#D4AF37",
+        backgroundColor: "#141821",
+        borderRadius: 28,
+        paddingTop: 36,
+        paddingBottom: 20,
+        paddingHorizontal: 24,
         alignItems: "center",
+        overflow: "hidden",
+        shadowColor: "#000",
         shadowOpacity: 0.4,
-        shadowRadius: 20,
-        elevation: 12,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 14,
+    },
+
+    endCardAccent: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 5,
     },
 
     endCardClose: {
         position: "absolute",
-        top: 10,
+        top: 14,
         right: 14,
         width: 30,
         height: 30,
         borderRadius: 15,
-        backgroundColor: "#222",
+        backgroundColor: "rgba(255,255,255,0.08)",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 1,
     },
 
     endCardCloseText: {
-        color: "#ccc",
-        fontSize: 20,
-        lineHeight: 22,
+        color: "#aaa",
+        fontSize: 18,
+        lineHeight: 20,
     },
 
     winTitle: {
-        fontSize: 38,
-        fontWeight: "900",
-        color: "#FFD700",
-        marginBottom: 8,
+        fontSize: 26,
+        fontWeight: "800",
+        color: "#4ADE80",
+        marginBottom: 4,
     },
 
     loseTitle: {
-        fontSize: 38,
-        fontWeight: "900",
-        color: "#ff3b3b",
-        marginBottom: 8,
+        fontSize: 26,
+        fontWeight: "800",
+        color: "#F87171",
+        marginBottom: 4,
     },
 
     drawTitle: {
-        fontSize: 38,
-        fontWeight: "900",
-        color: "#aaa",
-        marginBottom: 8,
+        fontSize: 26,
+        fontWeight: "800",
+        color: "#94A3B8",
+        marginBottom: 4,
     },
 
     subText: {
-        color: "#ccc",
+        color: "#94A3B8",
+        fontSize: 14,
         textAlign: "center",
-        lineHeight: 21,
-        marginBottom: 16,
+        lineHeight: 20,
+        marginBottom: 18,
+        paddingHorizontal: 8,
     },
 
     resultRating: {
-        width: "100%",
-        paddingVertical: 10,
-        marginBottom: 8,
-        borderRadius: 12,
-        backgroundColor: "#1d1d1d",
-        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginBottom: 22,
+        borderRadius: 999,
+        backgroundColor: "rgba(255,255,255,0.06)",
     },
 
     ratingText: {
-        color: "#aaa",
+        color: "#CBD5E1",
         fontSize: 13,
+        fontWeight: "600",
     },
 
     endButtons: {
@@ -2967,19 +3002,35 @@ const styles = StyleSheet.create({
     },
 
     primaryBtn: {
-        backgroundColor: "#D4AF37",
-        padding: 13,
-        borderRadius: 12,
+        width: "100%",
+        backgroundColor: "#7C9473",
+        paddingVertical: 15,
+        borderRadius: 16,
         alignItems: "center",
+        marginBottom: 12,
+    },
+
+    secondaryRow: {
+        flexDirection: "row",
+        width: "100%",
+        gap: 10,
     },
 
     secondaryBtn: {
-        backgroundColor: "#222",
-        padding: 13,
-        borderRadius: 12,
+        flex: 1,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        paddingVertical: 14,
+        borderRadius: 14,
         alignItems: "center",
+        justifyContent: "center",
         borderWidth: 1,
-        borderColor: "#333",
+        borderColor: "rgba(255,255,255,0.08)",
+    },
+
+    secondaryBtnText: {
+        color: "#CBD5E1",
+        fontSize: 12,
+        fontWeight: "600",
     },
 
     disabledBtn: {

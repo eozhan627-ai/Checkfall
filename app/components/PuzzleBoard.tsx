@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     Animated,
     Dimensions,
@@ -38,17 +38,42 @@ type Props = {
     legalSquares: string[];
     onSquarePress: (square: string) => void;
     playerColor?: "w" | "b";
+    // Neu – beide optional, der Puzzles-Screen funktioniert unverändert weiter
+    lastMove?: { from: string; to: string } | null;
+    checkSquare?: string | null;
+    // Felder, die per Tipp mit einem Halo markiert werden
+    hintSquares?: string[];
 };
 
 const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const ranks = ["8", "7", "6", "5", "4", "3", "2", "1"];
+
+// Gleiche Farben wie das Review-/Spielbrett
+const BOARD_COLORS = {
+    light: "#e7d5b7",
+    dark: "#b58863",
+    lastTo: "#6bb6ff",
+    lastFrom: "#4da3ff",
+    selected: "#4da3ff",
+    check: "#ff4d4d",
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const BOARD_SIZE = Math.min(SCREEN_WIDTH - 32, 420);
 const SQUARE_SIZE = BOARD_SIZE / 8;
 const PIECE_SIZE = SQUARE_SIZE * 0.86;
 
-// Deine Scale/Offset-Werte, nur als Maps (gleiche Werte wie vorher)
+// Halo als weicher Glow: viele übereinanderliegende Kreise ohne Rand.
+// Jeder Kreis ist nur leicht transparent -> in der Mitte addiert es sich
+// zu stark, nach außen wird es weicher und schwächer.
+const HALO_LAYERS = 12;
+const HALO_MAX = SQUARE_SIZE * 1.4;  // größer als das Feld, ragt in die Nachbarfelder
+const HALO_MIN = SQUARE_SIZE * 0.25; // innerster Kreis
+const HALO_COLOR = "rgba(20,200,120,0.09)";
+const HALO_DIAMETERS = Array.from({ length: HALO_LAYERS }, (_, i) =>
+    HALO_MAX - ((HALO_MAX - HALO_MIN) * i) / (HALO_LAYERS - 1)
+);
+
 const PIECE_SCALE: Record<string, number> = {
     wP: 1.35, wN: 1.55, wB: 1.7, wR: 1.65, wQ: 1.55, wK: 1.3,
     bP: 1.3, bN: 1.2, bB: 1.3, bR: 1.15, bQ: 1.25, bK: 1.15,
@@ -62,14 +87,49 @@ const pieceTransform = (key: string) => [
     { translateY: PIECE_OFFSET_Y[key] ?? 0 },
 ];
 
+// Feld des Königs, der gerade im Schach steht (für die rote Markierung)
+export function findCheckedKing(game: { inCheck: () => boolean; turn: () => string; board: () => Piece[][] }): string | null {
+    if (!game.inCheck()) return null;
+    const turn = game.turn();
+    const b = game.board();
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            const p = b[r][c];
+            if (p && p.type === "k" && p.color === turn) return files[c] + ranks[r];
+        }
+    }
+    return null;
+}
+
 export default function PuzzleBoard({
     board,
     selectedSquare,
     legalSquares,
     onSquarePress,
     playerColor = "w",
+    lastMove = null,
+    checkSquare = null,
+    hintSquares = [],
 }: Props) {
     const rotate = playerColor === "b";
+
+    // Halo pulsiert sanft, solange ein Tipp aktiv ist
+    const pulse = useRef(new Animated.Value(0)).current;
+    const hasHint = hintSquares.length > 0;
+    useEffect(() => {
+        if (!hasHint) {
+            pulse.setValue(0);
+            return;
+        }
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+                Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+            ])
+        );
+        loop.start();
+        return () => loop.stop();
+    }, [hasHint]);
 
     // =========================================================
     // DRAG & DROP
@@ -188,6 +248,10 @@ export default function PuzzleBoard({
                     const isDark = (r + c) % 2 === 1;
                     const isSelected = selectedSquare === square;
                     const isLegal = legalSquares.includes(square);
+                    const isCheckSq = checkSquare === square;
+                    const isLastTo = lastMove?.to === square;
+                    const isLastFrom = lastMove?.from === square;
+                    const isHint = hintSquares.includes(square);
 
                     const pieceKey = piece
                         ? ((piece.color + piece.type.toUpperCase()) as PieceKey)
@@ -196,17 +260,14 @@ export default function PuzzleBoard({
                     // Figur, die gerade gezogen wird, am Ursprung ausblenden
                     const hidden = drag?.from === square;
 
+                    const bg = isCheckSq ? BOARD_COLORS.check
+                        : isLastTo ? BOARD_COLORS.lastTo
+                        : isLastFrom ? BOARD_COLORS.lastFrom
+                        : isSelected ? BOARD_COLORS.selected
+                        : isDark ? BOARD_COLORS.dark : BOARD_COLORS.light;
+
                     return (
-                        <View
-                            key={square}
-                            style={[
-                                styles.square,
-                                {
-                                    backgroundColor: isDark ? "#3B82C4" : "#EAF4FC",
-                                },
-                                isSelected ? styles.selected : null,
-                            ]}
-                        >
+                        <View key={square} style={[styles.square, { backgroundColor: bg }, isHint && { zIndex: 2 }]}>
                             {/* Rang */}
                             {c === 0 && (
                                 <Text
@@ -233,6 +294,32 @@ export default function PuzzleBoard({
                                 </Text>
                             )}
 
+                            {/* Tipp-Halo: weicher Glow ohne Rand (liegt hinter der Figur) */}
+                            {isHint && (
+                                <Animated.View
+                                    pointerEvents="none"
+                                    style={[
+                                        styles.haloWrap,
+                                        { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
+                                    ]}
+                                >
+                                    {HALO_DIAMETERS.map((d, i) => (
+                                        <View
+                                            key={i}
+                                            style={{
+                                                position: "absolute",
+                                                left: (SQUARE_SIZE - d) / 2,
+                                                top: (SQUARE_SIZE - d) / 2,
+                                                width: d,
+                                                height: d,
+                                                borderRadius: d / 2,
+                                                backgroundColor: HALO_COLOR,
+                                            }}
+                                        />
+                                    ))}
+                                </Animated.View>
+                            )}
+
                             {/* Figur */}
                             {piece && pieceKey && !hidden && (
                                 <Image
@@ -244,8 +331,8 @@ export default function PuzzleBoard({
                                 />
                             )}
 
-                            {/* Legal Move Punkt */}
-                            {isLegal && <View style={styles.dot} />}
+                            {/* Legale Züge: Punkt auf leerem Feld, Ring bei Schlagzug */}
+                            {isLegal && <View style={piece ? styles.dotCapture : styles.dot} />}
                         </View>
                     );
                 })
@@ -300,6 +387,8 @@ const styles = StyleSheet.create({
         height: BOARD_SIZE,
         flexDirection: "row",
         flexWrap: "wrap",
+        borderRadius: 8,
+        overflow: "hidden",
     },
 
     square: {
@@ -309,11 +398,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
 
-    selected: {
-        borderWidth: 2,
-        borderColor: "#7c2525",
-    },
-
     piece: {
         width: PIECE_SIZE,
         height: PIECE_SIZE,
@@ -321,17 +405,35 @@ const styles = StyleSheet.create({
     },
 
     dot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: "rgba(0,0,0,0.4)",
         position: "absolute",
+        width: SQUARE_SIZE * 0.3,
+        height: SQUARE_SIZE * 0.3,
+        borderRadius: SQUARE_SIZE * 0.15,
+        backgroundColor: "rgba(0,0,0,0.25)",
+    },
+
+    dotCapture: {
+        position: "absolute",
+        width: SQUARE_SIZE * 0.9,
+        height: SQUARE_SIZE * 0.9,
+        borderRadius: SQUARE_SIZE * 0.45,
+        borderWidth: 3,
+        borderColor: "rgba(0,0,0,0.25)",
+    },
+
+    // Container für den Glow (Kreise darin sind absolut positioniert)
+    haloWrap: {
+        position: "absolute",
+        left: 0,
+        top: 0,
+        width: SQUARE_SIZE,
+        height: SQUARE_SIZE,
     },
 
     coord: {
         position: "absolute",
         fontSize: 10,
-        fontWeight: "600",
+        fontWeight: "700",
     },
 
     coordDark: {
