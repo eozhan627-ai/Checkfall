@@ -262,9 +262,9 @@ export default function PuzzleBoard({
 
                     const bg = isCheckSq ? BOARD_COLORS.check
                         : isLastTo ? BOARD_COLORS.lastTo
-                        : isLastFrom ? BOARD_COLORS.lastFrom
-                        : isSelected ? BOARD_COLORS.selected
-                        : isDark ? BOARD_COLORS.dark : BOARD_COLORS.light;
+                            : isLastFrom ? BOARD_COLORS.lastFrom
+                                : isSelected ? BOARD_COLORS.selected
+                                    : isDark ? BOARD_COLORS.dark : BOARD_COLORS.light;
 
                     return (
                         <View key={square} style={[styles.square, { backgroundColor: bg }, isHint && { zIndex: 2 }]}>
@@ -308,7 +308,7 @@ export default function PuzzleBoard({
                                             key={i}
                                             style={{
                                                 position: "absolute",
-                                                left: (SQUARE_SIZE - d) / 2,
+                                                zIndex: 20,                                                left: (SQUARE_SIZE - d) / 2,
                                                 top: (SQUARE_SIZE - d) / 2,
                                                 width: d,
                                                 height: d,
@@ -340,10 +340,9 @@ export default function PuzzleBoard({
 
             {/* Unsichtbare Touch-Schicht über dem ganzen Brett */}
             <View
-                style={StyleSheet.absoluteFill}
+                style={[StyleSheet.absoluteFill, { zIndex: 10 }]}
                 {...panResponder.panHandlers}
             />
-
             {/* Figur, die am Finger klebt (etwas über dem Finger, damit man sie sieht) */}
             {drag && (
                 <Animated.View
