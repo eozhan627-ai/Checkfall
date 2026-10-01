@@ -1,68 +1,96 @@
-import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Href, router } from 'expo-router';
 import React from 'react';
-import { ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+    ImageBackground,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+type Item = {
+    title: string;
+    subtitle: string;
+    href: Href;
+};
+
+type Section = {
+    label: string;
+    items: Item[];
+};
+
+const SECTIONS: Section[] = [
+    {
+        label: 'Account',
+        items: [
+            { title: 'Profile', subtitle: 'Edit account and avatar', href: '/profile' },
+            { title: 'Help', subtitle: 'FAQ and support', href: '/settings/Help' },
+        ],
+    },
+    {
+        label: 'Information',
+        items: [
+            { title: 'Terms of Use', subtitle: 'Legal', href: '/terms' },
+            { title: 'Privacy Policy', subtitle: 'Data protection information', href: '/privacypolicy' },
+            { title: 'Imprint', subtitle: 'Company information', href: '/settings/Impressum' },
+        ],
+    },
+];
+
+const backgroundImage = require('../../assets/images/loginbackground.png');
 
 export default function MoreScreen() {
-    const backgroundImage = require('../../assets/images/loginbackground.png');
+    const insets = useSafeAreaInsets();
 
     return (
-        <ImageBackground
-            source={backgroundImage}
-            style={styles.container}
-            resizeMode="cover"
-        >
+        <ImageBackground source={backgroundImage} style={styles.container} resizeMode="cover">
             <View style={styles.overlay} />
 
-            {/* HEADER */}
-            <View style={styles.header}>
+            <ScrollView
+                contentContainerStyle={{
+                    paddingTop: insets.top + 24,
+                    paddingBottom: insets.bottom + 32,
+                    paddingHorizontal: 16,
+                }}
+                showsVerticalScrollIndicator={false}
+            >
                 <Text style={styles.title}>More</Text>
-                <Text style={styles.subtitle}>Settings & Information</Text>
-            </View>
 
-            {/* CARDS */}
-            <View style={styles.lists}>
+                {SECTIONS.map((section) => (
+                    <View key={section.label} style={styles.section}>
+                        <Text style={styles.sectionLabel}>{section.label}</Text>
 
-                <TouchableOpacity
-                    style={styles.card}
-                    onPress={() => router.push('/profile')}
-                >
-                    <Text style={styles.cardTitle}>👤 Profile</Text>
-                    <Text style={styles.cardSub}>Edit account & avatar</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.card}
-                    onPress={() => router.push('/settings/Help')}
-                >
-                    <Text style={styles.cardTitle}>❓ Help</Text>
-                    <Text style={styles.cardSub}>FAQ & support</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.card}
-                    onPress={() => router.push('/terms')}
-                >
-                    <Text style={styles.cardTitle}>📄 Legal</Text>
-                    <Text style={styles.cardSub}>Terms of Use</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.card}
-                    onPress={() => router.push('/privacypolicy')}
-                >
-                    <Text style={styles.cardTitle}>📄 Privacy Policy</Text>
-                    <Text style={styles.cardSub}>Data protection information</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.card}
-                    onPress={() => router.push('/settings/Impressum')}
-                >
-                    <Text style={styles.cardTitle}>About us </Text>
-                    <Text style={styles.cardSub}>Imprint & company info</Text>
-                </TouchableOpacity>
-
-            </View>
+                        <View style={styles.group}>
+                            {section.items.map((item, index) => (
+                                <Pressable
+                                    key={item.title}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={item.title}
+                                    onPress={() => router.push(item.href)}
+                                    style={({ pressed }) => [
+                                        styles.row,
+                                        index > 0 && styles.rowDivider,
+                                        pressed && styles.rowPressed,
+                                    ]}
+                                >
+                                    <View style={styles.rowText}>
+                                        <Text style={styles.rowTitle}>{item.title}</Text>
+                                        <Text style={styles.rowSub}>{item.subtitle}</Text>
+                                    </View>
+                                    <Ionicons
+                                        name="chevron-forward"
+                                        size={18}
+                                        color="rgba(255,255,255,0.4)"
+                                    />
+                                </Pressable>
+                            ))}
+                        </View>
+                    </View>
+                ))}
+            </ScrollView>
         </ImageBackground>
     );
 }
@@ -71,52 +99,57 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(0,0,0,0.55)",
+        backgroundColor: 'rgba(0,0,0,0.6)',
     },
-
-    header: {
-        paddingTop: 60,
-        paddingHorizontal: 16,
-        marginBottom: 20,
-    },
-
     title: {
-        fontSize: 28,
-        fontWeight: "800",
-        color: "#fff",
-    },
-
-    subtitle: {
-        fontSize: 14,
-        color: "#ccc",
-        marginTop: 4,
-    },
-
-    lists: {
-        paddingHorizontal: 16,
-        gap: 12,
-    },
-
-    card: {
-        backgroundColor: 'rgba(255,255,255,0.07)',
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.10)',
-    },
-
-    cardTitle: {
-        fontSize: 16,
+        fontSize: 30,
         fontWeight: '700',
         color: '#fff',
+        marginBottom: 24,
     },
-
-    cardSub: {
+    section: {
+        marginBottom: 24,
+    },
+    sectionLabel: {
         fontSize: 12,
-        color: '#aaa',
-        marginTop: 4,
+        fontWeight: '600',
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+        color: 'rgba(255,255,255,0.5)',
+        marginBottom: 8,
+        marginLeft: 4,
+    },
+    group: {
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+    },
+    rowDivider: {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(255,255,255,0.15)',
+    },
+    rowPressed: {
+        backgroundColor: 'rgba(255,255,255,0.08)',
+    },
+    rowText: {
+        flex: 1,
+    },
+    rowTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    rowSub: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.55)',
+        marginTop: 2,
     },
 });

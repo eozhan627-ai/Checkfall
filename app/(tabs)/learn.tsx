@@ -1,64 +1,64 @@
-import { router } from "expo-router";
-import React from "react";
-import {
-    ImageBackground,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import { Ionicons } from '@expo/vector-icons';
+import { Href, router } from 'expo-router';
+import React from 'react';
+import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+type Item = {
+    title: string;
+    subtitle: string;
+    href: Href;
+    accent?: boolean;
+};
+
+const ITEMS: Item[] = [
+    { title: 'Tutorials', subtitle: 'Fundamentals and strategies', href: '/learn/tutorials' },
+    { title: 'Puzzles', subtitle: 'Train tactics and calculation', href: '/learn/puzzles' },
+    { title: 'Your Coach', subtitle: 'Personal lessons based on your games', href: '/learn/coach', accent: true },
+];
+
+const backgroundImage = require('../../assets/images/loginbackground.png');
 
 export default function LearnScreen() {
-    const backgroundImage = require("../../assets/images/loginbackground.png");
+    const insets = useSafeAreaInsets();
 
     return (
-        <ImageBackground
-            source={backgroundImage}
-            style={styles.container}
-            resizeMode="cover"
-        >
+        <ImageBackground source={backgroundImage} style={styles.container} resizeMode="cover">
             <View style={styles.overlay} />
 
-            <View style={styles.header}>
+            <ScrollView
+                contentContainerStyle={{
+                    paddingTop: insets.top + 24,
+                    paddingBottom: insets.bottom + 32,
+                    paddingHorizontal: 16,
+                }}
+                showsVerticalScrollIndicator={false}
+            >
                 <Text style={styles.title}>Learn</Text>
-                <Text style={styles.subtitle}>
-                    Improve step by step
-                </Text>
-            </View>
+                <Text style={styles.subtitle}>Improve step by step</Text>
 
-            <View style={styles.lists}>
-                <TouchableOpacity
-                    activeOpacity={0.85}
-                    style={styles.card}
-                    onPress={() => router.push("/learn/tutorials")}
-                >
-                    <Text style={styles.cardTitle}>Tutorials</Text>
-                    <Text style={styles.cardSub}>
-                        Learn fundamentals & strategies
-                    </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    activeOpacity={0.85}
-                    style={styles.card}
-                    onPress={() => router.push("/learn/puzzles")}
-                >
-                    <Text style={styles.cardTitle}>Puzzles</Text>
-                    <Text style={styles.cardSub}>
-                        Train tactics & calculation
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-    activeOpacity={0.85}
-    style={styles.coachCard}
-    onPress={() => router.push("/learn/coach")}
->
-    <Text style={styles.cardTitle}>Your Coach</Text>
-    <Text style={styles.cardSub}>
-        Personal lessons based on your games
-    </Text>
-</TouchableOpacity>
-            </View>
+                <View style={styles.list}>
+                    {ITEMS.map((item) => (
+                        <Pressable
+                            key={item.title}
+                            accessibilityRole="button"
+                            accessibilityLabel={item.title}
+                            onPress={() => router.push(item.href)}
+                            style={({ pressed }) => [
+                                styles.card,
+                                item.accent && styles.cardAccent,
+                                pressed && styles.cardPressed,
+                            ]}
+                        >
+                            <View style={styles.cardText}>
+                                <Text style={styles.cardTitle}>{item.title}</Text>
+                                <Text style={styles.cardSub}>{item.subtitle}</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color="#6B7580" />
+                        </Pressable>
+                    ))}
+                </View>
+            </ScrollView>
         </ImageBackground>
     );
 }
@@ -67,84 +67,52 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(0,0,0,0.55)",
+        backgroundColor: 'rgba(0,0,0,0.65)',
     },
-
-    header: {
-        marginTop: 70,
-        paddingHorizontal: 20,
-    },
-
     title: {
-        fontSize: 34,
-        fontWeight: "800",
-        color: "#fff",
+        fontSize: 30,
+        fontWeight: '700',
+        color: '#fff',
     },
-
     subtitle: {
         fontSize: 14,
-        color: "#ccc",
-        marginTop: 6,
+        color: '#9AA3AD',
+        marginTop: 4,
     },
-
-    lists: {
-        paddingHorizontal: 16,
-        marginTop: 30,
+    list: {
+        marginTop: 28,
+        gap: 10,
     },
-
     card: {
-        backgroundColor: "rgba(255,255,255,0.08)",
-        borderRadius: 16,
-        padding: 18,
-        marginBottom: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1B2027',
+        borderRadius: 12,
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.10)",
+        borderColor: '#2A313A',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
     },
-
+    cardAccent: {
+        borderLeftWidth: 3,
+        borderLeftColor: '#7C9473', // Salbeigrün
+    },
+    cardPressed: {
+        backgroundColor: '#232A33',
+    },
+    cardText: {
+        flex: 1,
+    },
     cardTitle: {
-        fontSize: 18,
-        fontWeight: "700",
-        color: "#fff",
+        fontSize: 17,
+        fontWeight: '600',
+        color: '#F2F4F6',
     },
-
     cardSub: {
         fontSize: 13,
-        color: "#ccc",
-        marginTop: 6,
+        color: '#9AA3AD',
+        marginTop: 3,
     },
-    coachCard: {
-    minHeight: 76,
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "rgba(27, 32, 39, 0.7)",
-    borderWidth: 1,
-    borderColor: "rgba(124, 148, 115, 0.25)", // Salbeigrün, dezent
-    marginTop: 4,
-    marginBottom: 12,
-},
-
-coachLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-},
-
-coachTitle: {
-    color: "#F2F4F6",
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 3,
-},
-
-coachSubtitle: {
-    color: "rgba(237, 240, 243, 0.5)",
-    fontSize: 12.5,
-},
 });

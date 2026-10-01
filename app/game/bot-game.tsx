@@ -193,6 +193,13 @@ export default function Playbot() {
     const [gameOver, setGameOver] = useState(false);
     const [savedData, setSavedData] = useState<SavedData | null>(null);
     const [endState, setEndState] = useState<EndState | null>(null);
+    // NEU (wie im Online-Spiel): Ergebnis-Karte lässt sich wegtippen, um die
+    // Endstellung anzuschauen, ohne dass endState verloren geht.
+    const [endCardVisible, setEndCardVisible] = useState(true);
+    // NEU: Supabase-ID der zuletzt gespeicherten Partie, damit der
+    // "Analyse"-Button direkt zur Auswertung verlinken kann.
+    // Bleibt null bei Gast-Accounts (dort wird nichts remote gespeichert).
+    const [lastGameId, setLastGameId] = useState<string | null>(null);
 
     const [showLeaveModal, setShowLeaveModal] = useState(false);
     const [showRestartModal, setShowRestartModal] = useState(false);
@@ -312,6 +319,7 @@ export default function Playbot() {
     useEffect(() => {
         if (!endState) return;
 
+        setEndCardVisible(true); // NEU: Karte bei jedem neuen Ergebnis wieder einblenden
         endAnimation.setValue(0);
 
         Animated.timing(endAnimation, {
@@ -339,6 +347,12 @@ export default function Playbot() {
 
     useEffect(() => {
         const onBackPress = () => {
+            // NEU: Zurück-Taste schließt zuerst nur die Ergebnis-Karte
+            // (damit man die Stellung ansehen kann), wie im Online-Spiel.
+            if (endState && endCardVisible) {
+                setEndCardVisible(false);
+                return true;
+            }
             if (showLeaveModal) {
                 setShowLeaveModal(false);
                 return true;
@@ -360,7 +374,7 @@ export default function Playbot() {
 
         const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
         return () => subscription.remove();
-    }, [gameStarted, showLeaveModal, showRestartModal, showSaveModal]);
+    }, [gameStarted, showLeaveModal, showRestartModal, showSaveModal, endState, endCardVisible]);
 
     useEffect(() => {
         const s = io("https://checkfall-server-clean-1.onrender.com");
@@ -477,6 +491,7 @@ export default function Playbot() {
 
             setRoomId(data.roomId);
             clearPremoves();
+            setLastGameId(null); // NEU: Analyse-Button gehört zur vorherigen Partie
 
             const playerIsWhite = data.white !== "bot";
             const actualHumanColor: "w" | "b" = playerIsWhite ? "w" : "b";
@@ -563,6 +578,7 @@ export default function Playbot() {
         setKingInCheck(null);
         setGameOver(false);
         setEndState(null);
+        setLastGameId(null); // NEU
         setRoomId(null);
         clearPremoves();
         setGameStarted(false);
@@ -593,6 +609,13 @@ export default function Playbot() {
         }, 700);
     };
 
+    // NEU: speichert die Partie und merkt sich die Remote-ID für den Analyse-Button
+    const saveFinishedGame = (result: "win" | "loss" | "draw", pgn: string) => {
+        saveGameToHistory("bot", result, pgn)
+            .then((remoteId) => setLastGameId(remoteId))
+            .catch((error) => console.log("SAVE FINISHED GAME ERROR:", error));
+    };
+
     const checkGameEnd = (currentGame: Chess) => {
         if (currentGame.isCheck()) {
             const checkedKing = getKingSquare(currentGame, currentGame.turn());
@@ -611,28 +634,28 @@ export default function Playbot() {
 
             const kingSquare = getKingSquare(currentGame, loser);
             setKingInCheck(kingSquare);
-            saveGameToHistory("bot", result, currentGame.pgn());
+            saveFinishedGame(result, currentGame.pgn());
 
             showEndPopupAfterDelay({ type: result, reason: "checkmate" });
             return true;
         }
         if (currentGame.isStalemate()) {
-            saveGameToHistory("bot", "draw", currentGame.pgn());
+            saveFinishedGame("draw", currentGame.pgn());
             showEndPopupAfterDelay({ type: "draw", reason: "stalemate" });
             return true;
         }
         if (currentGame.isThreefoldRepetition()) {
-            saveGameToHistory("bot", "draw", currentGame.pgn());
+            saveFinishedGame("draw", currentGame.pgn());
             showEndPopupAfterDelay({ type: "draw", reason: "draw" });
             return true;
         }
         if (currentGame.isInsufficientMaterial()) {
-            saveGameToHistory("bot", "draw", currentGame.pgn());
+            saveFinishedGame("draw", currentGame.pgn());
             showEndPopupAfterDelay({ type: "draw", reason: "draw" });
             return true;
         }
         if (currentGame.isDraw()) {
-            saveGameToHistory("bot", "draw", currentGame.pgn());
+            saveFinishedGame("draw", currentGame.pgn());
             showEndPopupAfterDelay({ type: "draw", reason: "draw" });
             return true;
         }
@@ -645,12 +668,14 @@ export default function Playbot() {
     // humanColor/botColor vom ersten Render gerechnet hätte.)
     live.current = { checkGameEnd, roomId };
 
+    // GEÄNDERT: gibt jetzt die remoteId (Supabase-Spiel-ID) zurück oder null,
+    // damit der "Analyse"-Button weiß, wohin er verlinken soll.
     async function saveGameToHistory(
         mode: "bot",
         result: "win" | "loss" | "draw" | "aborted",
         pgn: string,
         timestamp?: number
-    ) {
+    ): Promise<string | null> {
         const key = "game_history";
         const stored = await AsyncStorage.getItem(key);
         const history = stored ? JSON.parse(stored) : [];
@@ -665,11 +690,13 @@ export default function Playbot() {
 
         await AsyncStorage.setItem(key, JSON.stringify(history));
 
+        let remoteId: string | null = null;
+
         try {
             const acc = await getCurrentAccount();
 
             if (acc && !acc.guest && acc.authId) {
-                const remoteId = await saveGameRecord({
+                remoteId = await saveGameRecord({
                     userId: acc.authId,
                     opponentId: null,
                     mode,
@@ -689,6 +716,8 @@ export default function Playbot() {
         } catch (error) {
             console.log("SAVE GAME RECORD ERROR:", error);
         }
+
+        return remoteId ?? null;
     }
 
     const animatedCardStyle = {
@@ -861,7 +890,12 @@ export default function Playbot() {
                                 legalMoves={legalMoves}
                                 lastMove={lastMove}
                                 checkSquare={kingInCheck}
-                                onPressSquare={onPressSquare}
+                                onPressSquare={(square: string) => {
+                                    // NEU: nach Spielende keine Züge mehr (auch nicht,
+                                    // wenn die Ergebnis-Karte weggetippt wurde).
+                                    if (gameOver || endState) return;
+                                    onPressSquare(square);
+                                }}
                                 pieces={pieces}
                                 pieceToKey={pieceToKey}
                                 myColor={bottomColor}
@@ -984,9 +1018,34 @@ export default function Playbot() {
                             </View>
                         </Modal>
 
-                        {endState && (
+                        {/* =============================
+                            END GAME POPUP (Stil wie im Online-Spiel)
+                        ============================= */}
+                        {endState && endCardVisible && (
                             <View style={styles.endOverlay}>
                                 <Animated.View style={[styles.endCard, animatedCardStyle]}>
+                                    <View
+                                        style={[
+                                            styles.endCardAccent,
+                                            {
+                                                backgroundColor:
+                                                    endState.type === "win"
+                                                        ? "#4ADE80"
+                                                        : endState.type === "loss"
+                                                            ? "#F87171"
+                                                            : "#64748B",
+                                            },
+                                        ]}
+                                    />
+
+                                    <Pressable
+                                        style={styles.endCardClose}
+                                        onPress={() => setEndCardVisible(false)}
+                                        hitSlop={12}
+                                    >
+                                        <Text style={styles.endCardCloseText}>×</Text>
+                                    </Pressable>
+
                                     {endState.type === "win" && (
                                         <>
                                             <Text style={styles.winTitle}>Sieg!</Text>
@@ -1005,7 +1064,7 @@ export default function Playbot() {
                                     )}
                                     {endState.type === "draw" && (
                                         <>
-                                            <Text style={styles.drawTitle}>🤝 Remis</Text>
+                                            <Text style={styles.drawTitle}>Remis</Text>
                                             <Text style={styles.subText}>
                                                 {endState.reason === "stalemate"
                                                     ? "Patt – keine legalen Züge mehr."
@@ -1014,46 +1073,65 @@ export default function Playbot() {
                                         </>
                                     )}
 
-                                    <View style={styles.endButtons}>
+                                    <Pressable
+                                        style={styles.endPrimaryBtn}
+                                        onPress={() => {
+                                            const color = playerColor === "random" ? (Math.random() < 0.5 ? "w" : "b") : playerColor;
+
+                                            setEndState(null);
+                                            setGame(new Chess());
+                                            setPromotionMove(null);
+                                            setMoveHistory([]);
+                                            setLastMove(null);
+                                            setKingInCheck(null);
+                                            setGameOver(false);
+                                            setRoomId(null);
+                                            setLastGameId(null);
+                                            clearPremoves();
+
+                                            setHumanColor(color);
+                                            setBottomColor(color);
+                                            setBotColor(color === "w" ? "b" : "w");
+
+                                            socket.current?.emit("find_bot_match", {
+                                                name: "Player",
+                                                avatar: "",
+                                                level: botElo,
+                                                playerColor: playerColor === "random" ? null : playerColor,
+                                                startFEN: "startpos",
+                                            });
+                                        }}
+                                    >
+                                        <Text style={styles.btnText}>Neue Partie</Text>
+                                    </Pressable>
+
+                                    <View style={styles.secondaryRow}>
+                                        {/* Nur sichtbar, wenn die Partie remote gespeichert wurde
+                                            (nicht bei Gast-Accounts).
+                                            HINWEIS: Route "/game/review" ist wie im Online-Spiel
+                                            eine Annahme - bei Bedarf auf den echten Pfad anpassen. */}
+                                        {lastGameId && (
+                                            <Pressable
+                                                style={styles.endSecondaryBtn}
+                                                onPress={() => {
+                                                    router.push({
+                                                        pathname: "/game/review",
+                                                        params: { gameId: lastGameId },
+                                                    } as any);
+                                                }}
+                                            >
+                                                <Text style={styles.endSecondaryBtnText}>Analyse</Text>
+                                            </Pressable>
+                                        )}
+
                                         <Pressable
-                                            style={styles.primaryBtn}
-                                            onPress={() => {
-                                                const color = playerColor === "random" ? (Math.random() < 0.5 ? "w" : "b") : playerColor;
-
-                                                setEndState(null);
-                                                setGame(new Chess());
-                                                setPromotionMove(null);
-                                                setMoveHistory([]);
-                                                setLastMove(null);
-                                                setKingInCheck(null);
-                                                setGameOver(false);
-                                                setRoomId(null);
-                                                clearPremoves();
-
-                                                setHumanColor(color);
-                                                setBottomColor(color);
-                                                setBotColor(color === "w" ? "b" : "w");
-
-                                                socket.current?.emit("find_bot_match", {
-                                                    name: "Player",
-                                                    avatar: "",
-                                                    level: botElo,
-                                                    playerColor: playerColor === "random" ? null : playerColor,
-                                                    startFEN: "startpos",
-                                                });
-                                            }}
-                                        >
-                                            <Text style={styles.btnText}>Neue Partie</Text>
-                                        </Pressable>
-
-                                        <Pressable
-                                            style={styles.secondaryBtn}
+                                            style={styles.endSecondaryBtn}
                                             onPress={() => {
                                                 setEndState(null);
                                                 router.back();
                                             }}
                                         >
-                                            <Text style={styles.btnText}>Home</Text>
+                                            <Text style={styles.endSecondaryBtnText}>Home</Text>
                                         </Pressable>
                                     </View>
                                 </Animated.View>
@@ -1182,24 +1260,22 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "700",
     },
+    // Wird weiterhin vom "Spiel gespeichert"-Modal benutzt (Gold) - bewusst
+    // unverändert. Der End-Popup nutzt eigene Styles (endPrimaryBtn usw.).
     primaryBtn: {
         backgroundColor: "#D4AF37",
         padding: 13,
         borderRadius: 12,
         alignItems: "center",
     },
-    secondaryBtn: {
-        backgroundColor: "#222",
-        padding: 13,
-        borderRadius: 12,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#333",
-    },
     btnText: {
         color: "#fff",
         fontWeight: "700",
     },
+
+    // =============================
+    // END POPUP (übernommen aus online-game.tsx)
+    // =============================
     endOverlay: {
         position: "absolute",
         top: -BOARD_SIZE * 0.05,
@@ -1209,25 +1285,86 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         zIndex: 999,
-        backgroundColor: "rgba(0,0,0,0.18)",
+        backgroundColor: "rgba(0,0,0,0.55)",
         borderRadius: 18,
     },
     endCard: {
-        width: "85%",
+        width: "88%",
         maxWidth: 380,
-        backgroundColor: "#111",
-        borderRadius: 24,
-        padding: 24,
-        borderWidth: 1,
-        borderColor: "#D4AF37",
+        backgroundColor: "#141821",
+        borderRadius: 28,
+        paddingTop: 36,
+        paddingBottom: 20,
+        paddingHorizontal: 24,
         alignItems: "center",
+        overflow: "hidden",
+        shadowColor: "#000",
         shadowOpacity: 0.4,
-        shadowRadius: 20,
-        elevation: 12,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 14,
     },
-    winTitle: { fontSize: 38, fontWeight: "900", color: "#FFD700", marginBottom: 8 },
-    loseTitle: { fontSize: 38, fontWeight: "900", color: "#ff3b3b", marginBottom: 8 },
-    drawTitle: { fontSize: 38, fontWeight: "900", color: "#aaa", marginBottom: 8 },
-    subText: { color: "#ccc", textAlign: "center", lineHeight: 21, marginBottom: 16 },
-    endButtons: { width: "100%", gap: 10 },
+    endCardAccent: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 5,
+    },
+    endCardClose: {
+        position: "absolute",
+        top: 14,
+        right: 14,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: "rgba(255,255,255,0.08)",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1,
+    },
+    endCardCloseText: {
+        color: "#aaa",
+        fontSize: 18,
+        lineHeight: 20,
+    },
+    winTitle: { fontSize: 26, fontWeight: "800", color: "#4ADE80", marginBottom: 4 },
+    loseTitle: { fontSize: 26, fontWeight: "800", color: "#F87171", marginBottom: 4 },
+    drawTitle: { fontSize: 26, fontWeight: "800", color: "#94A3B8", marginBottom: 4 },
+    subText: {
+        color: "#94A3B8",
+        fontSize: 14,
+        textAlign: "center",
+        lineHeight: 20,
+        marginBottom: 18,
+        paddingHorizontal: 8,
+    },
+    endPrimaryBtn: {
+        width: "100%",
+        backgroundColor: "#7C9473",
+        paddingVertical: 15,
+        borderRadius: 16,
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    secondaryRow: {
+        flexDirection: "row",
+        width: "100%",
+        gap: 10,
+    },
+    endSecondaryBtn: {
+        flex: 1,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        paddingVertical: 14,
+        borderRadius: 14,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+    },
+    endSecondaryBtnText: {
+        color: "#CBD5E1",
+        fontSize: 12,
+        fontWeight: "600",
+    },
 });
