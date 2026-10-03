@@ -1,18 +1,35 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Image,
-    ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
+import { CoinAmount } from "../../components/Coin";
+import DailyTasksCard from "../../components/DailyTasksCard";
+import LimitGate from "../../components/LimitGate";
+import Sheet from "../../components/play/Sheet";
+import TimeControlPicker from "../../components/play/TimeControlPicker";
 import StreakFlame from "../../components/StreakFlame";
 import { AccountType, getCurrentAccount } from "../../lib/account";
+import { tr } from "../../lib/i18n";
+import { log } from "../../lib/log";
+import { claimVipPromo } from "../../lib/vipPromo";
+import { coinBalance } from "../../lib/boardThemes";
+import { useShop } from "../../lib/shop";
 import { getSocket } from "../../lib/socket";
+import {
+    DEFAULT_TIME_CONTROL,
+    describeTimeControl,
+    getTimeControl,
+    loadTimeControl,
+    saveTimeControl,
+} from "../../lib/timeControls";
 
 /**
  * Schlichte Outline-Icons (kein Fill), gebaut aus reinen View-Rahmen/Linien —
@@ -306,6 +323,43 @@ function Icon({
             );
     }
 }
+type RecentGame = {
+    id: string;
+    mode: "bot" | "local" | "online";
+    date: string;
+    result: "win" | "loss" | "draw" | "aborted";
+    remoteId?: string | null;
+    color?: "w" | "b" | null;
+};
+
+const MODE_LABEL: Record<string, string> = {
+    get online() { return tr("Online game"); },
+    get bot() { return tr("Game against the bot"); },
+    get local() { return tr("Local game"); },
+};
+
+const RESULT_STYLE: Record<string, { letter: string; label: string; color: string; soft: string }> = {
+    win: { letter: "W", get label() { return tr("Won"); }, color: "#6FBF73", soft: "rgba(111,191,115,0.16)" },
+    loss: { letter: "L", get label() { return tr("Lost"); }, color: "#D9534F", soft: "rgba(217,83,79,0.16)" },
+    draw: { letter: "D", get label() { return tr("Draw"); }, color: "#B9C2CC", soft: "rgba(185,194,204,0.14)" },
+    aborted: { letter: "–", get label() { return tr("Aborted"); }, color: "#8A9099", soft: "rgba(138,144,153,0.14)" },
+};
+
+/** The three most recent games stored on this device. */
+async function loadRecentGames(): Promise<RecentGame[]> {
+    try {
+        const raw = await AsyncStorage.getItem("game_history");
+        const list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) return [];
+
+        return [...list]
+            .sort((a, b) => (Number(b?.timestamp) || 0) - (Number(a?.timestamp) || 0))
+            .slice(0, 3);
+    } catch {
+        return [];
+    }
+}
+
 const STREAK_KEY = "povcheck_day_streak";
 
 async function updateDayStreak(): Promise<number> {
@@ -350,6 +404,19 @@ export default function HomeScreen() {
     const [loading, setLoading] = useState(true);
     const [dayStreak, setDayStreak] = useState(0);
 
+    // Time control for "Find an Opponent" (the last choice is remembered).
+    const [timeControl, setTimeControl] = useState(DEFAULT_TIME_CONTROL);
+    const [timeSheetOpen, setTimeSheetOpen] = useState(false);
+
+    const [promoOpen, setPromoOpen] = useState(false);
+    const promoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // The latest games, shown under "Recent games".
+    const [recentGames, setRecentGames] = useState<RecentGame[]>([]);
+
+    // Coins for the shop (earned with the daily missions).
+    const coins = coinBalance(useShop());
+
     // NEU: echte Anzahl online befindlicher Nutzer statt der festen
     // "Player is currently online"-Zeile. Erwartet ein Server-Event
     // "online_count" mit { count: number } (oder direkt einer Zahl) — falls
@@ -357,7 +424,7 @@ export default function HomeScreen() {
     const [onlineCount, setOnlineCount] = useState<number | null>(null);
 
     const placeholder = require("../../assets/images/knight_black.png");
-    const backgroundImage = require("../../assets/images/loginbackground.png");
+    const backgroundImage = require("../../assets/images/loginbackground.jpg");
 
     useEffect(() => {
         const socket = getSocket();
@@ -398,6 +465,18 @@ export default function HomeScreen() {
 
                     setAccount(currentAccount);
 
+                    // The app's own VIP pop-up: only here on the home screen,
+                    // only without VIP, at most once a day.
+                    if (!currentAccount.guest) {
+                        const hasVip = !!currentAccount.vipTier && currentAccount.vipTier !== "none";
+                        claimVipPromo(hasVip).then((show) => {
+                            if (show && mounted) promoTimer.current = setTimeout(() => mounted && setPromoOpen(true), 1200);
+                        });
+                    }
+
+                    loadTimeControl().then((id) => mounted && setTimeControl(id));
+                    loadRecentGames().then((games) => mounted && setRecentGames(games));
+
                     const streak = await updateDayStreak();
                     if (mounted) setDayStreak(streak);
                 } catch (error) {
@@ -418,6 +497,9 @@ export default function HomeScreen() {
 
             return () => {
                 mounted = false;
+                // Leaving the home screen: no pop-up on other screens.
+                if (promoTimer.current) clearTimeout(promoTimer.current);
+                setPromoOpen(false);
             };
         }, [router])
     );
@@ -430,13 +512,13 @@ export default function HomeScreen() {
                 resizeMode="cover"
             >
                 <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>POVCheck</Text>
+                    <Text style={styles.loadingText}>{tr("POVCheck")}</Text>
                 </View>
             </ImageBackground>
         );
     }
 
-    const username = account?.username || "Player";
+    const username = account?.username || tr("Player");
     const hasAvatar = account?.avatar && account.avatar.trim().length > 0;
 
     const avatarSource =
@@ -448,10 +530,10 @@ export default function HomeScreen() {
 
     const onlineStatusText =
         onlineCount === null
-            ? "Verbinde..."
+            ? tr("Connecting...")
             : onlineCount === 1
-                ? "1 Spieler online   "
-                : `${onlineCount} Spieler online  `;
+                ? tr("1 player online   ")
+                : tr("{0} players online  ", onlineCount);
 
     // ================================
     // ONLINE MATCHMAKING
@@ -460,10 +542,13 @@ export default function HomeScreen() {
     const goToOnlineGame = () => {
         const rating = Number(account?.rating ?? 1000);
 
-        console.log("🎯 HOME → MATCHMAKING");
-        console.log("NAME:", username);
-        console.log("AVATAR:", account?.avatar ?? "");
-        console.log("RATING:", rating);
+        setTimeSheetOpen(false);
+        saveTimeControl(timeControl);
+
+        log("🎯 HOME → MATCHMAKING");
+        log("NAME:", username);
+        log("AVATAR:", account?.avatar ?? "");
+        log("RATING:", rating);
 
         router.push({
             pathname: "/game/waiting",
@@ -474,6 +559,7 @@ export default function HomeScreen() {
                         ? account.avatar
                         : "",
                 rating: String(rating),
+                timeControl,
             },
         });
     };
@@ -495,8 +581,8 @@ export default function HomeScreen() {
                 {/* HEADER */}
                 <View style={styles.header}>
                     <View style={styles.headerText}>
-                        <Text style={styles.logo}>POVCHECK</Text>
-                        <Text style={styles.greeting}>Welcome back,</Text>
+                        <Text style={styles.logo}>{tr("POVCHECK")}</Text>
+                        <Text style={styles.greeting}>{tr("Welcome back,")}</Text>
                         <Pressable
                             onPress={() => router.push("/vip")}
                             hitSlop={6}
@@ -508,14 +594,25 @@ export default function HomeScreen() {
                             <Text style={styles.username}>{username}</Text>
                         </Pressable>
 
-                        {dayStreak > 0 && (
-                            <View style={styles.streakRow}>
+                        <View style={styles.streakRow}>
+                            {dayStreak > 0 && (
                                 <View style={styles.streakPill}>
                                     <StreakFlame size={16} />
-                                    <Text style={styles.streakText}>{dayStreak} Tage in Folge</Text>
+                                    <Text style={styles.streakText}>{dayStreak === 1 ? tr("1 day in a row") : tr("{0} days in a row", dayStreak)}</Text>
                                 </View>
-                            </View>
-                        )}
+                            )}
+
+                            {/* Coins: opens the shop */}
+                            <Pressable
+                                onPress={() => router.push("/shop" as any)}
+                                hitSlop={6}
+                                accessibilityRole="button"
+                                accessibilityLabel={tr("Shop")}
+                                style={({ pressed }) => [styles.streakPill, styles.coinPill, pressed && styles.pressed]}
+                            >
+                                <CoinAmount amount={coins} size={13} />
+                            </Pressable>
+                        </View>
                     </View>
 
 
@@ -540,7 +637,7 @@ export default function HomeScreen() {
 
                 {/* ONLINE */}
                 <Pressable
-                    onPress={goToOnlineGame}
+                    onPress={() => setTimeSheetOpen(true)}
                     style={({ pressed }) => [
                         styles.onlineCard,
                         pressed && styles.pressed,
@@ -556,11 +653,11 @@ export default function HomeScreen() {
                         </View>
 
                         <Text style={styles.onlineTitle}>
-                            Find an Opponent
+                            {tr("Find an Opponent")}
                         </Text>
 
                         <Text style={styles.onlineSubtitle}>
-                            Rated game against a real player
+                            {tr("Rated game ·")} {describeTimeControl(timeControl)}
                         </Text>
                     </View>
 
@@ -584,10 +681,10 @@ export default function HomeScreen() {
                         ]}
                     >
                         <View style={styles.vipContent}>
-                            <Text style={styles.vipEyebrow}>POV CHECK VIP</Text>
-                            <Text style={styles.vipTitle}>Go Premium</Text>
+                            <Text style={styles.vipEyebrow}>{tr("POVCHECK VIP")}</Text>
+                            <Text style={styles.vipTitle}>{tr("Go Premium")}</Text>
                             <Text style={styles.vipSubtitle}>
-                                Ab 5,99 € · Clans, Badges & mehr
+                                {tr("From €5.99 · Clans, badges & more")}
                             </Text>
                         </View>
 
@@ -599,7 +696,7 @@ export default function HomeScreen() {
 
                 {/* QUICK PLAY */}
                 <Text style={styles.sectionTitle}>
-                    Quick Play
+                    {tr("Quick Play")}
                 </Text>
 
                 <View style={styles.quickGrid}>
@@ -621,11 +718,11 @@ export default function HomeScreen() {
                         </View>
 
                         <Text style={styles.smallCardTitle}>
-                            Daily Puzzle
+                            {tr("Daily Puzzle")}
                         </Text>
 
                         <Text style={styles.smallCardSubtitle}>
-                            Sharpen your skills
+                            {tr("Sharpen your skills")}
                         </Text>
                     </Pressable>
 
@@ -647,11 +744,11 @@ export default function HomeScreen() {
                         </View>
 
                         <Text style={styles.smallCardTitle}>
-                            Play against Bot
+                            {tr("Play against Bot")}
                         </Text>
 
                         <Text style={styles.smallCardSubtitle}>
-                            Challenge the computer
+                            {tr("Challenge the computer")}
                         </Text>
                     </Pressable>
 
@@ -673,11 +770,11 @@ export default function HomeScreen() {
                         </View>
 
                         <Text style={styles.smallCardTitle}>
-                            Local Game
+                            {tr("Local Game")}
                         </Text>
 
                         <Text style={styles.smallCardSubtitle}>
-                            Play with a friend
+                            {tr("Play with a friend")}
                         </Text>
                     </Pressable>
 
@@ -699,54 +796,101 @@ export default function HomeScreen() {
                         </View>
 
                         <Text style={styles.smallCardTitle}>
-                            Saved Games
+                            {tr("Saved Games")}
                         </Text>
 
                         <Text style={styles.smallCardSubtitle}>
-                            Continue a game
+                            {tr("Continue a game")}
                         </Text>
                     </Pressable>
                 </View>
 
-                {/* HISTORY */}
-                <Pressable
-                    onPress={() =>
-                        router.push("/Spielverlauf")
-                    }
-                    style={({ pressed }) => [
-                        styles.historyCard,
-                        pressed && styles.pressed,
-                    ]}
-                >
-                    <View style={styles.historyLeft}>
-                        <View style={styles.iconBadge}>
-                            <Icon
-                                name="clock"
-                                size={16}
-                                color="#EDF0F3"
-                            />
-                        </View>
+                {/* DAILY TASKS */}
+                <DailyTasksCard onPlay={() => setTimeSheetOpen(true)} />
 
-                        <View>
-                            <Text style={styles.historyTitle}>
-                                Your Recent Games
-                            </Text>
+                {/* RECENT GAMES */}
+                <View style={styles.recentHeader}>
+                    <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{tr("Recent Games")}</Text>
 
-                            <Text style={styles.historySubtitle}>
-                                View your previous games
-                            </Text>
-                        </View>
+                    {recentGames.length > 0 && (
+                        <Pressable onPress={() => router.push("/Spielverlauf")} hitSlop={10}>
+                            <Text style={styles.recentAll}>{tr("See all")}</Text>
+                        </Pressable>
+                    )}
+                </View>
+
+                {recentGames.length === 0 ? (
+                    <View style={styles.recentEmpty}>
+                        <Text style={styles.recentEmptyTitle}>{tr("No games yet")}</Text>
+                        <Text style={styles.historySubtitle}>
+                            {tr("Your finished games appear here.")}
+                        </Text>
                     </View>
+                ) : (
+                    <View style={styles.recentList}>
+                        {recentGames.map((item, index) => {
+                            const result = RESULT_STYLE[item.result] ?? RESULT_STYLE.aborted;
 
-                    <Icon
-                        name="chevron"
-                        size={15}
-                        color="rgba(237,240,243,0.4)"
-                    />
-                </Pressable>
+                            return (
+                                <Pressable
+                                    key={item.id}
+                                    onPress={() =>
+                                        // Games stored on the server open their review directly.
+                                        item.remoteId
+                                            ? router.push({
+                                                pathname: "/game/review",
+                                                params: { gameId: item.remoteId, color: item.color ?? "" },
+                                            })
+                                            : router.push("/Spielverlauf")
+                                    }
+                                    style={({ pressed }) => [
+                                        styles.recentRow,
+                                        index > 0 && styles.recentDivider,
+                                        pressed && styles.pressed,
+                                    ]}
+                                >
+                                    <View style={[styles.resultBadge, { backgroundColor: result.soft }]}>
+                                        <Text style={[styles.resultBadgeText, { color: result.color }]}>
+                                            {result.letter}
+                                        </Text>
+                                    </View>
+
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.recentTitle}>{MODE_LABEL[item.mode] ?? tr("Game")}</Text>
+                                        <Text style={styles.historySubtitle}>{item.date}</Text>
+                                    </View>
+
+                                    <Text style={[styles.recentResult, { color: result.color }]}>{result.label}</Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                )}
 
                 <View style={styles.bottomSpace} />
             </ScrollView>
+
+            <LimitGate visible={promoOpen} kind="vip" onClose={() => setPromoOpen(false)} />
+
+            <Sheet
+                visible={timeSheetOpen}
+                title={tr("Find an Opponent")}
+                subtitle={tr("Choose how long you want to play. You are paired with players who picked the same time.")}
+                onClose={() => setTimeSheetOpen(false)}
+                footer={
+                    <Pressable
+                        onPress={goToOnlineGame}
+                        style={({ pressed }) => [styles.sheetButton, pressed && styles.pressed]}
+                    >
+                        <Text style={styles.sheetButtonText}>{tr("Find opponent")}</Text>
+                        <Text style={styles.sheetButtonSub}>
+                            {getTimeControl(timeControl).category} · {describeTimeControl(timeControl)} {tr("· Rated")}
+                        </Text>
+                    </Pressable>
+                }
+            >
+                <TimeControlPicker value={timeControl} onChange={setTimeControl} />
+            </Sheet>
         </ImageBackground>
     );
 }
@@ -1001,6 +1145,40 @@ const styles = StyleSheet.create({
         lineHeight: 17,
     },
 
+    recentHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginTop: 16,
+        marginBottom: 14,
+    },
+    recentAll: { color: "#5B8DB8", fontSize: 13.5, fontWeight: "600" },
+    recentList: {
+        borderRadius: 18,
+        backgroundColor: "#1B2027",
+        borderWidth: 1,
+        borderColor: "rgba(237, 240, 243, 0.08)",
+        paddingHorizontal: 16,
+    },
+    recentRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13 },
+    recentDivider: { borderTopWidth: 1, borderTopColor: "rgba(237, 240, 243, 0.06)" },
+    recentTitle: { color: "#F2F4F6", fontSize: 15, fontWeight: "600", marginBottom: 2 },
+    recentResult: { fontSize: 13, fontWeight: "700" },
+    resultBadge: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    resultBadgeText: { fontSize: 14, fontWeight: "800" },
+    recentEmpty: {
+        borderRadius: 18,
+        backgroundColor: "rgba(27, 32, 39, 0.7)",
+        borderWidth: 1,
+        borderColor: "rgba(237, 240, 243, 0.08)",
+        paddingHorizontal: 18,
+        paddingVertical: 18,
+    },
+    recentEmptyTitle: { color: "#F2F4F6", fontSize: 15, fontWeight: "600", marginBottom: 3 },
+    sheetButton: { backgroundColor: "#5B8DB8", borderRadius: 16, paddingVertical: 13, alignItems: "center" },
+    sheetButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
+    sheetButtonSub: { color: "rgba(255,255,255,0.78)", fontSize: 12, marginTop: 2 },
+
     historyCard: {
         minHeight: 76,
         borderRadius: 18,
@@ -1039,6 +1217,7 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(237, 240, 243, 0.06)",
         borderWidth: 1, borderColor: "rgba(237, 240, 243, 0.08)",
     },
+    coinPill: { backgroundColor: "rgba(212, 175, 55, 0.10)", borderColor: "rgba(212, 175, 55, 0.3)" },
     streakText: { color: "rgba(237, 240, 243, 0.75)", fontSize: 11.5, fontWeight: "600" },
     historySubtitle: {
         color: "rgba(237, 240, 243, 0.5)",

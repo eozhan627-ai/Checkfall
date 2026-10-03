@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { saveAccount } from "../../lib/account";
 import { supabase } from "../../lib/supabase";
+import { log } from "../../lib/log";
+import { tr } from "../../lib/i18n";
 export default function OnboardingPage() {
     const router = useRouter();
     const [username, setUsername] = useState("");
@@ -28,13 +30,13 @@ export default function OnboardingPage() {
                 data: { user },
             } = await supabase.auth.getUser();
             if (!user) {
-                console.log("ONBOARDING: NO SUPABASE USER");
+                log("ONBOARDING: NO SUPABASE USER");
                 setError("No Supabase user found.");
                 setChecking(false);
                 return;
             }
 
-            console.log(
+            log(
                 "ONBOARDING: USER FOUND",
                 user.id,
                 user.email
@@ -133,7 +135,7 @@ export default function OnboardingPage() {
             console.error("ONBOARDING ERROR:", e);
             setError(
                 e?.message ||
-                "Something went wrong. Please try again."
+                tr("Something went wrong. Please try again.")
             );
         } finally {
             setLoading(false);
@@ -157,17 +159,16 @@ export default function OnboardingPage() {
         >
             <View style={styles.card}>
                 <Text style={styles.logo}>
-                    POV<Text style={styles.gold}>Check</Text>
+                    {tr("POV")}<Text style={styles.gold}>{tr("Check")}</Text>
                 </Text>
                 <Text style={styles.step}>
-                    STEP 2 OF 3
+                    {tr("STEP 2 OF 3")}
                 </Text>
                 <Text style={styles.title}>
-                    Choose your username
+                    {tr("Choose your username")}
                 </Text>
                 <Text style={styles.subtitle}>
-                    This is the name other players will see
-                    across POVCheck.
+                    {tr("This is the name other players will see across POVCheck.")}
                 </Text>
                 <TextInput
                     style={[
@@ -179,7 +180,7 @@ export default function OnboardingPage() {
                         setUsername(text);
                         setError("");
                     }}
-                    placeholder="Username"
+                    placeholder={tr("Username")}
                     placeholderTextColor="#666"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -206,12 +207,12 @@ export default function OnboardingPage() {
                         <ActivityIndicator color="#111" />
                     ) : (
                         <Text style={styles.buttonText}>
-                            Continue
+                            {tr("Continue")}
                         </Text>
                     )}
                 </Pressable>
                 <Text style={styles.info}>
-                    Your username must be unique.
+                    {tr("Your username must be unique.")}
                 </Text>
             </View>
         </KeyboardAvoidingView>

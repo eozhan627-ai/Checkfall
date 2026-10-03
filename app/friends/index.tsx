@@ -3,7 +3,8 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import {
     ActivityIndicator,
-    ImageBackground,
+    Alert,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -11,21 +12,28 @@ import {
     TextInput,
     View,
 } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
 import { AccountType, getCurrentAccount } from "../../lib/account";
 import {
     FriendEntry,
     FriendProfile,
     acceptFriendRequest,
+    cancelFriendRequest,
     declineFriendRequest,
     getFriends,
     getIncomingRequests,
+    getOutgoingRequests,
     removeFriend,
     searchUsers,
     sendFriendRequest,
 } from "../../lib/friends";
 import { getSocket } from "../../lib/socket";
+import { log } from "../../lib/log";
+import UiAvatar from "../../components/ui/Avatar";
+import { startChallenge } from "../../lib/challenges";
+import { tr } from "../../lib/i18n";
 
-type FriendWithStatus = FriendEntry & { online: boolean };
+type FriendWithStatus = FriendEntry & { online: boolean; inGame: boolean };
 
 /** Gleiche Outline-Icon-Logik wie in Home/Social. */
 type IconName = "person" | "chevron" | "search";
@@ -85,34 +93,23 @@ function Icon({ name, size = 18, color = "#EDF0F3" }: { name: IconName; size?: n
     }
 }
 
-const AVATAR_COLORS = ["#5B8DB8", "#6F9E8C", "#C9A24B", "#8B6FB8", "#C25450"];
-
-function colorForName(name: string) {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function Avatar({ username, size = 44 }: { username: string; size?: number }) {
-    const initial = username.trim().charAt(0).toUpperCase() || "?";
-    const bg = colorForName(username);
-
-    return (
-        <View
-            style={{
-                width: size, height: size, borderRadius: size / 2,
-                backgroundColor: `${bg}33`, borderWidth: 1.5, borderColor: bg,
-                alignItems: "center", justifyContent: "center",
-            }}
-        >
-            <Text style={{ color: bg, fontWeight: "700", fontSize: size * 0.4 }}>{initial}</Text>
-        </View>
-    );
+function Avatar({
+    username,
+    uri,
+    size = 44,
+    status = null,
+}: {
+    username: string;
+    uri?: string | null;
+    size?: number;
+    status?: "online" | "ingame" | "offline" | null;
+}) {
+    return <UiAvatar name={username} uri={uri} size={size} status={status} />;
 }
 
 export default function FriendsScreen() {
     const router = useRouter();
-    const backgroundImage = require("../../assets/images/background.png");
+    const backgroundImage = require("../../assets/images/background.jpg");
 
     const [account, setAccount] = useState<AccountType | null>(null);
     const [loading, setLoading] = useState(true);
@@ -124,6 +121,7 @@ export default function FriendsScreen() {
 
     const [friends, setFriends] = useState<FriendWithStatus[]>([]);
     const [requests, setRequests] = useState<FriendEntry[]>([]);
+    const [outgoing, setOutgoing] = useState<FriendEntry[]>([]);
 
     const loadData = useCallback(async () => {
         const acc = await getCurrentAccount();
@@ -134,28 +132,71 @@ export default function FriendsScreen() {
             return;
         }
 
-        const [friendList, requestList] = await Promise.all([getFriends(), getIncomingRequests()]);
+        const [friendList, requestList, sentList] = await Promise.all([
+            getFriends(),
+            getIncomingRequests(),
+            getOutgoingRequests(),
+        ]);
 
-        setFriends(friendList.map((f) => ({ ...f, online: false })));
+        setFriends((prev) =>
+            friendList.map((f) => {
+                const known = prev.find((p) => p.profile.id === f.profile.id);
+                return { ...f, online: known?.online ?? false, inGame: known?.inGame ?? false };
+            })
+        );
         setRequests(requestList);
+        setOutgoing(sentList);
         setLoading(false);
 
         const authIds = friendList.map((f) => f.profile.id).filter(Boolean);
-        if (authIds.length === 0) return;
-
-        const socket = getSocket();
-
-        const handleStatus = (data: any) => {
-            const online: string[] = Array.isArray(data?.online) ? data.online : [];
-            setFriends((prev) => prev.map((f) => ({ ...f, online: online.includes(f.profile.id) })));
-        };
-
-        socket.once("friends_online_status", handleStatus);
-        socket.emit("check_friends_online", { authIds });
+        if (authIds.length > 0) getSocket().emit("check_friends_online", { authIds });
     }, []);
 
     useEffect(() => {
         loadData();
+    }, [loadData]);
+
+    // Who is online / in a game. The answer arrives as an event; the list is
+    // asked for again every 15 seconds while the screen is open.
+    useEffect(() => {
+        const socket = getSocket();
+
+        const handleStatus = (data: any) => {
+            const online: string[] = Array.isArray(data?.online) ? data.online : [];
+            const inGame: string[] = Array.isArray(data?.inGame) ? data.inGame : [];
+
+            setFriends((prev) =>
+                prev.map((f) => ({
+                    ...f,
+                    online: online.includes(f.profile.id),
+                    inGame: inGame.includes(f.profile.id),
+                }))
+            );
+        };
+
+        // A new request or an accepted one: load the lists again.
+        const reload = () => {
+            loadData();
+        };
+
+        socket.on("friends_online_status", handleStatus);
+        socket.on("friend_request_received", reload);
+        socket.on("friend_request_accepted", reload);
+
+        const interval = setInterval(() => {
+            setFriends((current) => {
+                const authIds = current.map((f) => f.profile.id).filter(Boolean);
+                if (authIds.length > 0) socket.emit("check_friends_online", { authIds });
+                return current;
+            });
+        }, 15000);
+
+        return () => {
+            clearInterval(interval);
+            socket.off("friends_online_status", handleStatus);
+            socket.off("friend_request_received", reload);
+            socket.off("friend_request_accepted", reload);
+        };
     }, [loadData]);
 
     async function handleSearch(text: string) {
@@ -171,7 +212,7 @@ export default function FriendsScreen() {
             const results = await searchUsers(text);
             setSearchResults(results);
         } catch (error) {
-            console.log("SEARCH ERROR:", error);
+            log("SEARCH ERROR:", error);
         } finally {
             setSearching(false);
         }
@@ -181,17 +222,22 @@ export default function FriendsScreen() {
         try {
             await sendFriendRequest(userId);
             setSentRequests((prev) => new Set(prev).add(userId));
+
+            // Lets the other player see the request right away.
+            getSocket().emit("friend_request_sent", { targetAuthId: userId });
+            getOutgoingRequests().then(setOutgoing).catch(() => undefined);
         } catch (error: any) {
-            console.log("ADD FRIEND ERROR:", error?.message || error);
+            log("ADD FRIEND ERROR:", error?.message || error);
         }
     }
 
-    async function handleAccept(friendshipId: string) {
+    async function handleAccept(friendshipId: string, userId: string) {
         try {
             await acceptFriendRequest(friendshipId);
+            getSocket().emit("friend_request_accepted", { targetAuthId: userId });
             await loadData();
         } catch (error) {
-            console.log("ACCEPT ERROR:", error);
+            log("ACCEPT ERROR:", error);
         }
     }
 
@@ -200,18 +246,59 @@ export default function FriendsScreen() {
             await declineFriendRequest(friendshipId);
             setRequests((prev) => prev.filter((r) => r.friendshipId !== friendshipId));
         } catch (error) {
-            console.log("DECLINE ERROR:", error);
+            log("DECLINE ERROR:", error);
         }
     }
 
-    async function handleRemoveFriend(friendshipId: string) {
+    async function handleCancelRequest(friendshipId: string) {
         try {
-            await removeFriend(friendshipId);
-            setFriends((prev) => prev.filter((f) => f.friendshipId !== friendshipId));
+            await cancelFriendRequest(friendshipId);
+            setOutgoing((prev) => prev.filter((r) => r.friendshipId !== friendshipId));
         } catch (error) {
-            console.log("REMOVE FRIEND ERROR:", error);
+            log("CANCEL REQUEST ERROR:", error);
         }
     }
+
+    function handleRemoveFriend(friendshipId: string, username: string) {
+        const remove = async () => {
+            try {
+                await removeFriend(friendshipId);
+                setFriends((prev) => prev.filter((f) => f.friendshipId !== friendshipId));
+            } catch (error) {
+                log("REMOVE FRIEND ERROR:", error);
+            }
+        };
+
+        const message = `Remove ${username} from your friends?`;
+
+        if (Platform.OS === "web") {
+            if (typeof window !== "undefined" && window.confirm(message)) remove();
+            return;
+        }
+
+        Alert.alert(tr("Remove friend"), message, [
+            { text: tr("Cancel"), style: "cancel" },
+            { text: tr("Remove"), style: "destructive", onPress: remove },
+        ]);
+    }
+
+    function handleChallenge(friend: FriendWithStatus) {
+        startChallenge({
+            id: friend.profile.id,
+            username: friend.profile.username,
+            avatar: friend.profile.avatar,
+            rating: friend.profile.rating,
+        });
+    }
+
+    // Online friends first, then by name.
+    const sortedFriends = friends.slice().sort((a, b) => {
+        const presence = Number(b.online) - Number(a.online);
+        if (presence !== 0) return presence;
+        return a.profile.username.localeCompare(b.profile.username);
+    });
+
+    const onlineCount = friends.filter((f) => f.online).length;
 
     function goToProfile(userId: string, username: string, avatar?: string, rating?: number) {
         router.push({
@@ -244,10 +331,9 @@ export default function FriendsScreen() {
                     <View style={styles.emptyIconWrap}>
                         <Icon name="person" size={26} color="#5B8DB8" />
                     </View>
-                    <Text style={styles.title}>Freunde</Text>
+                    <Text style={styles.title}>{tr("Friends")}</Text>
                     <Text style={styles.status}>
-                        Melde dich mit einem Account an, um Freunde hinzuzufügen. Als Gast ist das
-                        Freundessystem nicht verfügbar.
+                        {tr("Sign in with an account to add friends. The friends system is not available for guests.")}
                     </Text>
                 </View>
             </ImageBackground>
@@ -272,19 +358,18 @@ export default function FriendsScreen() {
         <Text style={styles.backText}>‹</Text>
     </Pressable>
 
-    <Text style={styles.headerTitle}>Freunde</Text>
+    <Text style={styles.headerTitle}>{tr("Friends")}</Text>
 
     <View style={{ width: 42 }} />
 </View>
 
 <View style={styles.headerRow}>
-    <Text style={styles.title}>{friends.length} Freunde</Text>
+    <Text style={styles.title}>{friends.length === 1 ? tr("1 friend") : tr("{0} friends", friends.length)}</Text>
 
     {requests.length > 0 && (
         <View style={styles.requestPill}>
             <Text style={styles.requestPillText}>
-                {requests.length}{" "}
-                {requests.length === 1 ? "Anfrage" : "Anfragen"}
+                {requests.length === 1 ? tr("1 request") : tr("{0} requests", requests.length)}
             </Text>
         </View>
     )}
@@ -296,7 +381,7 @@ export default function FriendsScreen() {
                         <TextInput
                             value={search}
                             onChangeText={handleSearch}
-                            placeholder="Username suchen"
+                            placeholder={tr("Search username")}
                             placeholderTextColor="rgba(237,240,243,0.4)"
                             style={styles.input}
                             autoCapitalize="none"
@@ -306,7 +391,8 @@ export default function FriendsScreen() {
                     {searching && <ActivityIndicator style={{ marginTop: 12 }} color="#EDF0F3" />}
 
                     {searchResults.map((user) => {
-                        const alreadySent = sentRequests.has(user.id);
+                        const alreadySent =
+                            sentRequests.has(user.id) || outgoing.some((r) => r.profile.id === user.id);
                         const alreadyFriend = friends.some((f) => f.profile.id === user.id);
 
                         return (
@@ -316,7 +402,7 @@ export default function FriendsScreen() {
                                     onPress={() => goToProfile(user.id, user.username, user.avatar ?? undefined, user.rating)}
                                     hitSlop={6}
                                 >
-                                    <Avatar username={user.username} size={36} />
+                                    <Avatar username={user.username} uri={user.avatar} size={36} />
                                     <Text style={styles.name}>{user.username}</Text>
                                 </Pressable>
 
@@ -326,7 +412,7 @@ export default function FriendsScreen() {
                                     onPress={() => handleAddFriend(user.id)}
                                 >
                                     <Text style={styles.buttonText}>
-                                        {alreadyFriend ? "Befreundet" : alreadySent ? "Angefragt" : "Hinzufügen"}
+                                        {alreadyFriend ? tr("Friends") : alreadySent ? tr("Requested") : tr("Add")}
                                     </Text>
                                 </Pressable>
                             </View>
@@ -337,7 +423,7 @@ export default function FriendsScreen() {
                 {/* REQUESTS */}
                 {requests.length > 0 && (
                     <>
-                        <Text style={styles.sectionTitle}>Anfragen</Text>
+                        <Text style={styles.sectionTitle}>{tr("Requests")}</Text>
 
                         {requests.map((r) => (
                             <View key={r.friendshipId} style={styles.cardRow}>
@@ -346,13 +432,18 @@ export default function FriendsScreen() {
                                     onPress={() => goToProfile(r.profile.id, r.profile.username, r.profile.avatar ?? undefined, r.profile.rating)}
                                     hitSlop={6}
                                 >
-                                    <Avatar username={r.profile.username} />
-                                    <Text style={styles.name}>{r.profile.username}</Text>
+                                    <Avatar username={r.profile.username} uri={r.profile.avatar} />
+                                    <View>
+                                        <Text style={styles.name}>{r.profile.username}</Text>
+                                        <Text style={styles.statusInline}>
+                                            {r.profile.rating != null ? tr("{0} Elo", r.profile.rating) : tr("Friend request")}
+                                        </Text>
+                                    </View>
                                 </Pressable>
 
                                 <View style={{ flexDirection: "row", gap: 10 }}>
-                                    <Pressable style={styles.acceptBtn} onPress={() => handleAccept(r.friendshipId)}>
-                                        <Text style={styles.acceptText}>Annehmen</Text>
+                                    <Pressable style={styles.acceptBtn} onPress={() => handleAccept(r.friendshipId, r.profile.id)}>
+                                        <Text style={styles.acceptText}>{tr("Accept")}</Text>
                                     </Pressable>
 
                                     <Pressable style={styles.declineBtn} onPress={() => handleDecline(r.friendshipId)}>
@@ -365,43 +456,89 @@ export default function FriendsScreen() {
                 )}
 
                 {/* FRIENDS */}
-                <Text style={styles.sectionTitle}>Deine Freunde</Text>
+                <Text style={styles.sectionTitle}>
+                    {tr("Your friends")}{friends.length > 0 ? tr(" · {0} online", onlineCount) : ""}
+                </Text>
 
                 {friends.length === 0 && (
                     <View style={styles.emptyCard}>
                         <View style={styles.emptyIconWrap}>
                             <Icon name="person" size={22} color="#5B8DB8" />
                         </View>
-                        <Text style={styles.emptyTitle}>Noch keine Freunde</Text>
+                        <Text style={styles.emptyTitle}>{tr("No friends yet")}</Text>
                         <Text style={styles.status}>
-                            Such oben nach einem Usernamen, um deine erste Freundschaft zu starten.
+                            {tr("Search for a username above to add your first friend.")}
                         </Text>
                     </View>
                 )}
 
-                {friends.map((f) => (
-                    <View key={f.friendshipId} style={styles.cardRow}>
-                        <Pressable
-                            style={styles.personTap}
-                            onPress={() => goToProfile(f.profile.id, f.profile.username, f.profile.avatar ?? undefined, f.profile.rating)}
-                            hitSlop={6}
-                        >
-                            <View>
-                                <Avatar username={f.profile.username} />
-                                {f.online && <View style={styles.onlineDot} />}
-                            </View>
+                {sortedFriends.map((f) => {
+                    const status = f.inGame ? "ingame" : f.online ? "online" : "offline";
 
-                            <View>
-                                <Text style={styles.name}>{f.profile.username}</Text>
-                                <Text style={styles.statusInline}>{f.online ? "Online" : "Offline"}</Text>
-                            </View>
-                        </Pressable>
+                    return (
+                        <View key={f.friendshipId} style={styles.cardRow}>
+                            <Pressable
+                                style={styles.personTap}
+                                onPress={() => goToProfile(f.profile.id, f.profile.username, f.profile.avatar ?? undefined, f.profile.rating)}
+                                hitSlop={6}
+                            >
+                                <Avatar username={f.profile.username} uri={f.profile.avatar} status={status} />
 
-                        <Pressable onPress={() => handleRemoveFriend(f.friendshipId)} hitSlop={8}>
-                            <Text style={styles.declineText}>✕</Text>
-                        </Pressable>
-                    </View>
-                ))}
+                                <View style={{ flexShrink: 1 }}>
+                                    <Text style={styles.name} numberOfLines={1}>{f.profile.username}</Text>
+                                    <Text
+                                        style={[
+                                            styles.statusInline,
+                                            status === "online" && { color: "#4ADE80" },
+                                            status === "ingame" && { color: "#F5B544" },
+                                        ]}
+                                    >
+                                        {status === "ingame" ? tr("In a game") : status === "online" ? tr("Online") : tr("Offline")}
+                                        {f.profile.rating != null ? tr(" · {0} Elo", f.profile.rating) : ""}
+                                    </Text>
+                                </View>
+                            </Pressable>
+
+                            <View style={styles.rowActions}>
+                                {f.online && !f.inGame && (
+                                    <Pressable style={styles.playBtn} onPress={() => handleChallenge(f)}>
+                                        <Text style={styles.playText}>{tr("Play")}</Text>
+                                    </Pressable>
+                                )}
+                                <Pressable onPress={() => handleRemoveFriend(f.friendshipId, f.profile.username)} hitSlop={8}>
+                                    <Text style={styles.declineText}>✕</Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    );
+                })}
+
+                {/* SENT REQUESTS */}
+                {outgoing.length > 0 && (
+                    <>
+                        <Text style={styles.sectionTitle}>{tr("Sent requests")}</Text>
+
+                        {outgoing.map((r) => (
+                            <View key={r.friendshipId} style={styles.cardRow}>
+                                <Pressable
+                                    style={styles.personTap}
+                                    onPress={() => goToProfile(r.profile.id, r.profile.username, r.profile.avatar ?? undefined, r.profile.rating)}
+                                    hitSlop={6}
+                                >
+                                    <Avatar username={r.profile.username} uri={r.profile.avatar} />
+                                    <View>
+                                        <Text style={styles.name}>{r.profile.username}</Text>
+                                        <Text style={styles.statusInline}>{tr("Waiting for an answer")}</Text>
+                                    </View>
+                                </Pressable>
+
+                                <Pressable style={styles.smallButton} onPress={() => handleCancelRequest(r.friendshipId)}>
+                                    <Text style={styles.buttonText}>{tr("Cancel")}</Text>
+                                </Pressable>
+                            </View>
+                        ))}
+                    </>
+                )}
 
                 <View style={styles.bottomSpace} />
             </ScrollView>
@@ -477,7 +614,7 @@ headerTitle: {
         flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 14,
     },
 
-    personTap: { flexDirection: "row", alignItems: "center", gap: 12, flexShrink: 1 },
+    personTap: { flexDirection: "row", alignItems: "center", gap: 12, flexShrink: 1, flex: 1 },
 
     cardRow: {
         flexDirection: "row", justifyContent: "space-between", alignItems: "center",
@@ -493,6 +630,10 @@ headerTitle: {
         width: 12, height: 12, borderRadius: 6,
         backgroundColor: "#6F9E8C", borderWidth: 2, borderColor: "#1B2027",
     },
+
+    rowActions: { flexDirection: "row", alignItems: "center", gap: 14 },
+    playBtn: { backgroundColor: "#5B8DB8", paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10 },
+    playText: { color: "#FFFFFF", fontWeight: "800", fontSize: 12.5 },
 
     smallButton: { backgroundColor: "rgba(91, 141, 184, 0.16)", paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10 },
     smallButtonDisabled: { opacity: 0.5 },

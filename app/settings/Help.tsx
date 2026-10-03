@@ -1,51 +1,51 @@
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { tr } from "../../lib/i18n";
 
 export default function Hilfe() {
     return (
         <View style={styles.container}>
 
             <View style={styles.header}>
-                <Text style={styles.title}>Help</Text>
-                <Text style={styles.subtitle}>FAQ & Support</Text>
+                <Text style={styles.title}>{tr("Help")}</Text>
+                <Text style={styles.subtitle}>{tr("FAQ & Support")}</Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>General</Text>
+                    <Text style={styles.cardTitle}>{tr("General")}</Text>
                     <Text style={styles.text}>
-                        Checkfall is a chess app for playing, learning, and training.
-                        Some features are still in development and may change over time.
+                        {tr("POVCheck is a chess app for playing, learning, and training. Some features are still in development and may change over time.")}
                     </Text>
                 </View>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Playing</Text>
+                    <Text style={styles.cardTitle}>{tr("Playing")}</Text>
                     <Text style={styles.text}>
-                        • Play locally against another player or a bot{"\n"}
-                        • Online matches are available through matchmaking
+                        {tr("• Play locally against another player or a bot")}{"\n"}
+                        {tr("• Online matches are available through matchmaking")}
                     </Text>
                 </View>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Game History</Text>
+                    <Text style={styles.cardTitle}>{tr("Game History")}</Text>
                     <Text style={styles.text}>
-                        Saved games are stored locally on your device.
+                        {tr("Saved games are stored locally on your device.")}
                     </Text>
 
                     <Text style={styles.text}>
-                        • Long-press a saved game to delete it{"\n"}
-                        • Deleted games cannot be restored
+                        {tr("• Long-press a saved game to delete it")}{"\n"}
+                        {tr("• Deleted games cannot be restored")}
                     </Text>
                 </View>
 
                 <View style={styles.card}>
-                    <Text style={styles.cardTitle}>Important Notes</Text>
+                    <Text style={styles.cardTitle}>{tr("Important Notes")}</Text>
                     <Text style={styles.text}>
-                        • This app is still in testing phase{"\n"}
-                        • Visual or functional changes may occur{"\n"}
-                        • Data is stored locally or on servers for online play
+                        {tr("• This app is still in testing phase")}{"\n"}
+                        {tr("• Visual or functional changes may occur")}{"\n"}
+                        {tr("• Data is stored locally or on servers for online play")}
                     </Text>
                 </View>
 

@@ -9,18 +9,18 @@
     "icon": "./assets/images/app-icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.povcheck",
+      "bundleIdentifier": "com.povcheck.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.anonymous.povcheck",
+      "package": "com.povcheck.app",
       "predictiveBackGestureEnabled": false,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#ffffff"
-      } 
+      }
     },
     "web": {
       "output": "static",
@@ -42,7 +42,14 @@
       ],
       "expo-asset",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-1563396210958550~5781582270"
+        }
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

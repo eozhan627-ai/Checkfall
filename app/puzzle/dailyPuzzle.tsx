@@ -3,11 +3,15 @@ import { Chess } from "chess.js";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ImageBackground, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
 import { getDailyPuzzle } from "../../lib/dailyPuzzle";
 import { activeStreak, awardDailyPuzzle, getRewards, levelFromXp, solvedToday, type AwardResult } from "../../lib/puzzleRewards";
-import PuzzleBoard, { findCheckedKing } from "../components/PuzzleBoard";
-import PuzzleSolvedModal from "../components/PuzzleSolvedModal";
+import PuzzleBoard, { findCheckedKing } from "../../components/PuzzleBoard";
+import PuzzleSolvedModal from "../../components/PuzzleSolvedModal";
+import { tr } from "../../lib/i18n";
+import { reportTaskEvent } from "../../lib/dailyTasks";
+import { usePositionSound } from "../../lib/sounds";
 
 // Bitte an deine Routen anpassen:
 const HOME_ROUTE = "/";
@@ -48,6 +52,7 @@ export default function DailyPuzzle() {
     const playerTotal = Math.ceil(solutionMoves.length / 2);
 
     const [game, setGame] = useState(() => new Chess(puzzle.fen));
+    usePositionSound(game);
     const [selected, setSelected] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<string[]>([]);
     const [moveIndex, setMoveIndex] = useState(0); // Index des nächsten erwarteten Spielerzugs
@@ -65,7 +70,7 @@ export default function DailyPuzzle() {
     const hints = useRef(0);
     const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-    const backgroundImage = require("../../assets/images/onlinebackground.png");
+    const backgroundImage = require("../../assets/images/background.jpg");
 
     useEffect(() => {
         getRewards().then((r) => {
@@ -79,7 +84,7 @@ export default function DailyPuzzle() {
         timers.current.push(setTimeout(fn, ms));
     };
 
-    const colorName = playerColor === "w" ? "Weiß" : "Schwarz";
+    const colorName = playerColor === "w" ? tr("White") : tr("Black");
     const playerDone = solved ? playerTotal : Math.min(Math.floor(moveIndex / 2), playerTotal);
     const checkSquare = findCheckedKing(game);
 
@@ -91,7 +96,7 @@ export default function DailyPuzzle() {
     async function finish() {
         setSolved(true);
         setHintStep(0);
-        setFeedback("🎉 Puzzle gelöst!");
+        setFeedback(tr("🎉 Puzzle solved!"));
         haptic("success");
 
         const penalty = mistakes.current + hints.current;
@@ -102,6 +107,12 @@ export default function DailyPuzzle() {
             award = await awardDailyPuzzle(stars, puzzle.rating ?? 1000);
             setStreak(activeStreak(award.rewards));
         } catch { /* Belohnung ist optional */ }
+
+        // Daily tasks: counts once a day, like the reward above.
+        if (award && !award.alreadySolvedToday) {
+            reportTaskEvent("daily_puzzle");
+            reportTaskEvent("puzzle_solved");
+        }
 
         setResult({ stars, mistakes: mistakes.current, hints: hints.current, award });
         later(() => setShowModal(true), 500);
@@ -136,7 +147,7 @@ export default function DailyPuzzle() {
         // Falscher Zug
         if (selected !== from || square !== to) {
             mistakes.current += 1;
-            setFeedback("❌ Falscher Zug – versuch’s nochmal.");
+            setFeedback(tr("❌ Wrong move – try again."));
             haptic("error");
             clearSelection();
             return;
@@ -162,7 +173,7 @@ export default function DailyPuzzle() {
 
         // Sonst antwortet der Gegner automatisch (kurz verzögert, damit man den eigenen Zug sieht)
         setBusy(true);
-        setFeedback("✅ Richtig – weiter!");
+        setFeedback(tr("✅ Correct – keep going!"));
         later(() => {
             const enemy = solutionMoves[next];
             const afterEnemy = new Chess(afterPlayer.fen());
@@ -187,7 +198,7 @@ export default function DailyPuzzle() {
             hints.current += 1;
             setHintStep(step);
         }
-        setFeedback(step === 1 ? "💡 Diese Figur musst du ziehen." : "💡 Und dorthin geht sie.");
+        setFeedback(step === 1 ? tr("💡 This is the piece to move.") : tr("💡 And this is where it goes."));
     }
 
     // Stellung zurücksetzen (Fehlversuche und Tipps bleiben in der Wertung)
@@ -219,9 +230,9 @@ export default function DailyPuzzle() {
 
     const level = result?.award ? levelFromXp(result.award.rewards.xp).level : 1;
 
-    let turnLabel = `${colorName} am Zug`;
-    if (solved) turnLabel = "Gelöst";
-    else if (busy) turnLabel = "Gegner zieht …";
+    let turnLabel = `${colorName} to move`;
+    if (solved) turnLabel = "Solved";
+    else if (busy) turnLabel = "Opponent is moving …";
 
     return (
         <ImageBackground source={backgroundImage} style={styles.container} resizeMode="cover">
@@ -231,14 +242,14 @@ export default function DailyPuzzle() {
                         <Text style={styles.backText}>‹</Text>
                     </Pressable>
 
-                    <Text style={styles.headerTitle}>Daily Puzzle</Text>
+                    <Text style={styles.headerTitle}>{tr("Daily Puzzle")}</Text>
 
                     <View style={styles.streakSlot}>
                         {streak > 0 && <Text style={styles.streakChip}>🔥 {streak}</Text>}
                     </View>
                 </View>
 
-                <Text style={styles.subtitle}>Rating: {puzzle.rating}</Text>
+                <Text style={styles.subtitle}>{tr("Rating:")} {puzzle.rating}</Text>
 
                 <View style={styles.turnPill}>
                     <View
@@ -264,7 +275,7 @@ export default function DailyPuzzle() {
                 />
 
                 <Text style={styles.progress}>
-                    {solved ? `Alle ${playerTotal} Züge gefunden` : `Zug ${Math.min(playerDone + 1, playerTotal)} von ${playerTotal}`}
+                    {solved ? tr("All {0} moves found", playerTotal) : tr("Move {0} of {1}", Math.min(playerDone + 1, playerTotal), playerTotal)}
                 </Text>
 
                 {feedback && <Text style={styles.feedback}>{feedback}</Text>}
@@ -332,20 +343,20 @@ function AlreadySolvedModal({
                 {/* Tipp auf die Karte selbst schließt nicht */}
                 <Pressable onPress={() => { }} style={styles.popCard}>
                     <Text style={styles.popEmoji}>✅</Text>
-                    <Text style={styles.popTitle}>Schon gelöst!</Text>
+                    <Text style={styles.popTitle}>{tr("Already solved!")}</Text>
                     <Text style={styles.popText}>
-                        Du hast das heutige Puzzle schon gelöst. Morgen wartet ein neues auf dich.
+                        {tr("You have already solved today's puzzle. A new one is waiting for you tomorrow.")}
                     </Text>
                     {streak > 0 && (
                         <View style={styles.popStreak}>
-                            <Text style={styles.popStreakText}>🔥 {streak} {streak === 1 ? "Tag" : "Tage"} in Folge</Text>
+                            <Text style={styles.popStreakText}>🔥 {streak} {streak === 1 ? "day" : "days"} {tr("in a row")}</Text>
                         </View>
                     )}
                     <Pressable onPress={onMore} style={({ pressed }) => [styles.popPrimary, pressed && { opacity: 0.85 }]}>
-                        <Text style={styles.popPrimaryText}>Weitere Puzzles</Text>
+                        <Text style={styles.popPrimaryText}>{tr("More puzzles")}</Text>
                     </Pressable>
                     <Pressable onPress={onClose} style={({ pressed }) => [styles.popSecondary, pressed && { opacity: 0.7 }]}>
-                        <Text style={styles.popSecondaryText}>Nochmal üben</Text>
+                        <Text style={styles.popSecondaryText}>{tr("Practice again")}</Text>
                     </Pressable>
                 </Pressable>
             </Pressable>

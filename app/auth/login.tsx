@@ -7,7 +7,6 @@ import {
     Alert,
     Animated,
     BackHandler,
-    ImageBackground,
     Modal,
     Platform,
     Pressable,
@@ -15,6 +14,7 @@ import {
     Text,
     View,
 } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
 import {
     createGuestAccount,
     getAccountByAuthId,
@@ -22,6 +22,8 @@ import {
     saveAccount,
 } from "../../lib/account";
 import { supabase } from "../../lib/supabase";
+import { log } from "../../lib/log";
+import { tr } from "../../lib/i18n";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -38,7 +40,7 @@ export default function LoginPage() {
     // (getSession + onAuthStateChange können beide feuern)
     const resolvingRef = useRef(false);
 
-    const backgroundImage = require("../../assets/images/loginbackground.png");
+    const backgroundImage = require("../../assets/images/loginbackground.jpg");
 
     // =============================
     // ANIMATIONS
@@ -89,16 +91,16 @@ export default function LoginPage() {
         timeout: ReturnType<typeof setTimeout>;
     } | void> {
         try {
-            console.log("LOGIN: checking local account...");
+            log("LOGIN: checking local account...");
             const acc = await getCurrentAccount();
-            console.log("LOGIN: local account =", acc);
+            log("LOGIN: local account =", acc);
 
             if (acc) {
-                console.log("LOGIN: existing account → /");
+                log("LOGIN: existing account → /");
                 router.replace("/");
                 return;
             }
-            console.log("LOGIN: no local account");
+            log("LOGIN: no local account");
 
             // =============================
             // WEB: RÜCKKEHR VON GOOGLE?
@@ -135,7 +137,7 @@ export default function LoginPage() {
                 } = await supabase.auth.getSession();
 
                 if (session?.user) {
-                    console.log("LOGIN (WEB): Supabase-Session gefunden");
+                    log("LOGIN (WEB): Supabase-Session gefunden");
                     setGoogleLoading(true);
                     await resolveAccountAfterGoogleLogin(session.user);
                     return;
@@ -144,7 +146,7 @@ export default function LoginPage() {
                 // Rückkehr von Google, aber Session noch nicht da:
                 // kurz auf SIGNED_IN warten, sonst Login-Screen zeigen.
                 if (returningFromGoogle) {
-                    console.log("LOGIN (WEB): warte auf SIGNED_IN...");
+                    log("LOGIN (WEB): warte auf SIGNED_IN...");
                     setGoogleLoading(true);
 
                     const { data: sub } = supabase.auth.onAuthStateChange(
@@ -159,7 +161,7 @@ export default function LoginPage() {
                     const timeout = setTimeout(() => {
                         sub.subscription.unsubscribe();
                         if (!resolvingRef.current) {
-                            console.log("LOGIN (WEB): Timeout, keine Session");
+                            log("LOGIN (WEB): Timeout, keine Session");
                             setGoogleLoading(false);
                             setError(
                                 "Google login did not complete. Please try again."
@@ -283,14 +285,14 @@ export default function LoginPage() {
         resolvingRef.current = true;
 
         try {
-            console.log("GOOGLE USER ID:", user.id);
-            console.log("GOOGLE USER EMAIL:", user.email);
+            log("GOOGLE USER ID:", user.id);
+            log("GOOGLE USER EMAIL:", user.email);
 
             // 1. LOCAL ACCOUNT CHECK
             const existingLocalAccount = await getAccountByAuthId(user.id);
 
             if (existingLocalAccount) {
-                console.log("GOOGLE: LOCAL ACCOUNT FOUND");
+                log("GOOGLE: LOCAL ACCOUNT FOUND");
                 await saveAccount({
                     username: existingLocalAccount.username,
                     guest: false,
@@ -304,7 +306,7 @@ export default function LoginPage() {
             }
 
             // 2. SUPABASE PROFILE CHECK
-            console.log("GOOGLE: checking Supabase profile...");
+            log("GOOGLE: checking Supabase profile...");
             const { data: profile, error: profileError } = await supabase
                 .from("profiles")
                 .select("id, username, rating, avatar")
@@ -317,7 +319,7 @@ export default function LoginPage() {
 
             // 3. EXISTING SUPABASE PROFILE
             if (profile) {
-                console.log("GOOGLE: SUPABASE PROFILE FOUND");
+                log("GOOGLE: SUPABASE PROFILE FOUND");
                 await saveAccount({
                     username: profile.username,
                     guest: false,
@@ -334,7 +336,7 @@ export default function LoginPage() {
             }
 
             // 4. REALLY NEW ACCOUNT
-            console.log("GOOGLE: NEW USER → onboarding");
+            log("GOOGLE: NEW USER → onboarding");
             setGoogleLoading(false);
             router.replace("/auth/onboarding");
         } catch (e: any) {
@@ -342,7 +344,7 @@ export default function LoginPage() {
             resolvingRef.current = false;
             setGoogleLoading(false);
             setLoading(false);
-            setError(e?.message || "Google login failed.");
+            setError(e?.message || tr("Google login failed."));
             triggerShake();
         }
     }
@@ -354,9 +356,9 @@ export default function LoginPage() {
         try {
             resetError();
             setGoogleLoading(true);
-            console.log("=================================");
-            console.log("GOOGLE LOGIN START");
-            console.log("=================================");
+            log("=================================");
+            log("GOOGLE LOGIN START");
+            log("=================================");
 
             // ---------------------------------
             // WEB: FULL-PAGE-REDIRECT
@@ -368,7 +370,7 @@ export default function LoginPage() {
             if (Platform.OS === "web") {
                 const webRedirectTo = `${window.location.origin}/auth/login`;
 
-                console.log("GOOGLE WEB REDIRECT:", webRedirectTo);
+                log("GOOGLE WEB REDIRECT:", webRedirectTo);
 
                 const { error: oauthError } =
                     await supabase.auth.signInWithOAuth({
@@ -394,7 +396,7 @@ export default function LoginPage() {
                 path: "/auth/callback",
                 isTripleSlashed: false,
             });
-            console.log("GOOGLE REDIRECT:", redirectTo);
+            log("GOOGLE REDIRECT:", redirectTo);
 
             const { data, error: oauthError } =
                 await supabase.auth.signInWithOAuth({
@@ -404,7 +406,7 @@ export default function LoginPage() {
                         skipBrowserRedirect: true,
                     },
                 });
-            console.log("GOOGLE OAUTH ERROR:", oauthError);
+            log("GOOGLE OAUTH ERROR:", oauthError);
 
             if (oauthError) {
                 throw oauthError;
@@ -417,10 +419,10 @@ export default function LoginPage() {
                 data.url,
                 redirectTo
             );
-            console.log("GOOGLE RESULT:", result);
+            log("GOOGLE RESULT:", result);
 
             if (result.type !== "success" || typeof result.url !== "string") {
-                console.log("GOOGLE: authentication cancelled.");
+                log("GOOGLE: authentication cancelled.");
                 setGoogleLoading(false);
                 return;
             }
@@ -439,11 +441,11 @@ export default function LoginPage() {
             const accessToken = hashParams.get("access_token");
             const refreshToken = hashParams.get("refresh_token");
 
-            console.log(
+            log(
                 "GOOGLE ACCESS TOKEN:",
                 accessToken ? "FOUND" : "MISSING"
             );
-            console.log(
+            log(
                 "GOOGLE REFRESH TOKEN:",
                 refreshToken ? "FOUND" : "MISSING"
             );
@@ -463,7 +465,7 @@ export default function LoginPage() {
                     access_token: accessToken,
                     refresh_token: refreshToken,
                 });
-            console.log(
+            log(
                 "GOOGLE SESSION:",
                 sessionData.session ? "SESSION CREATED" : "NO SESSION"
             );
@@ -488,7 +490,7 @@ export default function LoginPage() {
         } catch (e: any) {
             console.error("GOOGLE LOGIN ERROR:", e);
             setGoogleLoading(false);
-            setError(e?.message || "Google login failed.");
+            setError(e?.message || tr("Google login failed."));
             triggerShake();
         }
     }
@@ -499,15 +501,15 @@ export default function LoginPage() {
     async function handleGuest() {
         try {
             resetError();
-            console.log("GUEST LOGIN START");
+            log("GUEST LOGIN START");
 
             const account = await createGuestAccount();
-            console.log("GUEST CREATED:", account.username);
+            log("GUEST CREATED:", account.username);
 
             router.replace("/auth/skillLevel");
         } catch (e) {
             console.error("GUEST LOGIN ERROR:", e);
-            Alert.alert("Error", "Could not continue as guest.");
+            Alert.alert(tr("Error"), tr("Could not continue as guest."));
         }
     }
 
@@ -517,7 +519,7 @@ export default function LoginPage() {
     if (loading) {
         return (
             <View style={styles.loading}>
-                <Text style={styles.loadingText}>Loading...</Text>
+                <Text style={styles.loadingText}>{tr("Loading...")}</Text>
             </View>
         );
     }
@@ -574,13 +576,13 @@ export default function LoginPage() {
                             >
                                 {/* LOGO */}
                                 <Text style={styles.logo}>
-                                    POV
+                                    {tr("POV")}
                                     <Text style={styles.logoAccent}>
-                                        Check
+                                        {tr("Check")}
                                     </Text>
                                 </Text>
                                 <Text style={styles.subtitle}>
-                                    Play. Learn. Improve.
+                                    {tr("Play. Learn. Improve.")}
                                 </Text>
 
                                 {/* GOOGLE */}
@@ -595,8 +597,8 @@ export default function LoginPage() {
                                     <Text style={styles.googleIcon}>G</Text>
                                     <Text style={styles.googleText}>
                                         {googleLoading
-                                            ? "Connecting..."
-                                            : "Continue with Google"}
+                                            ? tr("Connecting...")
+                                            : tr("Continue with Google")}
                                     </Text>
                                 </Pressable>
 
@@ -608,7 +610,7 @@ export default function LoginPage() {
                                 {/* DIVIDER */}
                                 <View style={styles.dividerRow}>
                                     <View style={styles.divider} />
-                                    <Text style={styles.orText}>or</Text>
+                                    <Text style={styles.orText}>{tr("or")}</Text>
                                     <View style={styles.divider} />
                                 </View>
 
@@ -618,24 +620,24 @@ export default function LoginPage() {
                                     onPress={openGuestTerms}
                                 >
                                     <Text style={styles.guestText}>
-                                        Continue as guest
+                                        {tr("Continue as guest")}
                                     </Text>
                                 </Pressable>
 
                                 {/* TERMS */}
                                 <View style={styles.termsContainer}>
                                     <Text style={styles.terms}>
-                                        By continuing, you agree to our
+                                        {tr("By continuing, you agree to our")}
                                     </Text>
                                     <Pressable onPress={openTerms}>
                                         <Text style={styles.termsLink}>
-                                            Terms of Service
+                                            {tr("Terms of Service")}
                                         </Text>
                                     </Pressable>
-                                    <Text style={styles.terms}>and</Text>
+                                    <Text style={styles.terms}>{tr("and")}</Text>
                                     <Pressable onPress={openTerms}>
                                         <Text style={styles.termsLink}>
-                                            Privacy Policy.
+                                            {tr("Privacy Policy.")}
                                         </Text>
                                     </Pressable>
                                 </View>
@@ -657,11 +659,10 @@ export default function LoginPage() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.termsModal}>
                         <Text style={styles.modalTitle}>
-                            Welcome to POVCheck
+                            {tr("Welcome to POVCheck")}
                         </Text>
                         <Text style={styles.modalSubtitle}>
-                            Before continuing, please review and accept our
-                            Terms of Service and Privacy Policy.
+                            {tr("Before continuing, please review and accept our Terms of Service and Privacy Policy.")}
                         </Text>
 
                         <Pressable
@@ -669,7 +670,7 @@ export default function LoginPage() {
                             onPress={() => router.push("/terms")}
                         >
                             <Text style={styles.modalDocumentTitle}>
-                                Terms of Service
+                                {tr("Terms of Service")}
                             </Text>
                             <Text style={styles.modalDocumentArrow}>›</Text>
                         </Pressable>
@@ -679,7 +680,7 @@ export default function LoginPage() {
                             onPress={() => router.push("/privacypolicy")}
                         >
                             <Text style={styles.modalDocumentTitle}>
-                                Privacy Policy
+                                {tr("Privacy Policy")}
                             </Text>
                             <Text style={styles.modalDocumentArrow}>›</Text>
                         </Pressable>
@@ -693,7 +694,7 @@ export default function LoginPage() {
                             }
                         >
                             <Text style={styles.acceptText}>
-                                Agree & Continue
+                                {tr("Agree & Continue")}
                             </Text>
                         </Pressable>
 
@@ -701,7 +702,7 @@ export default function LoginPage() {
                             style={styles.cancelButton}
                             onPress={() => setTermsVisible(false)}
                         >
-                            <Text style={styles.cancelText}>Cancel</Text>
+                            <Text style={styles.cancelText}>{tr("Cancel")}</Text>
                         </Pressable>
                     </View>
                 </View>

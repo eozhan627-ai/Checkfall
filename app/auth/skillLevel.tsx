@@ -1,15 +1,16 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
 import { getCurrentAccount, saveAccount } from "../../lib/account";
-import { supabase } from "../../lib/supabase";
+import { setInitialRating } from "../../lib/api";
+import { tr } from "../../lib/i18n";
 
 /**
  * Nach dem ersten Login (Google oder Gast) landet der Nutzer hier,
@@ -32,32 +33,32 @@ type SkillLevel = {
 const LEVELS: SkillLevel[] = [
   {
     id: "beginner",
-    title: "Absoluter Anfänger",
-    description: "Ich kenne die Regeln gerade erst",
+    get title() { return tr("Complete beginner"); },
+    description: "I have only just learned the rules",
     elo: 400,
   },
   {
     id: "casual",
-    title: "Gelegenheitsspieler",
-    description: "Spiele ab und zu, kenne einfache Taktiken",
+    get title() { return tr("Casual player"); },
+    description: "I play now and then and know simple tactics",
     elo: 700,
   },
   {
     id: "average",
-    title: "Durchschnitt",
-    description: "Spiele regelmäßig, kenne Eröffnungen",
+    get title() { return tr("Intermediate"); },
+    description: "I play regularly and know some openings",
     elo: 1000,
   },
   {
     id: "club",
-    title: "Vereinsspieler",
-    description: "Spiele im Verein oder bei Turnieren",
+    get title() { return tr("Club player"); },
+    description: "I play in a club or in tournaments",
     elo: 1500,
   },
   {
     id: "strong",
-    title: "Sehr stark",
-    description: "Meisterniveau oder Titelträger",
+    get title() { return tr("Very strong"); },
+    description: "Master level or titled player",
     elo: 2000,
   },
 ];
@@ -69,7 +70,7 @@ export default function SkillLevelScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const backgroundImage = require("../../assets/images/loginbackground.png");
+  const backgroundImage = require("../../assets/images/loginbackground.jpg");
 
   async function handleConfirm() {
     if (!selectedId || saving) return;
@@ -86,33 +87,28 @@ export default function SkillLevelScreen() {
         throw new Error("No local account found.");
       }
 
+      // Signed-in accounts: the server stores the start rating (it only
+      // accepts the fixed values from LEVELS and only before the first
+      // rated game). Guests keep it on the device only.
+      let rating = level.elo;
+
+      if (!account.guest && account.authId) {
+        rating = await setInitialRating(level.elo);
+      }
+
       // Lokal speichern — gleiche Struktur wie in login.tsx bei saveAccount().
       await saveAccount({
         username: account.username,
         guest: account.guest,
         authId: account.authId,
         avatar: account.avatar,
-        rating: level.elo,
-        
+        rating,
       });
-
-      // Nur eingeloggte (nicht-Gast) Accounts haben eine Zeile in
-      // "profiles" — dort den Start-Elo mit hochschreiben.
-      if (!account.guest && account.authId) {
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update({ rating: level.elo })
-          .eq("id", account.authId);
-
-        if (updateError) {
-          throw updateError;
-        }
-      }
 
       router.replace("/");
     } catch (e: any) {
       console.error("SKILL LEVEL SAVE ERROR:", e);
-      setError(e?.message || "Speichern fehlgeschlagen.");
+      setError(e?.message || tr("Could not save."));
       setSaving(false);
     }
   }
@@ -129,10 +125,9 @@ export default function SkillLevelScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Wie gut spielst du?</Text>
+        <Text style={styles.title}>{tr("How well do you play?")}</Text>
         <Text style={styles.subtitle}>
-          Das legt nur deinen Start-Elo fest — er passt sich beim Spielen
-          schnell an.
+          {tr("This only sets your starting Elo — it adjusts quickly as you play.")}
         </Text>
 
         <View style={styles.list}>
@@ -181,7 +176,7 @@ export default function SkillLevelScreen() {
           ]}
         >
           <Text style={styles.confirmText}>
-            {saving ? "Speichern..." : "Weiter"}
+            {saving ? tr("Saving...") : tr("Continue")}
           </Text>
         </Pressable>
       </ScrollView>

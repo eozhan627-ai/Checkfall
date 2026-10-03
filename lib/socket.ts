@@ -1,85 +1,89 @@
 import { io, Socket } from "socket.io-client";
+import { SERVER_URL } from "./config";
+import { log } from "./log";
 import { supabase } from "./supabase";
 
 let socket: Socket | null = null;
 
+// The server refuses a connection whose access token is invalid or expired
+// ("INVALID_TOKEN"). We then refresh the session once and try again.
+let tokenRetryUsed = false;
+
 export const getSocket = (): Socket => {
     if (!socket) {
-        socket = io(
-            "https://checkfall-server-clean-1.onrender.com",
-            {
-                transports: ["websocket"],
-                autoConnect: false,
+        socket = io(SERVER_URL, {
+            transports: ["websocket"],
+            autoConnect: false,
+        });
+
+        // The server reads the user from the access token in socket.auth
+        // (see connectAuthenticatedSocket). No user id is sent from here.
+        socket.on("connect", () => {
+            tokenRetryUsed = false;
+            log("SOCKET CONNECTED", socket?.id);
+        });
+
+        socket.on("connect_error", async (error: Error) => {
+            log("SOCKET CONNECT ERROR:", error?.message);
+
+            if (error?.message !== "INVALID_TOKEN" || tokenRetryUsed) {
+                return;
             }
-        );
 
-        socket.on("connect", async () => {
-            console.log(
-                "🟢 SOCKET CONNECTED",
-                socket?.id
-            );
+            tokenRetryUsed = true;
 
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
+            let accessToken: string | undefined;
 
-            if (session?.user?.id) {
-                socket?.emit("authenticate_socket", {
-                    authId: session.user.id,
-                });
-
-                console.log(
-                    "🔐 SOCKET AUTH SENT:",
-                    session.user.id
-                );
+            try {
+                const { data } = await supabase.auth.refreshSession();
+                accessToken = data?.session?.access_token;
+            } catch (refreshError) {
+                log("SOCKET TOKEN REFRESH ERROR:", refreshError);
             }
+
+            if (!socket) return;
+
+            socket.auth = accessToken ? { accessToken } : {};
+            socket.connect();
         });
 
         socket.on("disconnect", (reason) => {
-            console.log(
-                "🔴 SOCKET DISCONNECTED:",
-                reason
-            );
-        });
-
-        socket.onAny((event, ...args) => {
-            console.log(
-                "📡 Event erhalten:",
-                event,
-                args
-            );
+            log("SOCKET DISCONNECTED:", reason);
         });
 
         // =================================
         // SESSION KICK
         // =================================
 
-        socket.on(
-            "session_kicked",
-            async (data) => {
-                console.log(
-                    "⚠️ SESSION KICKED:",
-                    data
-                );
+        socket.on("session_kicked", async (data) => {
+            log("SESSION KICKED:", data);
 
-                try {
-                    await supabase.auth.signOut();
-                } catch (error) {
-                    console.log(
-                        "SESSION KICK SIGNOUT ERROR:",
-                        error
-                    );
-                }
-
-                if (socket?.connected) {
-                    socket.disconnect();
-                }
+            try {
+                await supabase.auth.signOut();
+            } catch (error) {
+                log("SESSION KICK SIGNOUT ERROR:", error);
             }
-        );
+
+            if (socket?.connected) {
+                socket.disconnect();
+            }
+        });
     }
 
     return socket;
 };
+
+async function applyCurrentToken(currentSocket: Socket): Promise<boolean> {
+    const {
+        data: { session },
+    } = await supabase.auth.getSession();
+
+    currentSocket.auth = session?.access_token
+        ? { accessToken: session.access_token }
+        : {};
+
+    return !!session?.access_token;
+}
 
 // =================================
 // AUTHENTICATED SOCKET CONNECT
@@ -88,14 +92,10 @@ export const getSocket = (): Socket => {
 export async function connectAuthenticatedSocket() {
     const currentSocket = getSocket();
 
-    const {
-        data: { session },
-    } = await supabase.auth.getSession();
+    const signedIn = await applyCurrentToken(currentSocket);
 
-    if (!session?.access_token) {
-        console.log(
-            "SOCKET: no authenticated session"
-        );
+    if (!signedIn) {
+        log("SOCKET: no authenticated session");
 
         if (currentSocket.connected) {
             currentSocket.disconnect();
@@ -104,17 +104,26 @@ export async function connectAuthenticatedSocket() {
         return;
     }
 
-    console.log(
-        "SOCKET: connecting authenticated user..."
-    );
-
-    currentSocket.auth = {
-        accessToken: session.access_token,
-    };
-
     if (!currentSocket.connected) {
         currentSocket.connect();
     }
+}
+
+// =================================
+// CONNECT FOR GUESTS AND SIGNED-IN USERS
+// =================================
+// Used by screens that also work without an account (matchmaking, bot
+// games). Signed-in users connect with their token, guests without one.
+
+export async function ensureSocketConnected(): Promise<Socket> {
+    const currentSocket = getSocket();
+
+    if (!currentSocket.connected) {
+        await applyCurrentToken(currentSocket);
+        currentSocket.connect();
+    }
+
+    return currentSocket;
 }
 
 // =================================
@@ -123,10 +132,11 @@ export async function connectAuthenticatedSocket() {
 
 export function disconnectSocket() {
     if (socket) {
-        console.log(
-            "SOCKET: disconnecting..."
-        );
+        log("SOCKET: disconnecting...");
 
+        // Drop the token so a later guest connection is not made with the
+        // previous user's identity.
+        socket.auth = {};
         socket.disconnect();
     }
 }

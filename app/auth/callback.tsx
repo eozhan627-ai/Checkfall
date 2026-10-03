@@ -5,6 +5,7 @@ import {
     Text,
     View,
 } from "react-native";
+import { tr } from "../../lib/i18n";
 
 export default function CallbackPage() {
     return (
@@ -15,7 +16,7 @@ export default function CallbackPage() {
             />
 
             <Text style={styles.text}>
-                Signing in... </Text>
+                {tr("Signing in...")} </Text>
         </View>
     );
 }

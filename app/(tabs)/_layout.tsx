@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { tr } from "../../lib/i18n";
 export default function TabLayout() {
   return (
     <Tabs
@@ -26,7 +27,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Start",
+          title: tr("Home"),
           tabBarIcon: ({ color, size }) => (
             <Ionicons
               name="home"
@@ -39,7 +40,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="learn"
         options={{
-          title: "Lernen",
+          title: tr("Learn"),
           tabBarIcon: ({ color, size }) => (
             <Ionicons
               name="school"
@@ -52,7 +53,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="social"
         options={{
-          title: "Social",
+          title: tr("Social"),
        
           href: "/social",
           tabBarIcon: ({ color, size }) => (
@@ -67,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="more"
         options={{
-          title: "Mehr",
+          title: tr("More"),
           tabBarIcon: ({ color, size }) => (
             <Ionicons
               name="menu"

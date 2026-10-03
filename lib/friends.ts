@@ -1,5 +1,6 @@
 import { getCurrentAccount } from "./account";
 import { supabase } from "./supabase";
+import { log } from "./log";
 
 export type FriendProfile = {
     id: string; // = Supabase authId
@@ -35,7 +36,7 @@ export async function searchUsers(query: string): Promise<FriendProfile[]> {
         .limit(20);
 
     if (error) {
-        console.log("SEARCH USERS ERROR:", error);
+        log("SEARCH USERS ERROR:", error);
         return [];
     }
 
@@ -50,11 +51,11 @@ export async function sendFriendRequest(targetAuthId: string): Promise<void> {
     const me = await getCurrentAccount();
 
     if (!me || !me.authId) {
-        throw new Error("Nur mit Account möglich");
+        throw new Error("Only possible with an account");
     }
 
     if (me.authId === targetAuthId) {
-        throw new Error("Du kannst dich nicht selbst hinzufügen");
+        throw new Error("You cannot add yourself");
     }
 
     const { data: existing, error: lookupError } = await supabase
@@ -72,8 +73,8 @@ export async function sendFriendRequest(targetAuthId: string): Promise<void> {
     if (existing) {
         throw new Error(
             existing.status === "accepted"
-                ? "Ihr seid bereits befreundet"
-                : "Es gibt bereits eine offene Anfrage"
+                ? "You are already friends"
+                : "There is already a pending request"
         );
     }
 
@@ -138,7 +139,7 @@ export async function getIncomingRequests(): Promise<FriendEntry[]> {
         .eq("status", "pending");
 
     if (error) {
-        console.log("GET REQUESTS ERROR:", error);
+        log("GET REQUESTS ERROR:", error);
         return [];
     }
 
@@ -148,6 +149,43 @@ export async function getIncomingRequests(): Promise<FriendEntry[]> {
             friendshipId: row.id,
             profile: row.requester,
         }));
+}
+
+// =============================
+// GESENDETE ANFRAGEN
+// =============================
+
+export async function getOutgoingRequests(): Promise<FriendEntry[]> {
+    const me = await getCurrentAccount();
+    if (!me || !me.authId) return [];
+
+    const { data, error } = await supabase
+        .from("friendships")
+        .select("id, addressee:addressee_id (id, username, avatar, rating)")
+        .eq("requester_id", me.authId)
+        .eq("status", "pending");
+
+    if (error) {
+        log("GET SENT REQUESTS ERROR:", error);
+        return [];
+    }
+
+    return (data || [])
+        .filter((row: any) => row.addressee)
+        .map((row: any) => ({
+            friendshipId: row.id,
+            profile: row.addressee,
+        }));
+}
+
+/** Withdraws a request the user sent that has not been answered yet. */
+export async function cancelFriendRequest(friendshipId: string): Promise<void> {
+    const { error } = await supabase
+        .from("friendships")
+        .delete()
+        .eq("id", friendshipId);
+
+    if (error) throw error;
 }
 
 // =============================
@@ -167,7 +205,7 @@ export async function getFriends(): Promise<FriendEntry[]> {
         .or(`requester_id.eq.${me.authId},addressee_id.eq.${me.authId}`);
 
     if (error) {
-        console.log("GET FRIENDS ERROR:", error);
+        log("GET FRIENDS ERROR:", error);
         return [];
     }
 

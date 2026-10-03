@@ -1,15 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
-    ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
+import ImageBackground from '../../components/ui/ImageBackground';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LANGUAGES, setLanguage, tr, useLanguage } from "../../lib/i18n";
+import { isSoundEnabled, playSound, setSoundEnabled } from "../../lib/sounds";
 
 type Item = {
     title: string;
@@ -24,26 +26,38 @@ type Section = {
 
 const SECTIONS: Section[] = [
     {
-        label: 'Account',
+        get label() { return tr("Account"); },
         items: [
-            { title: 'Profile', subtitle: 'Edit account and avatar', href: '/profile' },
-            { title: 'Help', subtitle: 'FAQ and support', href: '/settings/Help' },
+            { get title() { return tr("Profile"); }, get subtitle() { return tr("Edit account and avatar"); }, href: '/profile' },
+            { get title() { return tr("Shop"); }, get subtitle() { return tr("Board designs for your coins"); }, href: '/shop' as Href },
+            { get title() { return tr("Help"); }, get subtitle() { return tr("Questions and answers"); }, href: '/settings/Help' },
+            { get title() { return tr("Support"); }, get subtitle() { return tr("Report a problem or ask a question"); }, href: '/support' as Href },
         ],
     },
     {
-        label: 'Information',
+        get label() { return tr("Information"); },
         items: [
-            { title: 'Terms of Use', subtitle: 'Legal', href: '/terms' },
-            { title: 'Privacy Policy', subtitle: 'Data protection information', href: '/privacypolicy' },
-            { title: 'Imprint', subtitle: 'Company information', href: '/settings/Impressum' },
+            { get title() { return tr("Terms of Use"); }, get subtitle() { return tr("Legal"); }, href: '/terms' },
+            { get title() { return tr("Privacy Policy"); }, get subtitle() { return tr("Data protection information"); }, href: '/privacypolicy' },
+            { get title() { return tr("Imprint"); }, get subtitle() { return tr("Company information"); }, href: '/settings/Impressum' },
         ],
     },
 ];
 
-const backgroundImage = require('../../assets/images/loginbackground.png');
+const backgroundImage = require('../../assets/images/loginbackground.jpg');
 
 export default function MoreScreen() {
     const insets = useSafeAreaInsets();
+    const language = useLanguage();
+    const [sounds, setSounds] = useState(isSoundEnabled());
+
+    const chooseSounds = (value: boolean) => {
+        setSounds(value);
+        setSoundEnabled(value).then(() => {
+            // Lets the player hear what they just switched on.
+            if (value) playSound("move");
+        });
+    };
 
     return (
         <ImageBackground source={backgroundImage} style={styles.container} resizeMode="cover">
@@ -57,7 +71,72 @@ export default function MoreScreen() {
                 }}
                 showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.title}>More</Text>
+                <Text style={styles.title}>{tr("More")}</Text>
+
+                {/* LANGUAGE */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>{tr("Language")}</Text>
+
+                    <View style={styles.languageRow}>
+                        {LANGUAGES.map((entry) => {
+                            const active = entry.code === language;
+
+                            return (
+                                <Pressable
+                                    key={entry.code}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ selected: active }}
+                                    onPress={() => setLanguage(entry.code)}
+                                    style={({ pressed }) => [
+                                        styles.languageOption,
+                                        active && styles.languageActive,
+                                        pressed && styles.rowPressed,
+                                    ]}
+                                >
+                                    <Text style={[styles.languageText, active && styles.languageTextActive]}>
+                                        {entry.name}
+                                    </Text>
+                                    {active && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                </View>
+
+                {/* SOUNDS */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>{tr("Sounds")}</Text>
+
+                    <View style={styles.languageRow}>
+                        {[true, false].map((value) => {
+                            const active = value === sounds;
+
+                            return (
+                                <Pressable
+                                    key={String(value)}
+                                    accessibilityRole="button"
+                                    accessibilityState={{ selected: active }}
+                                    onPress={() => chooseSounds(value)}
+                                    style={({ pressed }) => [
+                                        styles.languageOption,
+                                        active && styles.languageActive,
+                                        pressed && styles.rowPressed,
+                                    ]}
+                                >
+                                    <Ionicons
+                                        name={value ? "volume-high-outline" : "volume-mute-outline"}
+                                        size={16}
+                                        color={active ? "#FFFFFF" : "rgba(255,255,255,0.7)"}
+                                    />
+                                    <Text style={[styles.languageText, active && styles.languageTextActive]}>
+                                        {value ? tr("On") : tr("Off")}
+                                    </Text>
+                                    {active && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                </View>
 
                 {SECTIONS.map((section) => (
                     <View key={section.label} style={styles.section}>
@@ -109,6 +188,22 @@ const styles = StyleSheet.create({
         color: '#fff',
         marginBottom: 24,
     },
+    languageRow: { flexDirection: 'row', gap: 10 },
+    languageOption: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    languageActive: { backgroundColor: 'rgba(91,141,184,0.22)', borderColor: '#5B8DB8' },
+    languageText: { color: 'rgba(255,255,255,0.7)', fontSize: 15, fontWeight: '600' },
+    languageTextActive: { color: '#fff' },
     section: {
         marginBottom: 24,
     },

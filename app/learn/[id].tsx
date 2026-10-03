@@ -2,7 +2,11 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getLessonContent } from "../../lib/lessonContent";
-import { getLessonProgress, LessonProgress } from "./../../lib/lessonProgress";
+import { getLessonProgress, lessonProgressKey, LessonProgress } from "../../lib/lessonProgress";
+import LimitGate from "../../components/LimitGate";
+import { Allowance, consume, getAllowance, grantAdBonus } from "../../lib/dailyLimits";
+import { getPersonalExercises } from "../../lib/personalLessons";
+import { tr } from "../../lib/i18n";
 
 const ACCENT = "#7C9473";
 const GOLD = "#F5B942";
@@ -16,24 +20,59 @@ export default function LessonIntroScreen() {
 
     const coachImage = require("../../assets/images/coach.png");
     const content = getLessonContent(mistake_type);
-    const maxStars = content.exercises.length * 3;
+    // Positions from the user's own games come first, then the standard ones.
+    const ownExercises = getPersonalExercises(id);
+    const exerciseCount = ownExercises.length + content.exercises.length;
+    const maxStars = exerciseCount * 3;
+    // A lesson with positions from the user's games has its own best score.
+    const progressKey = lessonProgressKey(mistake_type, ownExercises.length > 0);
 
     const [best, setBest] = useState<LessonProgress | null>(null);
+
+    // Daily limit (1 lesson a day without VIP; an ad adds one more).
+    const [allowance, setAllowance] = useState<Allowance | null>(null);
+    const [gateOpen, setGateOpen] = useState(false);
+
+    const openLesson = () =>
+        router.push({
+            pathname: "/learn/lesson",
+            params: { id, title: title || content.title, mistake_type },
+        });
+
+    async function startLesson() {
+        const current = await getAllowance("lesson");
+        setAllowance(current);
+
+        if (!current.unlimited && current.left <= 0) {
+            setGateOpen(true);
+            return;
+        }
+
+        setAllowance(await consume("lesson"));
+        openLesson();
+    }
+
+    // An ad was watched: one more lesson for today.
+    async function handleRewarded() {
+        await grantAdBonus("lesson");
+        setAllowance(await consume("lesson"));
+        openLesson();
+    }
 
     useFocusEffect(
         useCallback(() => {
             let alive = true;
             getLessonProgress().then((p) => {
-                if (alive) setBest(p[mistake_type ?? ""] ?? null);
+                if (alive) setBest(p[progressKey] ?? null);
             });
+            getAllowance("lesson").then((a) => alive && setAllowance(a));
             return () => {
                 alive = false;
             };
-        }, [mistake_type])
+        }, [progressKey])
     );
 
-    const hasExercises = content.exercises.length > 0;
-    const stars = best?.bestStars ?? 0;
+    const hasExercises = exerciseCount > 0;
 
     return (
         <View style={styles.container}>
@@ -59,13 +98,13 @@ export default function LessonIntroScreen() {
 
                     {content.steps.length > 0 && (
                         <View style={styles.stepsBox}>
-                            <Text style={styles.stepsLabel}>✅ Deine Checkliste</Text>
+                            <Text style={styles.stepsLabel}>{tr("✅ Your checklist")}</Text>
                             {content.steps.map((s, i) => (
                                 <View key={i} style={styles.stepRow}>
                                     <View style={styles.stepNum}>
                                         <Text style={styles.stepNumText}>{i + 1}</Text>
                                     </View>
-                                    <Text style={styles.stepText}>{s}</Text>
+                                    <Text style={styles.stepText}>{tr(s)}</Text>
                                 </View>
                             ))}
                         </View>
@@ -73,7 +112,7 @@ export default function LessonIntroScreen() {
 
                     {content.tip ? (
                         <View style={styles.tipBox}>
-                            <Text style={styles.tipLabel}>💡 Tipp</Text>
+                            <Text style={styles.tipLabel}>{tr("💡 Tip")}</Text>
                             <Text style={styles.tipText}>{content.tip}</Text>
                         </View>
                     ) : null}
@@ -82,10 +121,13 @@ export default function LessonIntroScreen() {
                 {hasExercises && (
                     <View style={styles.bestRow}>
                         <Text style={styles.bestText}>
-                            {content.exercises.length} Aufgaben · bis zu {maxStars} ★
+                            {exerciseCount} {tr("exercises")}
+                            {ownExercises.length > 0
+                                ? tr(" · {0} from your games", ownExercises.length)
+                                : tr(" · up to {0} ★", maxStars)}
                         </Text>
                         <Text style={[styles.bestText, { color: GOLD }]}>
-                            {best ? `Bestwert: ${stars} / ${maxStars} ★` : "Noch nicht gespielt"}
+                            {best ? tr("Best {0}/{1} ★", best.bestStars, best.maxStars) : tr("Not played yet")}
                         </Text>
                     </View>
                 )}
@@ -93,23 +135,36 @@ export default function LessonIntroScreen() {
                 <Pressable
                     style={[styles.solveButton, !hasExercises && { opacity: 0.4 }]}
                     disabled={!hasExercises}
-                    onPress={() =>
-                        router.push({
-                            pathname: "/learn/lesson",
-                            params: { id, title: title || content.title, mistake_type },
-                        })
-                    }
+                    onPress={startLesson}
                 >
                     <Text style={styles.solveButtonText}>
-                        {!hasExercises ? "Noch keine Übung verfügbar" : best ? "Nochmal spielen" : "Los geht's! 🚀"}
+                        {!hasExercises ? tr("No exercise available yet") : best ? tr("Play again") : tr("Let's go! 🚀")}
                     </Text>
                 </Pressable>
+
+                {hasExercises && allowance && !allowance.unlimited && (
+                    <Text style={styles.limitText}>
+                        {allowance.left > 0
+                            ? allowance.left === 1
+                                ? tr("1 free lesson left today")
+                                : tr("{0} free lessons left today", allowance.left)
+                            : tr("Today's free lessons are used up")}
+                    </Text>
+                )}
             </ScrollView>
+
+            <LimitGate
+                visible={gateOpen}
+                kind="lesson"
+                onClose={() => setGateOpen(false)}
+                onRewarded={handleRewarded}
+            />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    limitText: { color: "rgba(255,255,255,0.5)", fontSize: 12.5, textAlign: "center", marginTop: 12 },
     container: { flex: 1, backgroundColor: "#0F1115" },
     header: {
         marginTop: 50,

@@ -5,155 +5,41 @@ import { useEffect, useRef, useState } from "react";
 import {
     Animated,
     BackHandler,
-    Dimensions,
     Easing,
-    ImageBackground,
     Modal,
-    PanResponder,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
-import { io, Socket } from "socket.io-client";
+import ImageBackground from "../../components/ui/ImageBackground";
+import type { Socket } from "socket.io-client";
 import { getCurrentAccount } from "../../lib/account";
 import { cloneWithHistory } from "../../lib/chessUtils";
 import { saveGameRecord } from "../../lib/games";
-import Board from "./components/Board";
-import { useChessInput } from "./hooks/useChessInput";
+import { ensureSocketConnected, getSocket } from "../../lib/socket";
+import Board from "../../components/game/Board";
+import BotSetup, { BotColorChoice } from "../../components/play/BotSetup";
+import { BOARD_SIZE, MAX_PREMOVES, pieces, pieceToKey } from "../../components/game/pieces";
+import { useChessInput } from "../../components/game/useChessInput";
+import { log } from "../../lib/log";
+import { tr } from "../../lib/i18n";
+import { playSound, useMoveSound } from "../../lib/sounds";
+import { reportTaskEvent } from "../../lib/dailyTasks";
+import { MIN_PLIES_FOR_GAME, countPlies } from "../../lib/dailyTaskRules";
 
 // GEÄNDERT: vorher ungedeckelt (Fensterbreite - 32), dadurch wurde das Brett
 // auf breiten Bildschirmen (Laptop/Web) riesig, weil <Board> ohne
 // begrenzenden Wrapper einfach 92% des verfügbaren Platzes eingenommen hat.
 // Jetzt genauso gedeckelt wie im Online-Spiel (online-game.tsx) und zusätzlich
 // unten als feste Breite um <Board> gelegt (siehe boardWrapper).
-const BOARD_SIZE = Math.min(Dimensions.get("window").width * 0.9, 520);
 
-const pieces: Record<string, any> = {
-    wp: require("../../assets/images/pawn_white.png"),
-    wr: require("../../assets/images/rook_white.png"),
-    wn: require("../../assets/images/knight_white.png"),
-    wb: require("../../assets/images/bishop_white.png"),
-    wq: require("../../assets/images/queen_white.png"),
-    wk: require("../../assets/images/king_white.png"),
-    bp: require("../../assets/images/pawn_black.png"),
-    br: require("../../assets/images/rook_black.png"),
-    bn: require("../../assets/images/knight_black.png"),
-    bb: require("../../assets/images/bishop_black.png"),
-    bq: require("../../assets/images/queen_black.png"),
-    bk: require("../../assets/images/king_black.png"),
-};
 
-const pieceToKey = (piece: any) => {
-    if (!piece) return null;
-    return `${piece.color}${piece.type}`;
-};
 
-// Slider geht jetzt bis 3200 - ab da spielt der Bot mit voller Stockfish-Stärke
-// (Kalibrierung passiert serverseitig über UCI_LimitStrength/UCI_Elo bzw.
-// eine eigene Schwäche-Simulation unterhalb der nativen Engine-Untergrenze).
-const BOT_ELO_MIN = 100;
-const BOT_ELO_MAX = 3200;
-const BOT_ELO_STEP = 50;
+// The bot's strength goes up to 3200 - from there it plays at full Stockfish
+// strength (the calibration happens on the server).
 const BOT_ELO_DEFAULT = 300;
-const MAX_PREMOVES = 8; // so viele Züge kann man maximal hintereinander vormerken
-
-function getEloLabel(elo: number) {
-    if (elo < 250) return "Beginner";
-    if (elo < 600) return "Casual";
-    if (elo < 1000) return "Club Player";
-    if (elo < 1500) return "Strong";
-    if (elo < 2000) return "Expert";
-    if (elo < 2600) return "Master";
-    if (elo < 3200) return "Grandmaster";
-    return "Full Stockfish";
-}
-
-// Reiner JS/RN-Slider ohne natives Modul. @react-native-community/slider
-// braucht einen echten Native-Rebuild (funktioniert NICHT in Expo Go, daher
-// der "Can't find view manager RNCSlider" Fehler) - das hier läuft überall.
-function EloSlider({
-    value,
-    onValueChange,
-    minimumValue,
-    maximumValue,
-    step,
-}: {
-    value: number;
-    onValueChange: (v: number) => void;
-    minimumValue: number;
-    maximumValue: number;
-    step: number;
-}) {
-    const trackWidthRef = useRef(0);
-
-    const clampToStep = (v: number) => {
-        const stepped = Math.round((v - minimumValue) / step) * step + minimumValue;
-        return Math.min(maximumValue, Math.max(minimumValue, stepped));
-    };
-
-    const updateFromX = (x: number) => {
-        if (trackWidthRef.current <= 0) return;
-        const ratio = Math.min(1, Math.max(0, x / trackWidthRef.current));
-        const raw = minimumValue + ratio * (maximumValue - minimumValue);
-        onValueChange(clampToStep(raw));
-    };
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: (evt) => updateFromX(evt.nativeEvent.locationX),
-            onPanResponderMove: (evt) => updateFromX(evt.nativeEvent.locationX),
-        })
-    ).current;
-
-    const ratio = Math.min(1, Math.max(0, (value - minimumValue) / (maximumValue - minimumValue)));
-
-    return (
-        <View
-            onLayout={(e) => {
-                trackWidthRef.current = e.nativeEvent.layout.width;
-            }}
-            {...panResponder.panHandlers}
-            hitSlop={{ top: 12, bottom: 12 }}
-            style={{ width: "100%", height: 40, justifyContent: "center" }}
-        >
-            <View
-                style={{
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: "rgba(255,255,255,0.25)",
-                    overflow: "hidden",
-                }}
-            >
-                <View
-                    style={{
-                        height: "100%",
-                        width: `${ratio * 100}%`,
-                        backgroundColor: "#FFD700",
-                    }}
-                />
-            </View>
-            <View
-                pointerEvents="none"
-                style={{
-                    position: "absolute",
-                    top: 8,
-                    left: `${ratio * 100}%`,
-                    marginLeft: -11,
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
-                    backgroundColor: "#FFD700",
-                    borderWidth: 2,
-                    borderColor: "#111827",
-                }}
-            />
-        </View>
-    );
-}
 
 type EndState = {
     type: "win" | "loss" | "draw";
@@ -166,6 +52,9 @@ export default function Playbot() {
     const socket = useRef<Socket | null>(null);
     const [game, setGame] = useState(new Chess());
     const [moveHistory, setMoveHistory] = useState<string[]>([]);
+
+    // Sounds: every move that is added to the list (own, bot, premove).
+    useMoveSound(moveHistory);
     const [promotionMove, setPromotionMove] = useState<{ from: string; to: string } | null>(null);
     const [botElo, setBotElo] = useState<number>(BOT_ELO_DEFAULT);
     const [gameStarted, setGameStarted] = useState(false);
@@ -178,7 +67,7 @@ export default function Playbot() {
     const [kingInCheck, setKingInCheck] = useState<string | null>(null);
     const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
 
-    const backgroundImage = require("../../assets/images/onlinebackground.png");
+    const backgroundImage = require("../../assets/images/background.jpg");
 
     const [roomId, setRoomId] = useState<string | null>(null);
     const params = useLocalSearchParams();
@@ -300,7 +189,7 @@ export default function Playbot() {
                 setGameOver(false);
                 setEndState(null);
             } catch (error) {
-                console.log("Error loading saved bot game:", error);
+                log("Error loading saved bot game:", error);
             }
         };
 
@@ -377,11 +266,13 @@ export default function Playbot() {
     }, [gameStarted, showLeaveModal, showRestartModal, showSaveModal, endState, endCardVisible]);
 
     useEffect(() => {
-        const s = io("https://checkfall-server-clean-1.onrender.com");
+        // Shared app connection (signed-in users with their token, guests
+        // without) instead of a second, separate connection.
+        const s = getSocket();
         socket.current = s;
 
         const onOpponentMove = (data: any) => {
-            console.log("🔥 BOT MOVE RECEIVED:", data);
+            log("🔥 BOT MOVE RECEIVED:", data);
 
             const moveObj = {
                 from: data.from,
@@ -399,7 +290,7 @@ export default function Playbot() {
             }
 
             if (!move) {
-                console.log("❌ INVALID BOT MOVE:", moveObj);
+                log("❌ INVALID BOT MOVE:", moveObj);
                 return;
             }
 
@@ -449,7 +340,7 @@ export default function Playbot() {
                         live.current.checkGameEnd(pmGame);
                     } else {
                         // Ist ein Premove ungültig, sind auch die folgenden hinfällig
-                        console.log("⚠️ PREMOVE INVALID, Kette verworfen:", pm);
+                        log("⚠️ PREMOVE INVALID, Kette verworfen:", pm);
                         setPremoves([]);
                     }
                 }
@@ -459,8 +350,8 @@ export default function Playbot() {
             setGame(finalGame);
         };
 
-        s.on("connect", async () => {
-            console.log("✅ Connected:", s.id);
+        const onConnect = async () => {
+            log("✅ Connected:", s.id);
 
             if (params.key) {
                 try {
@@ -471,7 +362,7 @@ export default function Playbot() {
 
                     const data = JSON.parse(stored);
 
-                    console.log("🔄 RESUMING SAVED BOT GAME");
+                    log("🔄 RESUMING SAVED BOT GAME");
 
                     s.emit("find_bot_match", {
                         name: "Player",
@@ -481,13 +372,17 @@ export default function Playbot() {
                         startFEN: data.fen,
                     });
                 } catch (error) {
-                    console.log("❌ Error resuming bot game:", error);
+                    log("❌ Error resuming bot game:", error);
                 }
             }
-        });
+        };
 
-        s.on("game_start", (data) => {
-            console.log("🎮 GAME START:", data);
+        const onGameStart = (data: any) => {
+            // Only bot games belong to this screen (a resumed online game
+            // would arrive on the same connection).
+            if (data?.white !== "bot" && data?.black !== "bot") return;
+
+            log("🎮 GAME START:", data);
 
             setRoomId(data.roomId);
             clearPremoves();
@@ -514,13 +409,28 @@ export default function Playbot() {
 
             setBottomColor(actualHumanColor);
             setGameStarted(true);
-        });
+        };
 
+        s.on("connect", onConnect);
+        s.on("game_start", onGameStart);
         s.on("opponent_move", onOpponentMove);
 
+        if (s.connected) {
+            onConnect();
+        } else {
+            ensureSocketConnected();
+        }
+
         return () => {
+            s.off("connect", onConnect);
+            s.off("game_start", onGameStart);
             s.off("opponent_move", onOpponentMove);
-            s.disconnect();
+
+            // Tell the server to stop the engine for this game. The shared
+            // connection itself stays open for the rest of the app.
+            if (s.connected) {
+                s.emit("leave_bot_game");
+            }
         };
     }, []);
 
@@ -600,6 +510,9 @@ export default function Playbot() {
     const showEndPopupAfterDelay = (state: EndState) => {
         setGameOver(true);
 
+        // Checkmate already has its own sound (the mating move).
+        if (state?.reason !== "checkmate") playSound("gameEnd");
+
         if (endPopupTimer.current) {
             clearTimeout(endPopupTimer.current);
         }
@@ -611,9 +524,15 @@ export default function Playbot() {
 
     // NEU: speichert die Partie und merkt sich die Remote-ID für den Analyse-Button
     const saveFinishedGame = (result: "win" | "loss" | "draw", pgn: string) => {
+        // Daily tasks: a game counts once it was really played.
+        if (countPlies(pgn) >= MIN_PLIES_FOR_GAME) {
+            reportTaskEvent("game_played");
+            if (result === "win") reportTaskEvent("game_won");
+        }
+
         saveGameToHistory("bot", result, pgn)
             .then((remoteId) => setLastGameId(remoteId))
-            .catch((error) => console.log("SAVE FINISHED GAME ERROR:", error));
+            .catch((error) => log("SAVE FINISHED GAME ERROR:", error));
     };
 
     const checkGameEnd = (currentGame: Chess) => {
@@ -686,6 +605,7 @@ export default function Playbot() {
             result,
             timestamp: timestamp ?? Date.now(),
             remoteId: null,
+            color: humanColor, // the review shows "you" for this side
         });
 
         await AsyncStorage.setItem(key, JSON.stringify(history));
@@ -702,6 +622,8 @@ export default function Playbot() {
                     mode,
                     result,
                     pgn,
+                    playerColor: humanColor,
+                    opponentName: `Stockfish (${botElo >= 3200 ? tr("full strength") : botElo})`,
                 });
 
                 if (remoteId) {
@@ -714,7 +636,7 @@ export default function Playbot() {
                 }
             }
         } catch (error) {
-            console.log("SAVE GAME RECORD ERROR:", error);
+            log("SAVE GAME RECORD ERROR:", error);
         }
 
         return remoteId ?? null;
@@ -741,103 +663,39 @@ export default function Playbot() {
     return (
         <ImageBackground source={backgroundImage} style={{ flex: 1 }} resizeMode="cover">
             {!gameStarted ? (
-                <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                    <Text style={{ color: "#fff", fontSize: 20, marginBottom: 16 }}>Start bot game  </Text>
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            justifyContent: "center",
-                            marginBottom: 18,
-                            gap: 10,
-                        }}
-                    >
-                        {["w", "b", "random"].map((c) => (
-                            <Pressable
-                                key={c}
-                                onPress={() => setPlayerColor(c as any)}
-                                style={{
-                                    paddingVertical: 12,
-                                    paddingHorizontal: 18,
-                                    borderRadius: 10,
-                                    backgroundColor:
-                                        playerColor === c
-                                            ? "rgba(255,215,0,0.18)"
-                                            : "rgba(255,255,255,0.08)",
-                                    borderWidth: 1,
-                                    borderColor:
-                                        playerColor === c
-                                            ? "#FFD700"
-                                            : "rgba(255,255,255,0.15)",
-                                }}
-                            >
-                                <Text style={{ color: "#fff", fontSize: 15, fontWeight: "600" }}>
-                                    {c === "w" ? "white" : c === "b" ? "black" : "random"}
-                                </Text>
-                            </Pressable>
-                        ))}
-                    </View>
-
-                    <View style={{ width: "80%", alignItems: "center", marginBottom: 20 }}>
-                        <Text style={{ color: "#FFD700", fontSize: 16, fontWeight: "700", marginBottom: 6 }}>
-                            {getEloLabel(botElo)} • ELO {botElo}
-                        </Text>
-                        <EloSlider
-                            minimumValue={BOT_ELO_MIN}
-                            maximumValue={BOT_ELO_MAX}
-                            step={BOT_ELO_STEP}
-                            value={botElo}
-                            onValueChange={setBotElo}
-                        />
-                        <View style={{ flexDirection: "row", justifyContent: "space-between", width: "100%" }}>
-                            <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{BOT_ELO_MIN}</Text>
-                            <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{BOT_ELO_MAX}</Text>
-                        </View>
-                    </View>
-
-                    <Pressable
-                        onPress={() => {
-                            if (savedData) {
-                                setHumanColor(savedData.humanColor);
-                                setBottomColor(savedData.bottomColor);
-                                setBotColor(savedData.botColor);
-                                setGameStarted(true);
-                                return;
-                            }
-
-                            const color = playerColor === "random" ? (Math.random() < 0.5 ? "w" : "b") : playerColor;
-
-                            setHumanColor(color);
-                            setBottomColor(color);
-                            setBotColor(color === "w" ? "b" : "w");
+                <BotSetup
+                    elo={botElo}
+                    onEloChange={setBotElo}
+                    color={playerColor as BotColorChoice}
+                    onColorChange={(c) => setPlayerColor(c as any)}
+                    hasSavedGame={!!savedData}
+                    onBack={() => router.back()}
+                    onStart={() => {
+                        if (savedData) {
+                            setHumanColor(savedData.humanColor);
+                            setBottomColor(savedData.bottomColor);
+                            setBotColor(savedData.botColor);
                             setGameStarted(true);
+                            return;
+                        }
 
-                            socket.current?.emit("find_bot_match", {
-                                name: "Player",
-                                avatar: "",
-                                level: botElo,
-                                playerColor: playerColor === "random" ? null : playerColor,
-                                startFEN: "startpos"
-                            });
-                        }}
-                        style={{
-                            marginTop: 12,
-                            paddingVertical: 14,
-                            paddingHorizontal: 28,
-                            borderRadius: 10,
-                            backgroundColor: "rgba(255,215,0,0.18)",
-                            borderWidth: 1,
-                            borderColor: "#FFD700",
-                            shadowColor: "#000",
-                            shadowOpacity: 0.25,
-                            shadowRadius: 6,
-                            shadowOffset: { width: 0, height: 3 },
-                        }}
-                    >
-                        <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
-                            Start game
-                        </Text>
-                    </Pressable>
-                </View>
+                        const color = playerColor === "random" ? (Math.random() < 0.5 ? "w" : "b") : playerColor;
+
+                        setHumanColor(color);
+                        setBottomColor(color);
+                        setBotColor(color === "w" ? "b" : "w");
+                        setGameStarted(true);
+
+                        socket.current?.emit("find_bot_match", {
+                            name: "Player",
+                            avatar: "",
+                            level: botElo,
+                            // The colour drawn here is the one that is played.
+                            playerColor: color,
+                            startFEN: "startpos",
+                        });
+                    }}
+                />
             ) : (
                 <View style={{ flex: 1 }}>
                     {promotionMove && (
@@ -906,6 +764,7 @@ export default function Playbot() {
                                 onPremove={(from: string, to: string) => {
                                     if (premovesRef.current.length >= MAX_PREMOVES) return;
                                     setPremoves([...premovesRef.current, { from, to }]);
+                                    playSound("premove");
                                 }}
                                 onClearPremove={clearPremoves}
                             />
@@ -913,7 +772,7 @@ export default function Playbot() {
 
                         <View style={styles.bottomBar}>
                             <Pressable onPress={() => setShowLeaveModal(true)}>
-                                <Text style={styles.bottomBtn}>Back</Text>
+                                <Text style={styles.bottomBtn}>{tr("Back")}</Text>
                             </Pressable>
                             <Pressable
                                 onPress={async () => {
@@ -921,11 +780,11 @@ export default function Playbot() {
                                     setShowSaveModal(true);
                                 }}
                             >
-                                <Text style={styles.bottomBtn}>Save</Text>
+                                <Text style={styles.bottomBtn}>{tr("Save")}</Text>
                             </Pressable>
 
                             <Pressable onPress={() => setShowRestartModal(true)}>
-                                <Text style={styles.bottomBtn}>Restart</Text>
+                                <Text style={styles.bottomBtn}>{tr("Restart")}</Text>
                             </Pressable>
                         </View>
 
@@ -937,14 +796,14 @@ export default function Playbot() {
                         >
                             <View style={styles.overlay}>
                                 <View style={styles.card}>
-                                    <Text style={styles.title}>Partie verlassen?</Text>
+                                    <Text style={styles.title}>{tr("Leave game?")}</Text>
                                     <Text style={styles.text}>
-                                        Dein Fortschritt geht verloren, wenn du das Spiel nicht vorher speicherst.
+                                        {tr("Your progress will be lost if you do not save the game first.")}
                                     </Text>
 
                                     <View style={styles.buttons}>
                                         <Pressable style={styles.cancelButton} onPress={() => setShowLeaveModal(false)}>
-                                            <Text style={styles.cancelButtonText}>Abbrechen</Text>
+                                            <Text style={styles.cancelButtonText}>{tr("Cancel")}</Text>
                                         </Pressable>
 
                                         <Pressable
@@ -956,7 +815,7 @@ export default function Playbot() {
                                                 router.back();
                                             }}
                                         >
-                                            <Text style={styles.leaveButtonText}>Verlassen</Text>
+                                            <Text style={styles.leaveButtonText}>{tr("Leave")}</Text>
                                         </Pressable>
                                     </View>
                                 </View>
@@ -971,14 +830,14 @@ export default function Playbot() {
                         >
                             <View style={styles.overlay}>
                                 <View style={styles.card}>
-                                    <Text style={styles.title}>Spiel neu starten?</Text>
+                                    <Text style={styles.title}>{tr("Restart game?")}</Text>
                                     <Text style={styles.text}>
-                                        Dein aktueller Fortschritt geht verloren.
+                                        {tr("Your current progress will be lost.")}
                                     </Text>
 
                                     <View style={styles.buttons}>
                                         <Pressable style={styles.cancelButton} onPress={() => setShowRestartModal(false)}>
-                                            <Text style={styles.cancelButtonText}>Abbrechen</Text>
+                                            <Text style={styles.cancelButtonText}>{tr("Cancel")}</Text>
                                         </Pressable>
 
                                         <Pressable
@@ -991,7 +850,7 @@ export default function Playbot() {
                                                 resetToSetupScreen();
                                             }}
                                         >
-                                            <Text style={styles.leaveButtonText}>Neustarten</Text>
+                                            <Text style={styles.leaveButtonText}>{tr("Restart")}</Text>
                                         </Pressable>
                                     </View>
                                 </View>
@@ -1006,13 +865,13 @@ export default function Playbot() {
                         >
                             <View style={styles.overlay}>
                                 <View style={styles.card}>
-                                    <Text style={styles.title}>Spiel gespeichert</Text>
+                                    <Text style={styles.title}>{tr("Game saved")}</Text>
                                     <Text style={styles.text}>
-                                        Du kannst es unter „Gespeicherte Spiele" fortsetzen.
+                                        {tr("You can continue it under \"Saved Games\".")}
                                     </Text>
 
                                     <Pressable style={styles.primaryBtn} onPress={() => setShowSaveModal(false)}>
-                                        <Text style={styles.btnText}>OK</Text>
+                                        <Text style={styles.btnText}>{tr("OK")}</Text>
                                     </Pressable>
                                 </View>
                             </View>
@@ -1048,27 +907,27 @@ export default function Playbot() {
 
                                     {endState.type === "win" && (
                                         <>
-                                            <Text style={styles.winTitle}>Sieg!</Text>
+                                            <Text style={styles.winTitle}>{tr("Victory!")}</Text>
                                             <Text style={styles.subText}>
-                                                {endState.reason === "checkmate" ? "Du hast den Bot schachmatt gesetzt." : ""}
+                                                {endState.reason === "checkmate" ? tr("You checkmated the bot.") : ""}
                                             </Text>
                                         </>
                                     )}
                                     {endState.type === "loss" && (
                                         <>
-                                            <Text style={styles.loseTitle}>Niederlage</Text>
+                                            <Text style={styles.loseTitle}>{tr("Defeat")}</Text>
                                             <Text style={styles.subText}>
-                                                {endState.reason === "checkmate" ? "Du wurdest schachmatt gesetzt." : ""}
+                                                {endState.reason === "checkmate" ? tr("You were checkmated.") : ""}
                                             </Text>
                                         </>
                                     )}
                                     {endState.type === "draw" && (
                                         <>
-                                            <Text style={styles.drawTitle}>Remis</Text>
+                                            <Text style={styles.drawTitle}>{tr("Draw")}</Text>
                                             <Text style={styles.subText}>
                                                 {endState.reason === "stalemate"
-                                                    ? "Patt – keine legalen Züge mehr."
-                                                    : "Remis durch Stellungswiederholung oder unzureichendes Material."}
+                                                    ? tr("Stalemate – no legal moves left.")
+                                                    : tr("Draw by repetition or insufficient material.")}
                                             </Text>
                                         </>
                                     )}
@@ -1102,7 +961,7 @@ export default function Playbot() {
                                             });
                                         }}
                                     >
-                                        <Text style={styles.btnText}>Neue Partie</Text>
+                                        <Text style={styles.btnText}>{tr("New game")}</Text>
                                     </Pressable>
 
                                     <View style={styles.secondaryRow}>
@@ -1116,11 +975,11 @@ export default function Playbot() {
                                                 onPress={() => {
                                                     router.push({
                                                         pathname: "/game/review",
-                                                        params: { gameId: lastGameId },
+                                                        params: { gameId: lastGameId, color: humanColor },
                                                     } as any);
                                                 }}
                                             >
-                                                <Text style={styles.endSecondaryBtnText}>Analyse</Text>
+                                                <Text style={styles.endSecondaryBtnText}>{tr("Analysis")}</Text>
                                             </Pressable>
                                         )}
 
@@ -1131,7 +990,7 @@ export default function Playbot() {
                                                 router.back();
                                             }}
                                         >
-                                            <Text style={styles.endSecondaryBtnText}>Home</Text>
+                                            <Text style={styles.endSecondaryBtnText}>{tr("Home")}</Text>
                                         </Pressable>
                                     </View>
                                 </Animated.View>
@@ -1260,7 +1119,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "700",
     },
-    // Wird weiterhin vom "Spiel gespeichert"-Modal benutzt (Gold) - bewusst
+    // Wird weiterhin vom "Game saved"-Modal benutzt (Gold) - bewusst
     // unverändert. Der End-Popup nutzt eigene Styles (endPrimaryBtn usw.).
     primaryBtn: {
         backgroundColor: "#D4AF37",

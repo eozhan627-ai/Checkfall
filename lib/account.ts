@@ -1,7 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
+import { DEFAULT_RATING } from "./config";
+import { log } from "./log";
 import { supabase } from "./supabase";
+
 export type AccountType = {
     id: string;
     username: string;
@@ -23,6 +26,9 @@ const CURRENT_KEY = "@current_account";
 // synchronisiert (sie können deshalb auch nicht per Suche gefunden
 // oder als Freund hinzugefügt werden). Aus demselben Grund können
 // Gäste auch keinem Clan beitreten (siehe clans.ts / clanSocket.js).
+//
+// Only the username is written from the app. Rating, statistics, VIP tier
+// and the avatar URL are owned by the game server - the app only reads them.
 
 async function syncProfileToSupabase(account: AccountType) {
     if (account.guest || !account.authId) {
@@ -30,21 +36,86 @@ async function syncProfileToSupabase(account: AccountType) {
     }
 
     try {
-        const { error } = await supabase.from("profiles").upsert({
-            id: account.authId,
-            username: account.username,
-            avatar: account.avatar || null,
-            rating: account.rating ?? 1000,
-            updated_at: new Date().toISOString(),
-        });
+        const { error } = await supabase
+            .from("profiles")
+            .update({
+                username: account.username,
+            })
+            .eq("id", account.authId);
 
         if (error) {
-            console.log("PROFILE SYNC ERROR:", error);
+            log("PROFILE SYNC ERROR:", error);
         }
     } catch (error) {
-        console.log("PROFILE SYNC ERROR:", error);
+        log("PROFILE SYNC ERROR:", error);
     }
-}// =============================
+}
+
+// =============================
+// SERVER-OWNED PROFILE VALUES
+// =============================
+// Rating, VIP tier and avatar are decided by the server. The copy in
+// AsyncStorage is only a cache for offline display.
+
+type RemoteProfile = {
+    vipTier: VipTier;
+    rating: number | null;
+    avatar: string | null;
+};
+
+async function fetchRemoteProfile(authId: string): Promise<RemoteProfile | null> {
+    try {
+        const { data, error } = await supabase
+            .from("profiles")
+            .select("vip_tier, rating, avatar")
+            .eq("id", authId)
+            .maybeSingle();
+
+        if (error || !data) {
+            if (error) log("REMOTE PROFILE FETCH ERROR:", error);
+            return null;
+        }
+
+        return {
+            vipTier: (data.vip_tier as VipTier) ?? "none",
+            rating: typeof data.rating === "number" ? data.rating : null,
+            avatar: typeof data.avatar === "string" ? data.avatar : null,
+        };
+    } catch (error) {
+        log("REMOTE PROFILE FETCH ERROR:", error);
+        return null;
+    }
+}
+
+// Writes values to the local cache only - nothing is sent to Supabase.
+async function patchLocalAccount(
+    id: string,
+    patch: Partial<AccountType>
+): Promise<AccountType | null> {
+    const accounts = await getAccounts();
+    const index = accounts.findIndex((account) => account.id === id);
+
+    if (index === -1) return null;
+
+    const updated: AccountType = { ...accounts[index], ...patch };
+    accounts[index] = updated;
+
+    await AsyncStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+
+    return updated;
+}
+
+// Stores the rating the server sent after a game ("rating_update").
+export async function setLocalRating(
+    id: string,
+    rating: number
+): Promise<AccountType | null> {
+    if (!Number.isFinite(rating)) return null;
+
+    return patchLocalAccount(id, { rating: Math.round(rating) });
+}
+
+// =============================
 // VIP TIER (live aus Supabase, nicht lokal cachen)
 // =============================
 
@@ -61,13 +132,13 @@ export async function fetchVipTier(authId: string): Promise<VipTier> {
             .single();
 
         if (error) {
-            console.log("VIP TIER FETCH ERROR:", error);
+            log("VIP TIER FETCH ERROR:", error);
             return "none";
         }
 
         return (data?.vip_tier as VipTier) ?? "none";
     } catch (error) {
-        console.log("VIP TIER FETCH ERROR:", error);
+        log("VIP TIER FETCH ERROR:", error);
         return "none";
     }
 }
@@ -129,7 +200,7 @@ export async function saveAccount(data: {
             rating:
                 data.rating ??
                 existing.rating ??
-                1000,
+                DEFAULT_RATING,
             clanId:
                 data.clanId ?? existing.clanId,
         };
@@ -161,7 +232,7 @@ export async function saveAccount(data: {
         guest: data.guest,
         authId: data.authId,
         avatar: data.avatar,
-        rating: data.rating ?? 1000,
+        rating: data.rating ?? DEFAULT_RATING,
         clanId: data.clanId,
     };
 
@@ -203,49 +274,16 @@ export async function getAccounts(): Promise<AccountType[]> {
             rating:
                 typeof account.rating === "number"
                     ? account.rating
-                    : 1000,
+                    : DEFAULT_RATING,
         }));
     } catch (error) {
-        console.log(
+        log(
             "GET ACCOUNTS ERROR:",
             error
         );
 
         return [];
     }
-}
-
-// =============================
-// ELO
-// =============================
-
-export function calculateElo(
-    playerRating: number,
-    opponentRating: number,
-    result: "win" | "loss" | "draw"
-) {
-    const K = 32;
-
-    const expectedScore =
-        1 /
-        (1 +
-            Math.pow(
-                10,
-                (opponentRating - playerRating) / 400
-            ));
-
-    const actualScore =
-        result === "win"
-            ? 1
-            : result === "draw"
-                ? 0.5
-                : 0;
-
-    const change = Math.round(
-        K * (actualScore - expectedScore)
-    );
-
-    return playerRating + change;
 }
 
 // =============================
@@ -297,6 +335,7 @@ export async function getCurrentAccount(): Promise<AccountType | null> {
 
         const {
             data: { session },
+            error: sessionError,
         } = await supabase.auth.getSession();
 
         if (session?.user) {
@@ -311,9 +350,29 @@ export async function getCurrentAccount(): Promise<AccountType | null> {
                     authAccount.id
                 );
 
-                const vipTier = await fetchVipTier(session.user.id); // GEÄNDERT
+                const remote = await fetchRemoteProfile(session.user.id);
 
-                return { ...authAccount, vipTier }; // GEÄNDERT
+                if (!remote) {
+                    // Offline or profile not readable: fall back to the cache.
+                    return { ...authAccount, vipTier: "none" };
+                }
+
+                const patch: Partial<AccountType> = {};
+
+                if (remote.rating !== null && remote.rating !== authAccount.rating) {
+                    patch.rating = remote.rating;
+                }
+
+                if (remote.avatar && remote.avatar !== authAccount.avatar) {
+                    patch.avatar = remote.avatar;
+                }
+
+                const fresh =
+                    Object.keys(patch).length > 0
+                        ? (await patchLocalAccount(authAccount.id, patch)) ?? authAccount
+                        : authAccount;
+
+                return { ...fresh, vipTier: remote.vipTier };
             }
 
             return null;
@@ -332,11 +391,29 @@ export async function getCurrentAccount(): Promise<AccountType | null> {
             return null;
         }
 
-        return await getAccountById(
+        const stored = await getAccountById(
             currentId
         );
+
+        // An account that belongs to a login, but the login is gone (it
+        // expired or was ended on another device): the user has to sign in
+        // again. Without a session nothing can be saved for this account -
+        // no games, no analysis, no friends.
+        // (If the session could not be read at all, e.g. offline, the
+        // account stays as it is.)
+        if (stored && !stored.guest && stored.authId && !sessionError) {
+            log("ACCOUNT: login expired, sign in again");
+
+            await AsyncStorage.removeItem(
+                CURRENT_KEY
+            );
+
+            return null;
+        }
+
+        return stored;
     } catch (error) {
-        console.log(
+        log(
             "ACCOUNT ERROR:",
             error
         );
@@ -440,18 +517,18 @@ export async function createGuestAccount(): Promise<AccountType> {
 
 export async function logoutAccount() {
     try {
-        console.log(
+        log(
             "LOGOUT: signing out from Supabase..."
         );
 
         // Supabase Session beenden
         await supabase.auth.signOut();
 
-        console.log(
+        log(
             "LOGOUT: Supabase session removed"
         );
     } catch (error) {
-        console.log(
+        log(
             "LOGOUT SUPABASE ERROR:",
             error
         );
@@ -468,7 +545,7 @@ export async function logoutAccount() {
         CURRENT_KEY
     );
 
-    console.log(
+    log(
         "LOGOUT: current account removed"
     );
 }

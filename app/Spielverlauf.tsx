@@ -1,774 +1,362 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
-import { useEffect, useState } from "react"; // useRef ergänzt
-
-import {
-  Alert,
-  FlatList,
-  ImageBackground,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { getCurrentAccount, VipTier } from "../lib/account";
-import {
-  onAnalysisComplete,
-  onAnalysisError,
-  onAnalysisProgress,
-  requestGameAnalysis,
-} from "../lib/games";
-import { getSocket } from "../lib/socket";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
+import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import ImageBackground from "../components/ui/ImageBackground";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { T } from "../components/ui/theme";
+import { log } from "../lib/log";
+import { tr } from "../lib/i18n";
 
 const STORAGE_KEY = "game_history";
+
 type GameHistoryItem = {
-  id: string;
-  mode: "bot" | "local" | "online";
-  date: string;
-  result: "win" | "loss" | "draw" | "aborted";
-  timestamp: number;
-  remoteId?: string | null; // NEU
+    id: string;
+    mode: "bot" | "local" | "online";
+    date: string;
+    result: "win" | "loss" | "draw" | "aborted";
+    timestamp: number;
+    /** Id of the game on the server; only these games can be reviewed. */
+    remoteId?: string | null;
+    /** Colour the user played (missing for older entries and local games). */
+    color?: "w" | "b" | null;
 };
-type AnalysisMove = { moveNumber: number; san: string; evalCp: number | null };
 
-function summarizeAnalysis(moves: AnalysisMove[]) {
-  let prevEval = 0;
-  let worst: { moveNumber: number; san: string; swing: number; mover: "w" | "b" } | null = null;
+type Filter = "all" | GameHistoryItem["mode"];
 
-  moves.forEach((m, i) => {
-    if (m.evalCp === null) return;
+const FILTERS: { key: Filter; label: string }[] = [
+    { key: "all", get label() { return tr("All"); } },
+    { key: "online", get label() { return tr("Online"); } },
+    { key: "bot", get label() { return tr("Bot"); } },
+    { key: "local", get label() { return tr("Local"); } },
+];
 
-    const mover: "w" | "b" = i % 2 === 0 ? "w" : "b";
-    const diff = m.evalCp - prevEval;
-    const badness = mover === "w" ? -diff : diff; // schlecht aus Sicht des Ziehenden
+const MODE_LABEL: Record<GameHistoryItem["mode"], string> = {
+    get online() { return tr("Online game"); },
+    get bot() { return tr("Game against the bot"); },
+    get local() { return tr("Local game"); },
+};
 
-    if (!worst || badness > worst.swing) {
-      worst = { moveNumber: m.moveNumber, san: m.san, swing: badness, mover };
-    }
+const RESULT: Record<GameHistoryItem["result"], { letter: string; label: string; color: string; soft: string }> = {
+    win: { letter: "W", get label() { return tr("Won"); }, color: "#6FBF73", soft: "rgba(111,191,115,0.16)" },
+    loss: { letter: "L", get label() { return tr("Lost"); }, color: "#D9534F", soft: "rgba(217,83,79,0.16)" },
+    draw: { letter: "D", get label() { return tr("Draw"); }, color: "#B9C2CC", soft: "rgba(185,194,204,0.14)" },
+    aborted: { letter: "–", get label() { return tr("Aborted"); }, color: "#8A9099", soft: "rgba(138,144,153,0.14)" },
+};
 
-    prevEval = m.evalCp;
-  });
+function formatDate(timestamp: number): string {
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) return "";
 
-  return worst;
+    return `${date.toLocaleDateString()} · ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 export default function GameHistory() {
-  const [history, setHistory] = useState<GameHistoryItem[]>([]);
-  const [vipTier, setVipTier] = useState<VipTier>("none");
+    const insets = useSafeAreaInsets();
+    const backgroundImage = require("../assets/images/loginbackground.jpg");
 
-  type AnalysisState = {
-    status: "idle" | "analyzing" | "done" | "error" | "not_vip";
-    progress?: number;
-    total?: number;
-    summary?: { moveNumber: number; san: string; swing: number; mover: "w" | "b" } | null;
-  };
+    const [history, setHistory] = useState<GameHistoryItem[]>([]);
+    const [filter, setFilter] = useState<Filter>("all");
 
+    useFocusEffect(
+        useCallback(() => {
+            let alive = true;
 
-  const [analysisByRemoteId, setAnalysisByRemoteId] = useState<Record<string, AnalysisState>>({});
-  const backgroundImage = require("../assets/images/background.png");
+            (async () => {
+                try {
+                    const data = await AsyncStorage.getItem(STORAGE_KEY);
+                    const list = data ? JSON.parse(data) : [];
 
-  useEffect(() => {
-    loadHistory();
-  }, []);
-  useEffect(() => {
-    (async () => {
-      const acc = await getCurrentAccount();
-      setVipTier(acc?.vipTier ?? "none");
-    })();
-  }, []);
+                    if (alive && Array.isArray(list)) {
+                        setHistory([...list].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)));
+                    }
+                } catch (e) {
+                    log("Error loading game history", e);
+                }
+            })();
 
-  useEffect(() => {
-    const socket = getSocket();
-
-    const offProgress = onAnalysisProgress(socket, ({ gameId, progress, total }) => {
-      setAnalysisByRemoteId((prev) => ({
-        ...prev,
-        [gameId]: { status: "analyzing", progress, total },
-      }));
-    });
-
-    const offComplete = onAnalysisComplete(socket, ({ gameId, analysis }) => {
-      const summary = summarizeAnalysis(analysis?.moves ?? []);
-      setAnalysisByRemoteId((prev) => ({
-        ...prev,
-        [gameId]: { status: "done", summary },
-      }));
-    });
-
-    const offError = onAnalysisError(socket, ({ gameId, error }) => {
-      setAnalysisByRemoteId((prev) => ({
-        ...prev,
-        [gameId]: { status: error === "NOT_VIP" ? "not_vip" : "error" },
-      }));
-    });
-
-    return () => {
-      offProgress();
-      offComplete();
-      offError();
-    };
-  }, []);
-  async function loadHistory() {
-    try {
-      const data = await AsyncStorage.getItem(STORAGE_KEY);
-
-      if (data) {
-        setHistory(JSON.parse(data));
-      }
-    } catch (e) {
-      console.log("Error loading game history", e);
-    }
-  }
-
-  async function deleteGame(id: string) {
-    try {
-      const updated = history.filter(
-        (item) => item.id !== id
-      );
-
-      setHistory(updated);
-
-      await AsyncStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(updated)
-      );
-    } catch (e) {
-      console.log("Error deleting game", e);
-    }
-  }
-  async function handleAnalyze(remoteId: string) {
-    setAnalysisByRemoteId((prev) => ({
-      ...prev,
-      [remoteId]: { status: "analyzing", progress: 0, total: 0 },
-    }));
-
-    try {
-      const socket = getSocket();
-      await requestGameAnalysis(socket, remoteId);
-      // Ergebnis kommt über die Listener oben (analysis_complete/analysis_progress)
-    } catch (error: any) {
-      const message = error?.message || "UNKNOWN_ERROR";
-      setAnalysisByRemoteId((prev) => ({
-        ...prev,
-        [remoteId]: { status: message === "NOT_VIP" ? "not_vip" : "error" },
-      }));
-    }
-  }
-  function confirmDelete(id: string) {
-    Alert.alert(
-      "Delete Game",
-      "Are you sure you want to delete this game?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteGame(id),
-        },
-      ]
+            return () => {
+                alive = false;
+            };
+        }, [])
     );
-  }
 
-  function getResultInfo(
-    result: GameHistoryItem["result"]
-  ) {
-    switch (result) {
-      case "win":
+    async function deleteGame(id: string) {
+        try {
+            const updated = history.filter((item) => item.id !== id);
+            setHistory(updated);
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {
+            log("Error deleting game", e);
+        }
+    }
+
+    function confirmDelete(id: string) {
+        // Alert.alert with buttons shows nothing on the web.
+        if (Platform.OS === "web") {
+            if (typeof window !== "undefined" && window.confirm(tr("Delete this game from your history?"))) {
+                deleteGame(id);
+            }
+            return;
+        }
+
+        Alert.alert(tr("Delete game"), tr("Delete this game from your history?"), [
+            { text: tr("Cancel"), style: "cancel" },
+            { text: tr("Delete"), style: "destructive", onPress: () => deleteGame(id) },
+        ]);
+    }
+
+    const counts = useMemo(() => {
+        const finished = history.filter((item) => item.result !== "aborted");
+
         return {
-          icon: "♛",
-          label: "WIN",
-          background: "rgba(70,200,120,0.12)",
-          border: "rgba(70,200,120,0.25)",
-          iconColor: "#55c98a",
+            games: finished.length,
+            win: finished.filter((item) => item.result === "win").length,
+            loss: finished.filter((item) => item.result === "loss").length,
+            draw: finished.filter((item) => item.result === "draw").length,
         };
+    }, [history]);
 
-      case "loss":
-        return {
-          icon: "×",
-          label: "LOSS",
-          background: "rgba(255,70,70,0.10)",
-          border: "rgba(255,70,70,0.25)",
-          iconColor: "#ff6464",
-        };
+    const visible = useMemo(
+        () => (filter === "all" ? history : history.filter((item) => item.mode === filter)),
+        [history, filter]
+    );
 
-      case "draw":
-        return {
-          icon: "＝",
-          label: "DRAW",
-          background: "rgba(212,175,55,0.10)",
-          border: "rgba(212,175,55,0.25)",
-          iconColor: "#D4AF37",
-        };
+    function renderItem({ item }: { item: GameHistoryItem }) {
+        const result = RESULT[item.result] ?? RESULT.aborted;
+        const canReview = !!item.remoteId;
 
-      case "aborted":
-        return {
-          icon: "↩",
-          label: "ABORTED",
-          background: "rgba(150,150,150,0.10)",
-          border: "rgba(150,150,150,0.20)",
-          iconColor: "#999",
-        };
-    }
-  }
+        const details = [
+            formatDate(item.timestamp) || item.date,
+            item.color === "w" ? tr("White") : item.color === "b" ? tr("Black") : null,
+        ].filter(Boolean);
 
-  function getModeInfo(
-    mode: GameHistoryItem["mode"]
-  ) {
-    switch (mode) {
-      case "bot":
-        return {
-          label: "BOT GAME",
-          background: "rgba(90,120,255,0.045)",
-          border: "rgba(90,120,255,0.08)",
-        };
+        return (
+            <Pressable
+                disabled={!canReview}
+                onPress={() =>
+                    router.push({
+                        pathname: "/game/review",
+                        params: { gameId: item.remoteId!, color: item.color ?? "" },
+                    })
+                }
+                style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+            >
+                <View style={[styles.resultBadge, { backgroundColor: result.soft }]}>
+                    <Text style={[styles.resultLetter, { color: result.color }]}>{result.letter}</Text>
+                </View>
 
-      case "online":
-        return {
-          label: "ONLINE GAME",
-          background: "rgba(70,180,255,0.045)",
-          border: "rgba(70,180,255,0.08)",
-        };
+                <View style={styles.cardBody}>
+                    <View style={styles.cardTitleRow}>
+                        <Text style={styles.cardTitle}>{MODE_LABEL[item.mode] ?? tr("Game")}</Text>
+                        <Text style={[styles.resultLabel, { color: result.color }]}>{result.label}</Text>
+                    </View>
 
-      case "local":
-        return {
-          label: "LOCAL GAME",
-          background: "rgba(212,175,55,0.045)",
-          border: "rgba(212,175,55,0.08)",
-        };
-    }
-  }
+                    <Text style={styles.cardMeta}>{details.join(" · ")}</Text>
 
-  function getResultLabel(
-    result: GameHistoryItem["result"]
-  ) {
-    switch (result) {
-      case "win":
-        return "Win";
-      case "loss":
-        return "Loss";
-      case "draw":
-        return "Draw";
-      case "aborted":
-        return "Aborted";
-    }
-  }
+                    <View style={styles.cardFooter}>
+                        {canReview ? (
+                            <View style={styles.reviewPill}>
+                                <Ionicons name="analytics-outline" size={13} color="#CFE0EF" />
+                                <Text style={styles.reviewPillText}>{tr("Game review")}</Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.noReview}>
+                                {item.mode === "local" ? tr("Local games have no review") : tr("No review for this game")}
+                            </Text>
+                        )}
 
-  function getResultStyle(
-    result: GameHistoryItem["result"]
-  ) {
-    switch (result) {
-      case "win":
-        return styles.resultWin;
-
-      case "loss":
-        return styles.resultLoss;
-
-      case "draw":
-        return styles.resultDraw;
-
-      case "aborted":
-        return styles.resultAborted;
-    }
-  }
-  function renderAnalysisSection(remoteId: string) {
-    const state = analysisByRemoteId[remoteId];
-
-    if (vipTier === "none" || state?.status === "not_vip") {
-      return (
-        <Pressable onPress={() => router.push("/vip")}>
-          <Text style={styles.vipHintText}>Analyse nur für VIP · Mehr erfahren</Text>
-        </Pressable>
-      );
+                        <Pressable
+                            onPress={() => confirmDelete(item.id)}
+                            hitSlop={12}
+                            accessibilityLabel={tr("Delete game")}
+                            style={({ pressed }) => pressed && styles.pressed}
+                        >
+                            <Ionicons name="trash-outline" size={17} color={T.textFaint} />
+                        </Pressable>
+                    </View>
+                </View>
+            </Pressable>
+        );
     }
 
-    if (!state || state.status === "idle") {
-      return (
-        <Pressable
-          onPress={() => handleAnalyze(remoteId)}
-          style={({ pressed }) => [styles.analyzeButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.analyzeButtonText}>Analysiere diese Partie</Text>
-        </Pressable>
-      );
-    }
+    const header = (
+        <View>
+            <Pressable onPress={() => router.back()} style={styles.back} hitSlop={10} accessibilityLabel={tr("Back")}>
+                <Ionicons name="chevron-back" size={20} color={T.text} />
+            </Pressable>
 
-    if (state.status === "analyzing") {
-      return (
-        <Text style={styles.analyzingText}>
-          Analysiere... {state.progress ?? 0}/{state.total || "?"}
-        </Text>
-      );
-    }
+            <View style={styles.header}>
+                <Text style={styles.logo}>{tr("HISTORY")}</Text>
+                <Text style={styles.title}>{tr("Your Games")}</Text>
+                <Text style={styles.subtitle}>{tr("Games played on this device")}</Text>
+            </View>
 
-    if (state.status === "error") {
-      return <Text style={styles.errorText}>Analyse fehlgeschlagen</Text>;
-    }
+            {history.length > 0 && (
+                <>
+                    <View style={styles.summary}>
+                        <Summary value={counts.games} label={tr("Games")} />
+                        <View style={styles.summaryDivider} />
+                        <Summary value={counts.win} label={tr("Won")} color={RESULT.win.color} />
+                        <View style={styles.summaryDivider} />
+                        <Summary value={counts.loss} label={tr("Lost")} color={RESULT.loss.color} />
+                        <View style={styles.summaryDivider} />
+                        <Summary value={counts.draw} label={tr("Draw")} />
+                    </View>
 
-    if (state.status === "done") {
-      if (!state.summary) {
-        return <Text style={styles.doneText}>✓ Analysiert – keine Auffälligkeiten</Text>;
-      }
+                    <View style={styles.filters}>
+                        {FILTERS.map((entry) => {
+                            const active = entry.key === filter;
 
-      const { moveNumber, san, mover, swing } = state.summary;
-      const sideLabel = mover === "w" ? "Weiß" : "Schwarz";
-      const pawns = (swing / 100).toFixed(1);
-
-      return (
-        <Text style={styles.doneText}>
-          ✓ Größter Fehler: Zug {moveNumber} {san} ({sideLabel}, {pawns} Bauerneinheiten)
-        </Text>
-      );
-    }
-
-    return null;
-  }
-  function renderItem({ item }: { item: GameHistoryItem }) {
-    const date = new Date(item.timestamp);
-    const formatted = `${date.toLocaleDateString()} · ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    const resultInfo = getResultInfo(item.result);
-    const modeInfo = getModeInfo(item.mode);
-    const canReview = !!item.remoteId;
+                            return (
+                                <Pressable
+                                    key={entry.key}
+                                    onPress={() => setFilter(entry.key)}
+                                    style={[styles.filter, active && styles.filterActive]}
+                                >
+                                    <Text style={[styles.filterText, active && styles.filterTextActive]}>
+                                        {entry.label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                </>
+            )}
+        </View>
+    );
 
     return (
-      <Pressable
-        onPress={() => {
-          if (!canReview) {
-            Alert.alert("Nicht verfügbar", "Diese Partie kann nicht analysiert werden.");
-            return;
-          }
-          router.push({ pathname: "/game/review", params: { gameId: item.remoteId! } });
-        }}
-        style={({ pressed }) => [
-          styles.gameCard,
-          { borderColor: modeInfo.border },
-          pressed && styles.pressed,
-        ]}
-      >
-        <View style={[styles.accentBar, { backgroundColor: resultInfo.iconColor }]} />
+        <ImageBackground source={backgroundImage} style={styles.container} resizeMode="cover">
+            <View style={styles.scrim} />
 
-        <View style={[styles.resultIcon, { backgroundColor: resultInfo.background, borderColor: resultInfo.border }]}>
-          <Text style={[styles.resultIconText, { color: resultInfo.iconColor }]}>{resultInfo.icon}</Text>
-        </View>
-
-        <View style={styles.gameContent}>
-          <View style={styles.titleRow}>
-            <Text style={styles.gameTitle}>{resultInfo.label}</Text>
-            <View style={[styles.modeBadge, { backgroundColor: modeInfo.background, borderColor: modeInfo.border }]}>
-              <Text style={styles.modeBadgeText}>{modeInfo.label}</Text>
-            </View>
-          </View>
-
-          <Text style={styles.date}>{formatted}</Text>
-
-          {canReview ? (
-            <Text style={styles.reviewHint}>Zum Review antippen ›</Text>
-          ) : (
-            <Text style={styles.noReviewHint}>Nicht analysierbar</Text>
-          )}
-        </View>
-
-        <Pressable
-          onPress={() => confirmDelete(item.id)}
-          hitSlop={10}
-          style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.deleteText}>×</Text>
-        </Pressable>
-      </Pressable>
+            <FlatList
+                data={visible}
+                keyExtractor={(item) => item.id}
+                renderItem={renderItem}
+                ListHeaderComponent={header}
+                ListEmptyComponent={
+                    <View style={styles.empty}>
+                        <Text style={styles.emptyTitle}>
+                            {history.length === 0 ? tr("No games yet") : tr("No games in this category")}
+                        </Text>
+                        <Text style={styles.cardMeta}>
+                            {history.length === 0
+                                ? tr("Your finished games appear here.")
+                                : tr("Choose another filter above.")}
+                        </Text>
+                    </View>
+                }
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingTop: insets.top + 14,
+                    paddingBottom: insets.bottom + 32,
+                }}
+            />
+        </ImageBackground>
     );
-  }
+}
 
-  return (
-    <ImageBackground
-      source={backgroundImage}
-      style={styles.background}
-      resizeMode="cover"
-    >
-      {/* DARK OVERLAY */}
-      <View style={styles.darkOverlay} />
-
-      <View style={styles.screen}>
-
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.backText}>
-              ‹
-            </Text>
-          </Pressable>
-
-          <Text style={styles.headerTitle}>
-            GAME HISTORY
-          </Text>
-
-          <View style={styles.headerSpacer} />
+function Summary({ value, label, color }: { value: number; label: string; color?: string }) {
+    return (
+        <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, color ? { color } : null]}>{value}</Text>
+            <Text style={styles.summaryLabel}>{label}</Text>
         </View>
-
-        {/* INTRO */}
-        <View style={styles.intro}>
-          <Text style={styles.title}>
-            Your Games
-          </Text>
-
-          <Text style={styles.subtitle}>
-            Your played games on this device
-          </Text>
-        </View>
-
-        {/* LIST */}
-        {history.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIcon}>
-              <Text style={styles.emptyIconText}>
-                ♟
-              </Text>
-            </View>
-
-            <Text style={styles.emptyTitle}>
-              No games yet
-            </Text>
-
-            <Text style={styles.emptySubtitle}>
-              Your played games will appear here.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={history}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContent}
-          />
-        )}
-      </View>
-    </ImageBackground>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
-  /* BACKGROUND */
+    container: { flex: 1, backgroundColor: "#12151B" },
+    scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(10, 12, 16, 0.6)" },
+    pressed: { opacity: 0.72 },
 
-  background: {
-    flex: 1,
-  },
+    back: {
+        width: 40,
+        height: 40,
+        borderRadius: 13,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#1B2027",
+        borderWidth: 1,
+        borderColor: T.border,
+        marginBottom: 18,
+    },
 
-  darkOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.68)",
-  },
+    header: { marginBottom: 22 },
+    logo: { color: "#5B8DB8", fontSize: 13, fontWeight: "700", letterSpacing: 1.4, marginBottom: 10 },
+    title: { color: "#F5F7F9", fontSize: 28, fontWeight: "700", letterSpacing: -0.6, marginBottom: 6 },
+    subtitle: { color: "rgba(237, 240, 243, 0.5)", fontSize: 13.5 },
 
-  screen: {
-    flex: 1,
-    alignItems: "center",
-  },
+    summary: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderRadius: 20,
+        paddingVertical: 16,
+        backgroundColor: "#1B2027",
+        borderWidth: 1,
+        borderColor: "rgba(91, 141, 184, 0.22)",
+        marginBottom: 16,
+    },
+    summaryItem: { flex: 1, alignItems: "center" },
+    summaryValue: { color: "#F5F7F9", fontSize: 22, fontWeight: "700", fontVariant: ["tabular-nums"] },
+    summaryLabel: { color: "rgba(237, 240, 243, 0.5)", fontSize: 12, marginTop: 3 },
+    summaryDivider: { width: 1, height: 30, backgroundColor: "rgba(237, 240, 243, 0.08)" },
 
-  /* HEADER */
+    filters: { flexDirection: "row", gap: 8, marginBottom: 16 },
+    filter: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: "rgba(237, 240, 243, 0.05)",
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    filterActive: { backgroundColor: T.accentSoft, borderColor: T.accent },
+    filterText: { color: T.textDim, fontSize: 13, fontWeight: "600" },
+    filterTextActive: { color: "#FFFFFF" },
 
-  header: {
-    width: "100%",
-    height: 70,
-    paddingHorizontal: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+    card: {
+        flexDirection: "row",
+        gap: 14,
+        borderRadius: 18,
+        padding: 14,
+        backgroundColor: "#1B2027",
+        borderWidth: 1,
+        borderColor: "rgba(237, 240, 243, 0.08)",
+        marginBottom: 10,
+    },
+    resultBadge: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    resultLetter: { fontSize: 18, fontWeight: "800" },
+    cardBody: { flex: 1 },
+    cardTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+    cardTitle: { color: "#F2F4F6", fontSize: 15.5, fontWeight: "600", flexShrink: 1 },
+    resultLabel: { fontSize: 13, fontWeight: "700" },
+    cardMeta: { color: "rgba(237, 240, 243, 0.5)", fontSize: 12.5, marginTop: 3 },
+    cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
+    reviewPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 999,
+        backgroundColor: "rgba(91, 141, 184, 0.16)",
+        borderWidth: 1,
+        borderColor: "rgba(91, 141, 184, 0.4)",
+    },
+    reviewPillText: { color: "#CFE0EF", fontSize: 12, fontWeight: "700" },
+    noReview: { color: T.textFaint, fontSize: 12 },
 
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  backText: {
-    color: "#fff",
-    fontSize: 34,
-    lineHeight: 34,
-    fontWeight: "300",
-  },
-
-  headerTitle: {
-    color: "#D4AF37",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 3,
-  },
-
-  headerSpacer: {
-    width: 42,
-  },
-
-  /* INTRO */
-
-  intro: {
-    width: "90%",
-    maxWidth: 430,
-    marginTop: 18,
-    marginBottom: 22,
-  },
-
-  title: {
-    color: "#fff",
-    fontSize: 28,
-    fontWeight: "800",
-  },
-
-  subtitle: {
-    color: "#777",
-    fontSize: 13,
-    marginTop: 5,
-  },
-
-  /* LIST */
-
-  listContent: {
-    width: "100%",
-    alignItems: "center",
-    paddingBottom: 50,
-  },
-
-  /* GAME CARD */
-  gameCard: {
-    width: "92%",
-    maxWidth: 430,
-    minHeight: 96,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    overflow: "hidden",
-  },
-  accentBar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
-  modeBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
-  modeBadgeText: { color: "#ccc", fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
-  reviewHint: { color: "#D4AF37", fontSize: 11, fontWeight: "600", marginTop: 6 },
-  noReviewHint: { color: "#555", fontSize: 11, marginTop: 6 },
-
-  /* RESULT ICON */
-
-  resultIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
-
-    justifyContent: "center",
-    alignItems: "center",
-
-    borderWidth: 1,
-
-    marginRight: 12,
-  },
-
-  resultIconText: {
-    fontSize: 24,
-    fontWeight: "700",
-  },
-
-  /* CONTENT */
-
-  gameContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-
-  gameTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-
-  gameSubtitle: {
-    color: "#777",
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
-    marginTop: 3,
-  },
-
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    minWidth: 0,
-  },
-
-  date: {
-    color: "#888",
-    fontSize: 10,
-    flexShrink: 1,
-  },
-
-  /* RESULT BADGE */
-
-  resultBadge: {
-    marginLeft: 7,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    flexShrink: 0,
-  },
-
-  resultWin: {
-    backgroundColor: "rgba(70,200,120,0.10)",
-    borderColor: "rgba(70,200,120,0.25)",
-  },
-
-  resultLoss: {
-    backgroundColor: "rgba(255,70,70,0.10)",
-    borderColor: "rgba(255,70,70,0.25)",
-  },
-
-  resultDraw: {
-    backgroundColor: "rgba(212,175,55,0.10)",
-    borderColor: "rgba(212,175,55,0.25)",
-  },
-
-  resultAborted: {
-    backgroundColor: "rgba(150,150,150,0.10)",
-    borderColor: "rgba(150,150,150,0.20)",
-  },
-
-  resultText: {
-    color: "#aaa",
-    fontSize: 8,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-
-  /* DELETE */
-
-  deleteButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-
-    backgroundColor: "rgba(255,255,255,0.045)",
-
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-
-    justifyContent: "center",
-    alignItems: "center",
-
-    marginLeft: 7,
-  },
-
-  deleteText: {
-    color: "#777",
-    fontSize: 25,
-    fontWeight: "300",
-    lineHeight: 25,
-  },
-
-  /* EMPTY */
-
-  emptyContainer: {
-    width: "90%",
-    maxWidth: 430,
-
-    marginTop: 50,
-
-    alignItems: "center",
-  },
-
-  emptyIcon: {
-    width: 70,
-    height: 70,
-    borderRadius: 22,
-
-    backgroundColor: "rgba(212,175,55,0.10)",
-
-    borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.18)",
-
-    justifyContent: "center",
-    alignItems: "center",
-
-    marginBottom: 16,
-  },
-
-  emptyIconText: {
-    color: "#D4AF37",
-    fontSize: 32,
-  },
-
-
-  emptyTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-
-  emptySubtitle: {
-    color: "#777",
-    fontSize: 12,
-    marginTop: 5,
-    textAlign: "center",
-  },
-
-  /* PRESS */
-
-  pressed: {
-    opacity: 0.65,
-    transform: [{ scale: 0.985 }],
-  },
-  analysisRow: {
-    marginTop: 8,
-  },
-
-  analyzeButton: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "rgba(212,175,55,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(212,175,55,0.35)",
-  },
-
-  analyzeButtonText: {
-    color: "#D4AF37",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  analyzingText: {
-    color: "#888",
-    fontSize: 11,
-  },
-
-  vipHintText: {
-    color: "#D4AF37",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-
-  errorText: {
-    color: "#ff6464",
-    fontSize: 11,
-  },
-
-  doneText: {
-    color: "#8fd4a8",
-    fontSize: 11,
-    lineHeight: 15,
-  },
+    empty: {
+        borderRadius: 18,
+        paddingHorizontal: 18,
+        paddingVertical: 20,
+        backgroundColor: "rgba(27, 32, 39, 0.7)",
+        borderWidth: 1,
+        borderColor: "rgba(237, 240, 243, 0.08)",
+    },
+    emptyTitle: { color: "#F2F4F6", fontSize: 15.5, fontWeight: "600" },
 });

@@ -1,13 +1,16 @@
-import { useRouter } from "expo-router";
-import React from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
-  ImageBackground,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
+import { getFriends, getIncomingRequests } from "../../lib/friends";
+import { getSocket } from "../../lib/socket";
+import { tr } from "../../lib/i18n";
 
 /**
  * Gleiche Outline-Icon-Logik wie im HomeScreen (reine Views, kein SVG).
@@ -153,12 +156,57 @@ function Badge({ count }: { count: number }) {
 
 export default function SocialScreen() {
   const router = useRouter();
-  const backgroundImage = require("../../assets/images/loginbackground.png");
+  const backgroundImage = require("../../assets/images/loginbackground.jpg");
 
-  // TODO: durch echte Werte aus State/Backend ersetzen
-  const friendsOnline = 4;
-  const friendRequestCount = 3;
-  const clanUnreadCount = 5;
+  const [friendsOnline, setFriendsOnline] = useState(0);
+  const [friendRequestCount, setFriendRequestCount] = useState(0);
+
+  // Reloaded every time the tab is opened. Guests get empty lists from
+  // getFriends()/getIncomingRequests(), so both numbers stay 0 for them.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const socket = getSocket();
+
+      const handleStatus = (data: any) => {
+        if (!active) return;
+        const online: string[] = Array.isArray(data?.online) ? data.online : [];
+        setFriendsOnline(online.length);
+      };
+
+      (async () => {
+        try {
+          const [friends, requests] = await Promise.all([
+            getFriends(),
+            getIncomingRequests(),
+          ]);
+
+          if (!active) return;
+
+          setFriendRequestCount(requests.length);
+
+          const authIds = friends.map((f) => f.profile.id).filter(Boolean);
+
+          if (authIds.length === 0 || !socket.connected) {
+            setFriendsOnline(0);
+            return;
+          }
+
+          socket.on("friends_online_status", handleStatus);
+          socket.emit("check_friends_online", { authIds });
+        } catch {
+          if (!active) return;
+          setFriendsOnline(0);
+          setFriendRequestCount(0);
+        }
+      })();
+
+      return () => {
+        active = false;
+        socket.off("friends_online_status", handleStatus);
+      };
+    }, [])
+  );
 
   return (
     <ImageBackground source={backgroundImage} style={styles.container} resizeMode="cover">
@@ -171,9 +219,9 @@ export default function SocialScreen() {
       >
         {/* HEADER */}
         <View style={styles.header}>
-          <Text style={styles.logo}>SOCIAL</Text>
-          <Text style={styles.title}>Freunde & Clans</Text>
-          <Text style={styles.subtitleText}>Verbinde dich, vergleiche dich, spiele zusammen</Text>
+          <Text style={styles.logo}>{tr("SOCIAL")}</Text>
+          <Text style={styles.title}>{tr("Friends & Clans")}</Text>
+          <Text style={styles.subtitleText}>{tr("Connect, compare, play together")}</Text>
         </View>
 
         {/* HIGHLIGHT: FRIENDS ONLINE */}
@@ -185,12 +233,12 @@ export default function SocialScreen() {
             <View style={styles.onlineTop}>
               <View style={styles.statusDot} />
               <Text style={styles.statusText}>
-                {friendsOnline > 0 ? `${friendsOnline} Freunde sind online` : "Niemand online gerade"}
+                {friendsOnline > 0 ? (friendsOnline === 1 ? tr("1 friend is online") : tr("{0} friends are online", friendsOnline)) : tr("No one online right now")}
               </Text>
             </View>
 
-            <Text style={styles.onlineTitle}>Fordere jemanden heraus</Text>
-            <Text style={styles.onlineSubtitle}>Starte eine Partie mit einem Freund</Text>
+            <Text style={styles.onlineTitle}>{tr("Challenge someone")}</Text>
+            <Text style={styles.onlineSubtitle}>{tr("Start a game with a friend")}</Text>
           </View>
 
           <View style={styles.onlineArrow}>
@@ -199,7 +247,7 @@ export default function SocialScreen() {
         </Pressable>
 
         {/* QUICK GRID */}
-        <Text style={styles.sectionTitle}>Übersicht</Text>
+        <Text style={styles.sectionTitle}>{tr("Overview")}</Text>
 
         <View style={styles.quickGrid}>
           <Pressable
@@ -210,8 +258,8 @@ export default function SocialScreen() {
               <Icon name="person" size={17} color="#EDF0F3" />
               <Badge count={friendRequestCount} />
             </View>
-            <Text style={styles.smallCardTitle}>Freunde</Text>
-            <Text style={styles.smallCardSubtitle}>Anfragen & Liste</Text>
+            <Text style={styles.smallCardTitle}>{tr("Friends")}</Text>
+            <Text style={styles.smallCardSubtitle}>{tr("Requests & list")}</Text>
           </Pressable>
 
           <Pressable
@@ -220,10 +268,9 @@ export default function SocialScreen() {
           >
             <View style={styles.iconBadge}>
               <Icon name="rook" size={17} color="#EDF0F3" />
-              <Badge count={clanUnreadCount} />
             </View>
-            <Text style={styles.smallCardTitle}>Clan</Text>
-            <Text style={styles.smallCardSubtitle}>Beitreten oder gründen</Text>
+            <Text style={styles.smallCardTitle}>{tr("Clan")}</Text>
+            <Text style={styles.smallCardSubtitle}>{tr("Join or create")}</Text>
           </Pressable>
 
           <Pressable
@@ -233,8 +280,8 @@ export default function SocialScreen() {
             <View style={styles.iconBadge}>
               <Icon name="chat" size={17} color="#EDF0F3" />
             </View>
-            <Text style={styles.smallCardTitle}>Nachrichten</Text>
-            <Text style={styles.smallCardSubtitle}>Bald verfügbar</Text>
+            <Text style={styles.smallCardTitle}>{tr("Messages")}</Text>
+            <Text style={styles.smallCardSubtitle}>{tr("Coming soon")}</Text>
           </Pressable>
 
           <Pressable
@@ -244,8 +291,8 @@ export default function SocialScreen() {
             <View style={styles.iconBadge}>
               <Icon name="trophy" size={17} color="#EDF0F3" />
             </View>
-            <Text style={styles.smallCardTitle}>Rangliste</Text>
-            <Text style={styles.smallCardSubtitle}>Vergleich mit Freunden</Text>
+            <Text style={styles.smallCardTitle}>{tr("Leaderboard")}</Text>
+            <Text style={styles.smallCardSubtitle}>{tr("Compare with friends")}</Text>
           </Pressable>
         </View>
       </ScrollView>

@@ -1,24 +1,32 @@
 import type { Socket } from "socket.io-client";
-
-type Ack<T> = { ok: true } & T | { ok: false; error: string };
-
-function emitWithAck<T>(socket: Socket, event: string, payload: Record<string, unknown> = {}): Promise<T> {
-    return new Promise((resolve, reject) => {
-        socket.emit(event, payload, (response: Ack<T>) => {
-            if (response?.ok) resolve(response as unknown as T);
-            else reject(new Error(response?.error || "UNKNOWN_ERROR"));
-        });
-    });
-}
+import { emitWithAck } from "./socketAck";
 
 export type Weakness = { mistake_type: string; count: number };
+
+/** An example in a personal lesson: from the user's own game or a generic one. */
+export type LessonExample = {
+    source: "own" | "generic";
+    fen?: string;
+    gameId?: string;
+    moveIndex?: number;
+    motif?: string | null;
+    /** Solution as coordinate moves ("e2e4"); present for playable examples. */
+    moves?: string[];
+    played?: string;
+    bestSan?: string;
+    intro?: string;
+    hint?: string;
+    why?: string;
+};
+
 export type Lesson = {
     id: string;
     mistake_type: string;
     title: string;
     explanation: string;
-    example_fens: { source: "own" | "generic"; fen?: string; gameId?: string; moveIndex?: number }[];
+    example_fens: LessonExample[];
     completed_at: string | null;
+    created_at?: string;
 };
 
 export function getWeaknesses(socket: Socket) {
@@ -26,7 +34,7 @@ export function getWeaknesses(socket: Socket) {
 }
 
 export function generateLesson(socket: Socket, mistakeType: string) {
-    return emitWithAck<{ lesson: Lesson }>(socket, "generate_lesson", { mistakeType });
+    return emitWithAck<{ lesson: Lesson }>(socket, "generate_lesson", { mistakeType }, 20000);
 }
 
 export function getLessons(socket: Socket) {

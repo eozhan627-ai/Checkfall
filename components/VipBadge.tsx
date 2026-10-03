@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { tr } from "../lib/i18n";
 
 type Tier = "silver" | "gold" | "diamond";
 
@@ -10,19 +11,19 @@ const TIER_STYLES: Record<Tier, TierStyle> = {
         bg: "rgba(192, 197, 206, 0.12)",
         border: "rgba(192, 197, 206, 0.45)",
         text: "#C0C5CE",
-        label: "SILVER",
+        get label() { return tr("SILVER"); },
     },
     gold: {
         bg: "rgba(212, 175, 55, 0.14)",
         border: "rgba(212, 175, 55, 0.5)",
         text: "#D4AF37",
-        label: "GOLD",
+        get label() { return tr("GOLD"); },
     },
     diamond: {
         bg: "rgba(168, 224, 236, 0.14)",
         border: "rgba(168, 224, 236, 0.5)",
         text: "#A8E0EC",
-        label: "DIAMOND",
+        get label() { return tr("DIAMOND"); },
     },
 };
 

@@ -1,26 +1,35 @@
 # POVCheck
 
-POVCheck is a modern chess app built with React Native and Expo.
+POVCheck is a chess app built with React Native and Expo.
 
-## Current Features
+## Features
 - Local chess games
-- Online multiplayer matches
-- Daily tactical puzzles
-- Interactive chess lessons
-- Game history with saved and archived games
+- Online multiplayer matches with server-side Elo ratings
 - Bot matches with adjustable difficulty
+- Daily tactical puzzles and a puzzle trainer
+- Interactive lessons and a personal coach
+- Friends and clans
+- Game history, saved games and game analysis (VIP)
 
-## Planned Features
-- Clans for community play
-- Deep game analysis
-- Personal training tools
-- VIP subscription features
+## Project layout
+- `app/` – screens only (every file here is a route of expo-router)
+- `components/` – shared UI (`components/game/` holds the chess board)
+- `lib/` – data access, socket connection, storage helpers
+- `tests/` – unit tests for pure logic
+- `scripts/` – one-off tooling (puzzle import, image generation)
 
-## Tech Stack
-- React Native
-- Expo
-- chess.js
-- socket.io
+## Development
+```
+npm install
+npm start          # Expo dev server
+npm run typecheck  # TypeScript
+npm test           # unit tests (Node 22+)
+npm run lint
+```
 
-## Status
-Work in progress (MVP development). Currently fixing bugs and improving core gameplay.
+The game server lives in a separate repository. Its address is set in
+`lib/config.ts`. Ratings, statistics, VIP tier and avatars are owned by the
+server; the app only reads them.
+
+## Tech stack
+React Native, Expo, expo-router, chess.js, socket.io, Supabase.

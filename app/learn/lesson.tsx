@@ -1,26 +1,30 @@
 import { Chess } from "chess.js";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getLessonContent } from "../../lib/lessonContent";
-import { saveLessonResult } from "../../lib/lessonProgress";
-import PuzzleBoard from "../components/PuzzleBoard";
+import { lessonProgressKey, saveLessonResults } from "../../lib/lessonProgress";
+import { getPersonalExercises } from "../../lib/personalLessons";
+import PuzzleBoard from "../../components/PuzzleBoard";
+import { tr } from "../../lib/i18n";
+import { reportTaskEvent } from "../../lib/dailyTasks";
+import { usePositionSound } from "../../lib/sounds";
 
 const ACCENT = "#7C9473";
 const GOLD = "#F5B942";
 
 const WRONG_LINES = [
-    "Knapp daneben – schau nochmal genau hin.",
-    "Nicht ganz. Was greift dein Gegner an?",
-    "Fast! Denk an die Checkliste.",
-    "Autsch, der war's nicht. Versuch's nochmal!",
+    "Close – take another careful look.",
+    "Not quite. What is your opponent attacking?",
+    "Almost! Remember the checklist.",
+    "Ouch, that was not it. Try again!",
 ];
 const RIGHT_LINES = [
-    "Sauber gespielt! 🔥",
-    "Genau so! Das hast du gesehen. 👀",
-    "Richtig! Der Coach ist stolz. 😎",
-    "Perfekt erkannt! ⚡",
+    "Nicely played! 🔥",
+    "Exactly! You spotted it. 👀",
+    "Correct! Your coach is proud. 😎",
+    "Perfectly spotted! ⚡",
 ];
 const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
 
@@ -52,7 +56,7 @@ function Stars({ count, max = 3, size = 26 }: { count: number; max?: number; siz
 type Phase = "playing" | "solved" | "finished";
 
 export default function LessonScreen() {
-    const { title, mistake_type } = useLocalSearchParams<{
+    const { id, title, mistake_type } = useLocalSearchParams<{
         id: string;
         title: string;
         explanation: string;
@@ -61,11 +65,17 @@ export default function LessonScreen() {
 
     const coachImage = require("../../assets/images/coach.png");
     const content = getLessonContent(mistake_type);
-    const exercises = content.exercises;
+    // Positions from the user's own games come first, then the standard ones.
+    const ownExercises = useMemo(() => getPersonalExercises(id), [id]);
+    const exercises = useMemo(
+        () => [...ownExercises, ...content.exercises],
+        [ownExercises, content]
+    );
     const maxStars = exercises.length * 3;
 
     const [index, setIndex] = useState(0);
     const [game, setGame] = useState<Chess | null>(null);
+    usePositionSound(game);
     const [playerColor, setPlayerColor] = useState<"w" | "b">("w");
     const [selected, setSelected] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<string[]>([]);
@@ -115,7 +125,9 @@ export default function LessonScreen() {
         setSolvedStars(0);
         setPhase("playing");
         setCoachText(
-            `Aufgabe ${i + 1} von ${exercises.length} – du spielst ${g.turn() === "w" ? "Weiß" : "Schwarz"}. Finde den besten Zug!`
+            ex.intro
+                ? tr("Exercise {0} of {1}. {2}", i + 1, exercises.length, ex.intro)
+                : tr("Exercise {0} of {1} – you play {2}. Find the best move!", i + 1, exercises.length, g.turn() === "w" ? "White" : "Black")
         );
     }
 
@@ -147,7 +159,7 @@ export default function LessonScreen() {
         const from = expected.slice(0, 2);
         setSelected(from);
         setLegalMoves(game.moves({ square: from as any, verbose: true }).map((m) => m.to));
-        setCoachText("👆 Mit dieser Figur musst du ziehen!");
+        setCoachText(tr("👆 This is the piece you need to move!"));
     }
 
     function onSquarePress(square: string) {
@@ -175,21 +187,22 @@ export default function LessonScreen() {
             setWrong(w);
             setSelected(null);
             setLegalMoves([]);
-            setCoachText("❌ " + pick(WRONG_LINES) + (w >= 2 && hintLevel === 0 ? " Tipp gefällig? Tippe auf 💡" : ""));
+            setCoachText("❌ " + pick(WRONG_LINES) + (w >= 2 && hintLevel === 0 ? tr(" Need a hint? Tap 💡") : ""));
             buzz("wrong");
             runShake();
             return;
         }
 
         const newGame = new Chess(game.fen());
-        newGame.move({ from: selected, to: square });
+        // The fifth character of a coordinate move is the promotion piece.
+        newGame.move({ from: selected, to: square, promotion: expectedMove[4] || undefined });
 
         let nextMoveIndex = moveIndex + 1;
 
         // automatische Gegenantwort
         if (nextMoveIndex < exercise.moves.length) {
             const enemy = exercise.moves[nextMoveIndex];
-            newGame.move({ from: enemy.slice(0, 2), to: enemy.slice(2, 4) });
+            newGame.move({ from: enemy.slice(0, 2), to: enemy.slice(2, 4), promotion: enemy[4] || undefined });
             nextMoveIndex++;
         }
 
@@ -209,7 +222,7 @@ export default function LessonScreen() {
             return;
         }
 
-        setCoachText("✅ Richtig – und jetzt weiter!");
+        setCoachText(tr("✅ Correct – keep going!"));
         buzz("right");
     }
 
@@ -219,7 +232,19 @@ export default function LessonScreen() {
             return;
         }
         const total = results.reduce((a, b) => a + b, 0);
-        saveLessonResult(mistake_type ?? "unknown", total, maxStars);
+        const ownCount = ownExercises.length;
+
+        const standard = results.slice(ownCount).reduce((a, b) => a + b, 0);
+
+        saveLessonResults([
+            // The standard exercises count towards the tutorial ...
+            { key: lessonProgressKey(mistake_type), stars: standard, maxStars: content.exercises.length * 3 },
+            // ... and a lesson with positions from the user's games is counted on its own.
+            ...(ownCount > 0
+                ? [{ key: lessonProgressKey(mistake_type, true), stars: total, maxStars }]
+                : []),
+        ]);
+        reportTaskEvent("lesson_done");
         setPhase("finished");
         runPop();
     }
@@ -236,7 +261,7 @@ export default function LessonScreen() {
                     </Pressable>
                     <Text style={styles.title}>{title || content.title}</Text>
                 </View>
-                <Text style={styles.emptyText}>Für diese Lektion gibt es noch keine Übungen.</Text>
+                <Text style={styles.emptyText}>{tr("There are no exercises for this lesson yet.")}</Text>
             </View>
         );
     }
@@ -249,10 +274,10 @@ export default function LessonScreen() {
         const ratio = total / maxStars;
         const msg =
             ratio === 1
-                ? "Perfekt! Keine Fehler, keine Hilfe – Meisterleistung! 🏆"
+                ? tr("Perfect! No mistakes, no help – masterful! 🏆")
                 : ratio >= 0.66
-                ? "Stark! Das sitzt schon fast. 💪"
-                : "Guter Start – noch eine Runde, dann sitzt es! 🔁";
+                ? tr("Strong! You have almost got it. 💪")
+                : tr("Good start – one more round and you have got it! 🔁");
 
         return (
             <View style={styles.container}>
@@ -260,7 +285,7 @@ export default function LessonScreen() {
                     <Pressable onPress={() => router.back()} style={styles.iconButton}>
                         <Text style={styles.backText}>‹</Text>
                     </Pressable>
-                    <Text style={styles.title}>Geschafft!</Text>
+                    <Text style={styles.title}>{tr("Done!")}</Text>
                 </View>
 
                 <ScrollView contentContainerStyle={[styles.content, { alignItems: "center" }]}>
@@ -274,7 +299,7 @@ export default function LessonScreen() {
                         <Image source={coachImage} style={styles.coachBig} resizeMode="contain" />
                         <Stars count={Math.round(ratio * 3)} size={44} />
                         <Text style={styles.resultBig}>
-                            {total} / {maxStars} Sterne
+                            {total} / {maxStars} {tr("stars")}
                         </Text>
                     </Animated.View>
 
@@ -283,17 +308,17 @@ export default function LessonScreen() {
                     <View style={styles.resultList}>
                         {results.map((s, i) => (
                             <View key={i} style={styles.resultRow}>
-                                <Text style={styles.resultLabel}>Aufgabe {i + 1}</Text>
+                                <Text style={styles.resultLabel}>{tr("Exercise")} {i + 1}</Text>
                                 <Stars count={s} size={18} />
                             </View>
                         ))}
                     </View>
 
                     <Pressable style={styles.solveButton} onPress={restartAll}>
-                        <Text style={styles.solveButtonText}>🔁 Nochmal spielen</Text>
+                        <Text style={styles.solveButtonText}>{tr("🔁 Play again")}</Text>
                     </Pressable>
                     <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
-                        <Text style={styles.secondaryButtonText}>Fertig</Text>
+                        <Text style={styles.secondaryButtonText}>{tr("Finish")}</Text>
                     </Pressable>
                 </ScrollView>
             </View>
@@ -303,7 +328,7 @@ export default function LessonScreen() {
     // =============================
     // Spielen
     // =============================
-    const hintLabel = hintLevel === 0 ? "💡 Tipp" : "👆 Figur zeigen";
+    const hintLabel = hintLevel === 0 ? tr("💡 Hint") : tr("👆 Show piece");
 
     return (
         <View style={styles.container}>
@@ -338,6 +363,12 @@ export default function LessonScreen() {
                     <Image source={coachImage} style={styles.coachImage} resizeMode="contain" />
                 </View>
 
+                {exercise.fromOwnGame && (
+                    <View style={styles.ownTag}>
+                        <Text style={styles.ownTagText}>{tr("♟ FROM YOUR GAME")}</Text>
+                    </View>
+                )}
+
                 {/* Brett */}
                 <Animated.View style={[styles.boardWrap, { transform: [{ translateX: shake }] }]}>
                     {game && (
@@ -357,7 +388,7 @@ export default function LessonScreen() {
                             <Text style={styles.chipButtonText}>{hintLabel}</Text>
                         </Pressable>
                         <Pressable style={styles.chipButton} onPress={resetPosition}>
-                            <Text style={styles.chipButtonText}>🔁 Neu starten</Text>
+                            <Text style={styles.chipButtonText}>{tr("🔁 Restart")}</Text>
                         </Pressable>
                     </View>
                 ) : (
@@ -371,11 +402,11 @@ export default function LessonScreen() {
                         ]}
                     >
                         <Stars count={solvedStars} size={34} />
-                        <Text style={styles.whyLabel}>Warum?</Text>
+                        <Text style={styles.whyLabel}>{tr("Why?")}</Text>
                         <Text style={styles.whyText}>{exercise.why}</Text>
                         <Pressable style={styles.solveButton} onPress={next}>
                             <Text style={styles.solveButtonText}>
-                                {index + 1 < exercises.length ? "Nächste Aufgabe ›" : "Ergebnis ansehen 🏁"}
+                                {index + 1 < exercises.length ? tr("Next exercise ›") : tr("See result 🏁")}
                             </Text>
                         </Pressable>
                     </Animated.View>
@@ -416,6 +447,17 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(255,255,255,0.14)",
     },
     dotDone: { backgroundColor: ACCENT },
+    ownTag: {
+        alignSelf: "flex-start",
+        backgroundColor: "rgba(245,185,66,0.14)",
+        borderColor: "rgba(245,185,66,0.45)",
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        marginBottom: 10,
+    },
+    ownTagText: { color: GOLD, fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
     dotActive: { backgroundColor: "rgba(124,148,115,0.45)", borderWidth: 1, borderColor: ACCENT },
 
     coachRow: {

@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LESSONS } from "../../lib/lessonContent";
 import { getLessonProgress, LessonProgressMap } from "../../lib/lessonProgress";
+import { tr } from "../../lib/i18n";
 
 const PIECES = ["♞", "♝", "♜", "♛", "♟", "♚"];
 const ACCENTS = ["#F5B942", "#4DA3FF", "#FF6B6B", "#5BD69A", "#B389FF", "#FF9F5A"];
@@ -28,10 +29,13 @@ export default function TutorialsScreen() {
     );
 
     const totalMax = entries.reduce((sum, [, l]) => sum + l.exercises.length * 3, 0);
-    const totalStars = entries.reduce((sum, [key]) => sum + (progress[key]?.bestStars ?? 0), 0);
+    // Never more stars than the tutorial has (older data could contain more).
+    const starsOf = (key: string, max: number) => Math.min(progress[key]?.bestStars ?? 0, max);
+
+    const totalStars = entries.reduce((sum, [key, l]) => sum + starsOf(key, l.exercises.length * 3), 0);
     const doneCount = entries.filter(([key, l]) => {
         const max = l.exercises.length * 3;
-        return max > 0 && (progress[key]?.bestStars ?? 0) >= max;
+        return max > 0 && starsOf(key, max) >= max;
     }).length;
 
     return (
@@ -45,9 +49,9 @@ export default function TutorialsScreen() {
                     <Text style={styles.backText}>‹</Text>
                 </Pressable>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.title}>Tutorials</Text>
+                    <Text style={styles.title}>{tr("Tutorials")}</Text>
                     <Text style={styles.subtitle}>
-                        {doneCount} von {entries.length} gemeistert · Fehler gezielt beheben
+                        {doneCount} {tr("of")} {entries.length} {tr("mastered · Fix mistakes step by step")}
                     </Text>
                 </View>
                 <View style={styles.starPill}>
@@ -64,7 +68,7 @@ export default function TutorialsScreen() {
                 {entries.map(([mistakeType, lesson], i) => {
                     const accent = ACCENTS[i % ACCENTS.length];
                     const max = lesson.exercises.length * 3;
-                    const stars = progress[mistakeType]?.bestStars ?? 0;
+                    const stars = starsOf(mistakeType, max);
                     const pct = max > 0 ? Math.min(1, stars / max) : 0;
                     const mastered = max > 0 && stars >= max;
                     const started = stars > 0;
@@ -110,7 +114,7 @@ export default function TutorialsScreen() {
                                     ★ {stars}/{max}
                                 </Text>
                                 <Text style={[styles.cta, { color: accent }]}>
-                                    {mastered ? "Nochmal ›" : started ? "Weiter ›" : "Los ›"}
+                                    {mastered ? tr("Again ›") : started ? tr("Continue ›") : tr("Start ›")}
                                 </Text>
                             </View>
                         </Pressable>

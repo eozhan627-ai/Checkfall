@@ -1,4 +1,4 @@
-name: Android Debug Build
+name: Checks and Android Debug Build
 
 on:
   workflow_dispatch:
@@ -6,6 +6,33 @@ on:
     branches: [main]
 
 jobs:
+  # Fast feedback: type errors, tests, lint. Runs separately so a failing
+  # check does not stop the APK from being built.
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -15,7 +42,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
 
       - name: Setup Java
         uses: actions/setup-java@v4

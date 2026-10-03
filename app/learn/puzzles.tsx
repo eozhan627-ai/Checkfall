@@ -3,17 +3,22 @@ import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
     Animated,
-    ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
 
 import puzzles from "../../assets/puzzle.json";
 import { getSolvedPuzzleIds, markPuzzleSolved } from "../../lib/puzzleStats";
-import PuzzleBoard, { findCheckedKing } from "../components/PuzzleBoard";
+import PuzzleBoard, { findCheckedKing } from "../../components/PuzzleBoard";
+import LimitGate from "../../components/LimitGate";
+import { Allowance, consume, getAllowance, grantAdBonus } from "../../lib/dailyLimits";
+import { tr } from "../../lib/i18n";
+import { reportTaskEvent } from "../../lib/dailyTasks";
+import { usePositionSound } from "../../lib/sounds";
 
 type Puzzle = {
     id: string;
@@ -32,9 +37,9 @@ const SETUP_DELAY = 700; // Pause, bevor der Gegner den ersten Zug spielt
 const ENEMY_DELAY = 500; // Pause vor jeder Gegnerantwort
 
 const REWARD: Record<number, { title: string; sub: string }> = {
-    3: { title: "Perfekt!", sub: "Ohne Fehler und ohne Tipp. " },
-    2: { title: "Sauber gelöst!", sub: "Nur ein kleiner Umweg." },
-    1: { title: "Geschafft!", sub: "Aus Fehlern lernt man – das Muster bleibt hängen." },
+    3: { get title() { return tr("Perfect!"); }, get sub() { return tr("No mistakes and no hint. "); } },
+    2: { get title() { return tr("Nicely solved!"); }, get sub() { return tr("Just a small detour."); } },
+    1: { get title() { return tr("Done!"); }, get sub() { return tr("You learn from mistakes – the pattern will stick."); } },
 };
 
 const haptic = (kind: "success" | "error" | "light") => {
@@ -68,9 +73,11 @@ type RunnerProps = {
     total: number;
     onSolved: (perfect: boolean) => void;
     onNext: () => void;
+    /** Free puzzles left today; null = unlimited. */
+    freeLeft: number | null;
 };
 
-function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: RunnerProps) {
+function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext, freeLeft }: RunnerProps) {
     // Lichess-Format: moves[0] ist der Zug des Gegners, danach beginnt das eigentliche Puzzle.
     // Im FEN ist also der GEGNER am Zug, der Spieler ist die andere Farbe.
     const setupMove = puzzle.moves[0];
@@ -92,6 +99,7 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
     );
 
     const [game, setGame] = useState(() => new Chess(puzzle.fen));
+    usePositionSound(game);
     const [selected, setSelected] = useState<string | null>(null);
     const [legalMoves, setLegalMoves] = useState<string[]>([]);
     const [moveIndex, setMoveIndex] = useState(0); // Index des nächsten erwarteten Spielerzugs in `solution`
@@ -148,7 +156,7 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
         return () => clearTimeout(t);
     }, [result]);
 
-    const colorName = playerColor === "w" ? "Weiß" : "Schwarz";
+    const colorName = playerColor === "w" ? tr("White") : tr("Black");
     const playerDone = solved ? playerTotal : Math.min(Math.floor(moveIndex / 2), playerTotal);
     const checkSquare = findCheckedKing(game);
 
@@ -161,7 +169,7 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
         setSolved(true);
         setHintVisible(false);
         setHintStep(0);
-        setFeedback("🎉 Gelöst!");
+        setFeedback(tr("🎉 Solved!"));
         haptic("success");
 
         const penalty = mistakes.current + hints.current;
@@ -203,7 +211,7 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
         // Falscher Zug
         if (selected !== from || square !== to) {
             mistakes.current += 1;
-            setFeedback("❌ Falscher Zug – versuch’s nochmal.");
+            setFeedback(tr("❌ Wrong move – try again."));
             haptic("error");
             clearSelection();
             return;
@@ -230,7 +238,7 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
 
         // Sonst antwortet der Gegner automatisch
         setBusy(true);
-        setFeedback("✅ Richtig – weiter!");
+        setFeedback(tr("✅ Correct – keep going!"));
         later(() => {
             const enemy = solution[next];
             const afterEnemy = applyUci(afterPlayer, enemy);
@@ -260,7 +268,7 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
             setHintStep(target);
         }
         setHintVisible(true);
-        setFeedback(target === 1 ? "💡 Diese Figur musst du ziehen." : "💡 Und dorthin geht sie.");
+        setFeedback(target === 1 ? tr("💡 This is the piece to move.") : tr("💡 And this is where it goes."));
     }
 
     // Stellung zurücksetzen (Fehlversuche und Tipps bleiben in der Wertung)
@@ -282,9 +290,9 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
             : [hintMove.slice(0, 2), hintMove.slice(2, 4)]
         : [];
 
-    let turnLabel = `${colorName} am Zug`;
-    if (solved) turnLabel = "Gelöst";
-    else if (busy) turnLabel = "Gegner zieht …";
+    let turnLabel = `${colorName} to move`;
+    if (solved) turnLabel = "Solved";
+    else if (busy) turnLabel = "Opponent is moving …";
 
     const pct = total > 0 ? Math.round((solvedCount / total) * 100) : 0;
 
@@ -292,15 +300,21 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
         <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
             <View style={styles.header}>
                 <View style={styles.headerSide} />
-                <Text style={styles.headerTitle}>Puzzles</Text>
+                <Text style={styles.headerTitle}>{tr("Puzzles")}</Text>
                 <View style={styles.headerSide}>
                     {combo >= 2 && <Text style={styles.streakChip}>🔥 {combo}</Text>}
                 </View>
             </View>
 
             <Text style={styles.subtitle}>
-                Rating: {puzzle.rating} · {solvedCount} von {total} gelöst
+                {tr("Rating:")} {puzzle.rating} · {solvedCount} {tr("of")} {total} {tr("solved")}
             </Text>
+
+            {freeLeft !== null && !solved && (
+                <Text style={styles.freeLeft}>
+                    {freeLeft === 1 ? tr("Last free puzzle for today") : tr("{0} free puzzles left today", freeLeft)}
+                </Text>
+            )}
 
             <View style={styles.turnPill}>
                 <View
@@ -327,7 +341,7 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
             />
 
             <Text style={styles.progress}>
-                {solved ? `Alle ${playerTotal} Züge gefunden` : `Zug ${Math.min(playerDone + 1, playerTotal)} von ${playerTotal}`}
+                {solved ? tr("All {0} moves found", playerTotal) : tr("Move {0} of {1}", Math.min(playerDone + 1, playerTotal), playerTotal)}
             </Text>
 
             {feedback && !result && <Text style={styles.feedback}>{feedback}</Text>}
@@ -372,12 +386,12 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
                     <Text style={styles.rewardTitle}>{REWARD[result.stars].title}</Text>
                     <Text style={styles.rewardSub}>{REWARD[result.stars].sub}</Text>
                     <Text style={styles.rewardStats}>
-                        {result.mistakes} Fehler · {result.hints} {result.hints === 1 ? "Tipp" : "Tipps"}
+                        {tr("Mistakes: {0} · Hints: {1}", result.mistakes, result.hints)}
                     </Text>
 
                     {result.mistakes + result.hints === 0 && combo >= 2 && (
                         <View style={styles.comboChip}>
-                            <Text style={styles.comboChipText}>🔥 {combo} ohne Fehler in Folge</Text>
+                            <Text style={styles.comboChipText}>🔥 {combo} {tr("in a row without mistakes")}</Text>
                         </View>
                     )}
 
@@ -385,11 +399,11 @@ function PuzzleRunner({ puzzle, combo, solvedCount, total, onSolved, onNext }: R
                         <View style={[styles.barFill, { width: `${pct}%` as `${number}%` }]} />
                     </View>
                     <Text style={styles.barLabel}>
-                        {solvedCount} von {total} Puzzles gelöst
+                        {solvedCount} {tr("of")} {total} {tr("puzzles solved")}
                     </Text>
 
                     <Pressable onPress={onNext} style={({ pressed }) => [styles.nextBtn, pressed && { opacity: 0.85 }]}>
-                        <Text style={styles.nextBtnText}>Nächstes Puzzle ›</Text>
+                        <Text style={styles.nextBtnText}>{tr("Next puzzle ›")}</Text>
                     </Pressable>
                 </Animated.View>
             )}
@@ -410,6 +424,27 @@ export default function PuzzlesScreen() {
     const [solvedIds, setSolvedIds] = useState<string[] | null>(null); // null = lädt noch
     const [currentId, setCurrentId] = useState<string | null>(null);
     const [combo, setCombo] = useState(0); // Puzzles ohne Fehler in Folge (nur in dieser Sitzung)
+
+    // Daily limit without VIP (4 puzzles; an ad adds 4 more).
+    const [allowance, setAllowance] = useState<Allowance | null>(null);
+    const [gateOpen, setGateOpen] = useState(false);
+    // True while the limit blocks the next puzzle.
+    const [locked, setLocked] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        getAllowance("puzzle").then((a) => {
+            if (!alive) return;
+            setAllowance(a);
+            if (!a.unlimited && a.left <= 0) {
+                setLocked(true);
+                setGateOpen(true);
+            }
+        });
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     // Beim Start: gespeicherten Stand laden und mit dem ersten ungelösten Puzzle beginnen
     useEffect(() => {
@@ -440,26 +475,57 @@ export default function PuzzlesScreen() {
         setCombo((c) => (perfect ? c + 1 : 0));
         setSolvedIds((prev) => (prev && !prev.includes(id) ? [...prev, id] : prev));
         markPuzzleSolved(id).catch(() => { });
+        reportTaskEvent("puzzle_solved");
+        consume("puzzle").then(setAllowance).catch(() => { });
+    }
+
+    function showNext() {
+        const next = sortedPuzzles.find((p) => !(solvedIds ?? []).includes(p.id));
+        setCurrentId(next?.id ?? null);
     }
 
     function goNext() {
-        const next = sortedPuzzles.find((p) => !(solvedIds ?? []).includes(p.id));
-        setCurrentId(next?.id ?? null);
+        if (allowance && !allowance.unlimited && allowance.left <= 0) {
+            setLocked(true);
+            setGateOpen(true);
+            return;
+        }
+        showNext();
+    }
+
+    // An ad was watched: more puzzles for today.
+    async function handleRewarded() {
+        setAllowance(await grantAdBonus("puzzle"));
+        setLocked(false);
+        showNext();
     }
 
     let content;
     if (solvedIds === null) {
         content = (
             <View style={styles.center}>
-                <Text style={styles.centerText}>Lade Puzzles …</Text>
+                <Text style={styles.centerText}>{tr("Loading puzzles …")}</Text>
+            </View>
+        );
+    } else if (locked && puzzle) {
+        content = (
+            <View style={styles.center}>
+                <Text style={styles.centerEmoji}>⏳</Text>
+                <Text style={styles.centerTitle}>{tr("That's it for today")}</Text>
+                <Text style={styles.centerText}>
+                    {tr("Four puzzles a day are free. The Daily Puzzle is always free.")}
+                </Text>
+                <Pressable onPress={() => setGateOpen(true)} style={({ pressed }) => [styles.nextBtn, { maxWidth: 300 }, pressed && { opacity: 0.85 }]}>
+                    <Text style={styles.nextBtnText}>{tr("Unlock more puzzles")}</Text>
+                </Pressable>
             </View>
         );
     } else if (!puzzle) {
         content = (
             <View style={styles.center}>
                 <Text style={styles.centerEmoji}>🏆</Text>
-                <Text style={styles.centerTitle}>Alle Puzzles geschafft!</Text>
-                <Text style={styles.centerText}>Du hast alle {sortedPuzzles.length} Puzzles gelöst.</Text>
+                <Text style={styles.centerTitle}>{tr("All puzzles completed!")}</Text>
+                <Text style={styles.centerText}>{tr("You solved all")} {sortedPuzzles.length} {tr("puzzles.")}</Text>
             </View>
         );
     } else {
@@ -472,17 +538,25 @@ export default function PuzzlesScreen() {
                 total={sortedPuzzles.length}
                 onSolved={handleSolved}
                 onNext={goNext}
+                freeLeft={allowance && !allowance.unlimited ? allowance.left : null}
             />
         );
     }
 
     return (
         <ImageBackground
-            source={require("../../assets/images/onlinebackground.png")}
+            source={require("../../assets/images/background.jpg")}
             style={styles.container}
             resizeMode="cover"
         >
             {content}
+
+            <LimitGate
+                visible={gateOpen}
+                kind="puzzle"
+                onClose={() => setGateOpen(false)}
+                onRewarded={handleRewarded}
+            />
         </ImageBackground>
     );
 }
@@ -583,6 +657,7 @@ const styles = StyleSheet.create({
     },
     nextBtnText: { color: "#12151B", fontSize: 15, fontWeight: "800" },
 
+    freeLeft: { color: "#E8B93E", fontSize: 12.5, fontWeight: "600", marginBottom: 8 },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     centerEmoji: { fontSize: 44 },
     centerTitle: { color: "#fff", fontSize: 22, fontWeight: "800", marginTop: 10 },

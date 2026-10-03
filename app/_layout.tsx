@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -12,11 +12,37 @@ import {
   disconnectSocket,
   getSocket,
 } from "../lib/socket";
+import ChallengeHost from "../components/ChallengeHost";
+import { syncProgress } from "../lib/progressSync";
 import { supabase } from "../lib/supabase";
+import { log } from "../lib/log";
+import { loadLanguage, tr, useLanguage } from "../lib/i18n";
+import { loadSoundSetting } from "../lib/sounds";
+import { installErrorReporting, setErrorScreen } from "../lib/feedback";
+import { loadShop } from "../lib/shop";
 
 export default function Layout() {
   const [sessionKicked, setSessionKicked] = useState(false);
   const sessionKickedRef = useRef(false);
+
+  // Language: the stored choice is read once; changing it in the settings
+  // rebuilds the screens (the "key" below) so every text is shown again in
+  // the new language.
+  const language = useLanguage();
+  const [languageReady, setLanguageReady] = useState(false);
+
+  useEffect(() => {
+    loadLanguage().finally(() => setLanguageReady(true));
+    loadSoundSetting();
+    loadShop();
+    installErrorReporting();
+  }, []);
+
+  // Error reports say on which screen the error happened.
+  const pathname = usePathname();
+  useEffect(() => {
+    setErrorScreen(pathname);
+  }, [pathname]);
 
   // =============================
   // WEB: HINTERGRUNDBILD-FIX
@@ -64,7 +90,7 @@ export default function Layout() {
     // =============================
     const handleSessionKicked = () => {
       if (!mounted) return;
-      console.log(
+      log(
         "⚠️ SESSION KICKED: another device logged in"
       );
       sessionKickedRef.current = true;
@@ -82,13 +108,13 @@ export default function Layout() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(
+        log(
           "AUTH EVENT:",
           event
         );
         if (!mounted) return;
         if (sessionKickedRef.current) {
-          console.log(
+          log(
             "SOCKET: blocked because this device was kicked"
           );
           return;
@@ -103,6 +129,8 @@ export default function Layout() {
               !sessionKickedRef.current
             ) {
               connectAuthenticatedSocket();
+              // XP, streak and lesson progress follow the account.
+              syncProgress();
             }
           }, 100);
         }
@@ -128,6 +156,7 @@ export default function Layout() {
     // INITIAL SESSION
     // =============================
     connectAuthenticatedSocket();
+    syncProgress();
     // =============================
     // CLEANUP
     // =============================
@@ -142,7 +171,9 @@ export default function Layout() {
   }, []);
   return (
     <View style={styles.container}>
+      {languageReady && (
       <Stack
+        key={`screens-${language}`}
         screenOptions={{
           headerShown: false,
           contentStyle: {
@@ -151,6 +182,9 @@ export default function Layout() {
           animation: "none",
         }}
       />
+      )}
+      {/* Challenges and short notices, on top of every screen */}
+      {!sessionKicked && languageReady && <ChallengeHost key={`host-${language}`} />}
       {sessionKicked && (
         <View style={styles.overlay}>
           <View style={styles.card}>
@@ -158,25 +192,21 @@ export default function Layout() {
               <Text style={styles.icon}>!</Text>
             </View>
             <Text style={styles.title}>
-              Account auf anderem Gerät aktiv
+              {tr("Account active on another device")}
             </Text>
             <Text style={styles.message}>
-              Dieser Account wird gerade auf
-              einem anderen Gerät verwendet.
+              {tr("This account is currently being used on another device.")}
             </Text>
             <Text style={styles.message}>
-              Ein Account kann nicht gleichzeitig
-              auf mehreren Geräten verwendet werden.
+              {tr("An account cannot be used on several devices at the same time.")}
             </Text>
             <Text style={styles.instruction}>
-              Schließe die App auf dem anderen
-              Gerät vollständig. Danach kannst du
-              diesen Account hier wieder verwenden.
+              {tr("Close the app completely on the other device. After that you can use this account here again.")}
             </Text>
             <View style={styles.status}>
               <ActivityIndicator size="small" />
               <Text style={styles.statusText}>
-                Diese Sitzung ist gesperrt
+                {tr("This session is locked")}
               </Text>
             </View>
           </View>

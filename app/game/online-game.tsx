@@ -7,10 +7,8 @@ import {
     Alert,
     Animated,
     BackHandler,
-    Dimensions,
     Easing,
     Image,
-    ImageBackground,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -21,46 +19,37 @@ import {
     TextInput,
     View,
 } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-    calculateElo,
     getCurrentAccount,
-    updateAccount,
+    setLocalRating,
 } from "../../lib/account";
+import { claimGameStart } from "../../lib/challenges";
 import { cloneWithHistory } from "../../lib/chessUtils";
 import { getFriendshipStatusWith, sendFriendRequest } from "../../lib/friends";
 import { saveGameRecord } from "../../lib/games";
 import { getSocket } from "../../lib/socket";
-import Board from "./components/Board";
-import { useChessInput } from "./hooks/useChessInput";
+import Board from "../../components/game/Board";
+import { BOARD_SIZE, MAX_PREMOVES, pieces, pieceToKey } from "../../components/game/pieces";
+import { useChessInput } from "../../components/game/useChessInput";
+import { log } from "../../lib/log";
+import { tr } from "../../lib/i18n";
+import { playSound, useMoveSound } from "../../lib/sounds";
+import { reportTaskEvent } from "../../lib/dailyTasks";
+import ReportSheet from "../../components/ReportSheet";
+import { MIN_PLIES_FOR_GAME } from "../../lib/dailyTaskRules";
 
 // Board.tsx currently exports a component without declared props types.
 const BoardAny: any = Board;
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
-const BOARD_SIZE = Math.min(Dimensions.get("window").width * 0.9, 520);
 const SQUARE_SIZE = BOARD_SIZE / 8;
 
 // Same as in the bot game: this many premoves can be queued in a row at most.
-const MAX_PREMOVES = 8;
 
-const pieces: Record<string, any> = {
-    wp: require("../../assets/images/pawn_white.png"),
-    wr: require("../../assets/images/rook_white.png"),
-    wn: require("../../assets/images/knight_white.png"),
-    wb: require("../../assets/images/bishop_white.png"),
-    wq: require("../../assets/images/queen_white.png"),
-    wk: require("../../assets/images/king_white.png"),
-    bp: require("../../assets/images/pawn_black.png"),
-    br: require("../../assets/images/rook_black.png"),
-    bn: require("../../assets/images/knight_black.png"),
-    bb: require("../../assets/images/bishop_black.png"),
-    bq: require("../../assets/images/queen_black.png"),
-    bk: require("../../assets/images/king_black.png"),
-};
 
 const toSquare = (row: number, col: number) => `${FILES[col]}${8 - row}`;
-const pieceToKey = (piece: any) => (piece ? `${piece.color}${piece.type}` : null);
 
 // =============================
 // MATERIAL / CAPTURED PIECES
@@ -174,10 +163,20 @@ export default function GameScreen() {
         Number(getParam("blackRating")) || 1000
     );
 
+    // Rating after the game as sent by the server (null until it arrives).
+    const [ratingAfter, setRatingAfter] = useState<number | null>(null);
+
     const userId = getParam("userId");
 
     const [game, setGame] = useState(new Chess());
     const [moveHistory, setMoveHistory] = useState<string[]>([]);
+
+    // Sounds: every move that is added to the list (own, opponent, premove).
+    useMoveSound(moveHistory);
+
+    useEffect(() => {
+        playSound("gameStart");
+    }, []);
     const [lastMove, setLastMove] =
         useState<{ from: string; to: string } | null>(null);
 
@@ -197,8 +196,13 @@ export default function GameScreen() {
     );
     const [friendStatus, setFriendStatus] = useState<FriendStatus>("none");
 
-    const [whiteTime, setWhiteTime] = useState(300000);
-    const [blackTime, setBlackTime] = useState(300000);
+    // The clocks start with the time control of this game (sent with the
+    // game start); the server keeps them in sync afterwards.
+    const initialWhiteTime = Number(getParam("whiteTime")) || 300000;
+    const initialBlackTime = Number(getParam("blackTime")) || 300000;
+
+    const [whiteTime, setWhiteTime] = useState(initialWhiteTime);
+    const [blackTime, setBlackTime] = useState(initialBlackTime);
     const [activeColor, setActiveColor] =
         useState<"w" | "b">("w");
 
@@ -223,6 +227,7 @@ export default function GameScreen() {
 
     const [rematchWaiting, setRematchWaiting] = useState(false);
     const [showRematchOffer, setShowRematchOffer] = useState(false);
+    const [reportOpen, setReportOpen] = useState(false);
 
     // NEW: Supabase game ID of the most recently saved game, so the
     // "Analysis" button can link directly to the game review view.
@@ -274,8 +279,8 @@ export default function GameScreen() {
     // The server is authoritative. This ref stores the last exact server clock.
     // The UI interpolates locally between server packets for a smooth timer.
     const clockSync = useRef({
-        whiteTime: 300000,
-        blackTime: 300000,
+        whiteTime: initialWhiteTime,
+        blackTime: initialBlackTime,
         activeColor: "w" as "w" | "b",
         receivedAt: Date.now(),
     });
@@ -283,7 +288,7 @@ export default function GameScreen() {
     const endAnimation = useRef(new Animated.Value(0)).current;
 
     const backgroundImage =
-        require("../../assets/images/onlinebackground.png");
+        require("../../assets/images/background.jpg");
 
     const myRating =
         myColor === "w" ? whiteRating : blackRating;
@@ -424,6 +429,15 @@ export default function GameScreen() {
         clearPremoves(); // NEW: discard the premove chain once the game ends
         setGameEnded(true);
 
+        // Checkmate already has its own sound (the mating move).
+        if (reason !== "checkmate") playSound("gameEnd");
+
+        // Daily tasks: a game counts once it was really played.
+        if (gameRef.current.history().length >= MIN_PLIES_FOR_GAME) {
+            reportTaskEvent("game_played");
+            if (result === "win") reportTaskEvent("game_won");
+        }
+
         try {
             const acc = await getCurrentAccount();
 
@@ -432,10 +446,8 @@ export default function GameScreen() {
                 return;
             }
 
-            const currentRating = acc.rating ?? 1000;
-            const newRating = calculateElo(currentRating, opponentRating, result);
-
-            await updateAccount(acc.id, { rating: newRating });
+            // The new rating is calculated by the server and arrives via
+            // "rating_update" (see the effect below) - nothing to compute here.
 
             // CHANGED: also pass pgn + opponentAuthId, remember the remoteId
             // for the "Analysis" button (stays null for guest accounts).
@@ -443,13 +455,16 @@ export default function GameScreen() {
                 "online",
                 result,
                 pgnOverride ?? gameRef.current.pgn(),
-                opponentAuthId
+                opponentAuthId,
+                undefined,
+                myColor,
+                opponentName
             );
             setLastGameId(remoteId);
 
             showEndPopupAfterDelay({ type: result, reason });
         } catch (error) {
-            console.log("ELO UPDATE ERROR:", error);
+            log("GAME FINISH ERROR:", error);
             showEndPopupAfterDelay({ type: result, reason });
         }
     };
@@ -516,7 +531,7 @@ export default function GameScreen() {
 
         if (!move) {
             // If a premove is invalid, the following ones are void too
-            console.log("⚠️ PREMOVE INVALID, chain discarded:", pm);
+            log("⚠️ PREMOVE INVALID, chain discarded:", pm);
             setPremoves([]);
             return;
         }
@@ -571,7 +586,7 @@ export default function GameScreen() {
 
             if (!acc) return;
 
-            console.log("Socket ID:", s.id);
+            log("Socket ID:", s.id);
 
             // If this screen was opened from matchmaking,
             // determine color immediately from the route params.
@@ -694,6 +709,7 @@ export default function GameScreen() {
             setLastMove(null);
             setGameEnded(false);
             setEndState(null);
+            if (!data.resumed) playSound("gameStart");
             setShowLeaveModal(false);
             setShowPromotion(false);
             setPromotionMove(null);
@@ -702,6 +718,7 @@ export default function GameScreen() {
             setChatMessages([]);
             setUnreadCount(0);
             setLastGameId(null); // NEW: the Analysis button belongs to the previous game
+            setRatingAfter(null);
 
             eloProcessed.current = false;
             isLeaving.current = false;
@@ -727,7 +744,11 @@ export default function GameScreen() {
 
         s.on("game_start", handleGameStart);
 
+        // This screen handles new games (rematch, accepted challenge) itself.
+        const releaseGameStart = claimGameStart();
+
         return () => {
+            releaseGameStart();
             s.off("connect", onConnect);
             s.off("game_start", handleGameStart);
         };
@@ -762,8 +783,8 @@ export default function GameScreen() {
             setFriendStatus("pending_sent");
         } catch (error: any) {
             Alert.alert(
-                "Not possible",
-                error?.message || "The request could not be sent."
+                tr("Not possible"),
+                error?.message || tr("The request could not be sent.")
             );
         }
     };
@@ -827,6 +848,40 @@ export default function GameScreen() {
     }, [socket, myColor, opponentRating]);
 
     // =============================
+    // RATING (decided by the server)
+    // =============================
+
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleRatingUpdate = async (data: any) => {
+            const rating = Number(data?.rating);
+
+            if (!Number.isFinite(rating)) return;
+
+            setRatingAfter(rating);
+
+            try {
+                const acc = await getCurrentAccount();
+
+                // Signed-in players read their rating from the server anyway;
+                // this keeps the local copy (and guests) up to date.
+                if (acc) {
+                    await setLocalRating(acc.id, rating);
+                }
+            } catch (error) {
+                log("RATING UPDATE ERROR:", error);
+            }
+        };
+
+        socket.on("rating_update", handleRatingUpdate);
+
+        return () => {
+            socket.off("rating_update", handleRatingUpdate);
+        };
+    }, [socket]);
+
+    // =============================
     // OPPONENT MOVES
     // =============================
 
@@ -868,7 +923,7 @@ export default function GameScreen() {
             }
 
             if (!result) {
-                console.log(
+                log(
                     "IGNORED INVALID MOVE:",
                     {
                         from,
@@ -917,12 +972,11 @@ export default function GameScreen() {
 
         const handleDrawOffer = (data: any) => {
             Alert.alert(
-                "Draw offered",
-                `${data?.name || "Your opponent"
-                } wants a draw.`,
+                tr("Draw offered"),
+                tr("{0} wants a draw.", data?.name || "Your opponent"),
                 [
                     {
-                        text: "Decline",
+                        text: tr("Decline"),
                         style: "cancel",
                         onPress: () =>
                             socket.emit(
@@ -934,7 +988,7 @@ export default function GameScreen() {
                             ),
                     },
                     {
-                        text: "Accept",
+                        text: tr("Accept"),
                         onPress: () =>
                             socket.emit(
                                 "answer_draw",
@@ -950,8 +1004,8 @@ export default function GameScreen() {
 
         const handleDrawDeclined = () => {
             Alert.alert(
-                "Draw declined",
-                "Your opponent wants to keep playing."
+                tr("Draw declined"),
+                tr("Your opponent wants to keep playing.")
             );
         };
 
@@ -1054,8 +1108,8 @@ export default function GameScreen() {
             setRematchWaiting(false);
 
             Alert.alert(
-                "Rematch declined",
-                "Your opponent doesn't want a rematch."
+                tr("Rematch declined"),
+                tr("Your opponent doesn't want a rematch.")
             );
         };
 
@@ -1065,9 +1119,9 @@ export default function GameScreen() {
             setRematchWaiting(false);
 
             Alert.alert(
-                "Rematch not possible",
+                tr("Rematch not possible"),
                 data?.message ||
-                "Your opponent is no longer online."
+                tr("Your opponent is no longer online.")
             );
         };
 
@@ -1378,7 +1432,9 @@ export default function GameScreen() {
         result: "win" | "loss" | "draw" | "aborted",
         pgn: string,
         opponentId: string | null,
-        timestamp?: number
+        timestamp?: number,
+        color?: "w" | "b" | null,
+        opponent?: string | null
     ): Promise<string | null> {
         const key = "game_history";
         const stored = await AsyncStorage.getItem(key);
@@ -1390,6 +1446,7 @@ export default function GameScreen() {
             result,
             timestamp: timestamp ?? Date.now(),
             remoteId: null, // NEW, filled in shortly if the sync succeeds
+            color: color ?? null, // the review shows "you" for this side
         });
 
         await AsyncStorage.setItem(key, JSON.stringify(history));
@@ -1406,6 +1463,8 @@ export default function GameScreen() {
                     mode,
                     result,
                     pgn,
+                    playerColor: color ?? null,
+                    opponentName: opponent || null,
                 });
 
                 // NEW: write the remoteId into the same history entry afterwards
@@ -1419,7 +1478,7 @@ export default function GameScreen() {
                 }
             }
         } catch (error) {
-            console.log("SAVE GAME RECORD ERROR:", error);
+            log("SAVE GAME RECORD ERROR:", error);
         }
 
         return remoteId;
@@ -1504,7 +1563,7 @@ export default function GameScreen() {
                                     styles.title
                                 }
                             >
-                                Leave game?
+                                {tr("Leave game?")}
                             </Text>
 
                             <Text
@@ -1512,9 +1571,7 @@ export default function GameScreen() {
                                     styles.text
                                 }
                             >
-                                If you leave the game,
-                                it will be counted
-                                as a loss.
+                                {tr("If you leave the game, it will be counted as a loss.")}
                             </Text>
 
                             <View
@@ -1537,7 +1594,7 @@ export default function GameScreen() {
                                             styles.cancelButtonText
                                         }
                                     >
-                                        Cancel
+                                        {tr("Cancel")}
                                     </Text>
                                 </Pressable>
 
@@ -1556,7 +1613,7 @@ export default function GameScreen() {
                                             styles.leaveButtonText
                                         }
                                     >
-                                        Resign
+                                        {tr("Resign")}
                                     </Text>
                                 </Pressable>
                             </View>
@@ -1592,7 +1649,7 @@ export default function GameScreen() {
                                     styles.title
                                 }
                             >
-                                Rematch?
+                                {tr("Rematch?")}
                             </Text>
 
                             <Text
@@ -1600,9 +1657,7 @@ export default function GameScreen() {
                                     styles.text
                                 }
                             >
-                                Your opponent wants
-                                to play a new game
-                                against you.
+                                {tr("Your opponent wants to play a new game against you.")}
                             </Text>
 
                             <View style={styles.rematchButtons}>
@@ -1619,7 +1674,7 @@ export default function GameScreen() {
                                             styles.btnText
                                         }
                                     >
-                                        Play
+                                        {tr("Play")}
                                     </Text>
                                 </Pressable>
 
@@ -1636,7 +1691,7 @@ export default function GameScreen() {
                                             styles.declineLinkText
                                         }
                                     >
-                                        No, thanks
+                                        {tr("No, thanks")}
                                     </Text>
                                 </Pressable>
                             </View>
@@ -1682,7 +1737,7 @@ export default function GameScreen() {
                                             styles.chatTitle
                                         }
                                     >
-                                        Chat
+                                        {tr("Chat")}
                                     </Text>
                                     <Text
                                         style={
@@ -1691,7 +1746,7 @@ export default function GameScreen() {
                                     >
                                         {
                                             opponentName ||
-                                            "Opponent"
+                                            tr("Opponent")
                                         }
                                     </Text>
                                 </View>
@@ -1735,8 +1790,7 @@ export default function GameScreen() {
                                             styles.emptyChat
                                         }
                                     >
-                                        No messages
-                                        yet.
+                                        {tr("No messages yet.")}
                                     </Text>
                                 ) : (
                                     chatMessages.map(
@@ -1800,7 +1854,7 @@ export default function GameScreen() {
                                     onChangeText={
                                         setChatInput
                                     }
-                                    placeholder="Message..."
+                                    placeholder={tr("Message...")}
                                     placeholderTextColor="#888"
                                     maxLength={
                                         300
@@ -1827,7 +1881,7 @@ export default function GameScreen() {
                                             styles.chatSendText
                                         }
                                     >
-                                        Send
+                                        {tr("Send")}
                                     </Text>
                                 </Pressable>
                             </View>
@@ -1860,7 +1914,7 @@ export default function GameScreen() {
                                     styles.title
                                 }
                             >
-                                Choose promotion
+                                {tr("Choose promotion")}
                             </Text>
 
                             <View
@@ -1937,7 +1991,7 @@ export default function GameScreen() {
                                             "center",
                                     }}
                                 >
-                                    Cancel
+                                    {tr("Cancel")}
                                 </Text>
                             </Pressable>
                         </View>
@@ -1955,7 +2009,7 @@ export default function GameScreen() {
                                 styles.waitText
                             }
                         >
-                            Waiting for connection...  </Text>
+                            {tr("Waiting for connection...")}  </Text>
                     </View>
                 ) : (
                     <View
@@ -1981,7 +2035,7 @@ export default function GameScreen() {
                                         styles.clockLabel
                                     }
                                 >
-                                    ⚪ {whiteName || "White"}
+                                    ⚪ {whiteName || tr("White")}
                                 </Text>
                                 <Text
                                     style={
@@ -2021,7 +2075,7 @@ export default function GameScreen() {
                                         styles.clockLabel
                                     }
                                 >
-                                    ⚫ {blackName || "Black"}
+                                    ⚫ {blackName || tr("Black")}
                                 </Text>
                                 <Text
                                     style={
@@ -2122,7 +2176,7 @@ export default function GameScreen() {
                                                         styles.addFriendBtnText
                                                     }
                                                 >
-                                                    + Friend
+                                                    {tr("+ Friend")}
                                                 </Text>
                                             </Pressable>
                                         )}
@@ -2130,21 +2184,21 @@ export default function GameScreen() {
                                     {opponentAuthId &&
                                         friendStatus === "pending_sent" && (
                                             <Text style={styles.friendPending}>
-                                                Request sent
+                                                {tr("Request sent")}
                                             </Text>
                                         )}
 
                                     {opponentAuthId &&
                                         friendStatus === "pending_received" && (
                                             <Text style={styles.friendPending}>
-                                                Sent you a request
+                                                {tr("Sent you a request")}
                                             </Text>
                                         )}
 
                                     {opponentAuthId &&
                                         friendStatus === "friends" && (
                                             <Text style={styles.friendPending}>
-                                                ✓ Friends
+                                                {tr("✓ Friends")}
                                             </Text>
                                         )}
                                 </View>
@@ -2276,6 +2330,7 @@ export default function GameScreen() {
                                     if (gameEnded || endState) return;
                                     if (premovesRef.current.length >= MAX_PREMOVES) return;
                                     setPremoves([...premovesRef.current, { from, to }]);
+                                    playSound("premove");
                                 }}
                                 onClearPremove={clearPremoves}
                             />
@@ -2302,7 +2357,7 @@ export default function GameScreen() {
                                             styles.bottomBtn
                                         }
                                     >
-                                        Resign
+                                        {tr("Resign")}
                                     </Text>
                                 </Pressable>
 
@@ -2319,8 +2374,8 @@ export default function GameScreen() {
                                         );
 
                                         Alert.alert(
-                                            "Draw offered",
-                                            "Your opponent will receive the draw request."
+                                            tr("Draw offered"),
+                                            tr("Your opponent will receive the draw request.")
                                         );
                                     }}
                                 >
@@ -2329,7 +2384,7 @@ export default function GameScreen() {
                                             styles.bottomBtn
                                         }
                                     >
-                                        Draw
+                                        {tr("Draw")}
                                     </Text>
                                 </Pressable>
 
@@ -2346,7 +2401,7 @@ export default function GameScreen() {
                                             styles.bottomBtn
                                         }
                                     >
-                                        Chat
+                                        {tr("Chat")}
                                     </Text>
                                     {unreadCount > 0 && (
                                         <View style={styles.chatBadge}>
@@ -2403,7 +2458,7 @@ export default function GameScreen() {
                                                             styles.winTitle
                                                         }
                                                     >
-                                                        Victory!
+                                                        {tr("Victory!")}
                                                     </Text>
 
                                                     <Text
@@ -2413,16 +2468,16 @@ export default function GameScreen() {
                                                     >
                                                         {endState.reason ===
                                                             "checkmate"
-                                                            ? "You checkmated your opponent."
+                                                            ? tr("You checkmated your opponent.")
                                                             : endState.reason ===
                                                                 "timeout"
-                                                                ? "Your opponent's time ran out."
+                                                                ? tr("Your opponent's time ran out.")
                                                                 : endState.reason ===
                                                                     "resign"
-                                                                    ? "Your opponent resigned."
+                                                                    ? tr("Your opponent resigned.")
                                                                     : endState.reason ===
                                                                         "disconnect"
-                                                                        ? "Your opponent lost connection. " : ""}
+                                                                        ? tr("Your opponent lost connection. ") : ""}
                                                     </Text>
                                                 </>
                                             )}
@@ -2435,7 +2490,7 @@ export default function GameScreen() {
                                                             styles.loseTitle
                                                         }
                                                     >
-                                                        Defeat
+                                                        {tr("Defeat")}
                                                     </Text>
 
                                                     <Text
@@ -2445,16 +2500,16 @@ export default function GameScreen() {
                                                     >
                                                         {endState.reason ===
                                                             "checkmate"
-                                                            ? "You were checkmated."
+                                                            ? tr("You were checkmated.")
                                                             : endState.reason ===
                                                                 "timeout"
-                                                                ? "Your time ran out."
+                                                                ? tr("Your time ran out.")
                                                                 : endState.reason ===
                                                                     "resign"
-                                                                    ? "You resigned the game."
+                                                                    ? tr("You resigned the game.")
                                                                     : endState.reason ===
                                                                         "disconnect"
-                                                                        ? "The connection was lost."
+                                                                        ? tr("The connection was lost.")
                                                                         : ""}
                                                     </Text>
                                                 </>
@@ -2468,7 +2523,7 @@ export default function GameScreen() {
                                                             styles.drawTitle
                                                         }
                                                     >
-                                                        Draw
+                                                        {tr("Draw")}
                                                     </Text>
 
                                                     <Text
@@ -2476,8 +2531,7 @@ export default function GameScreen() {
                                                             styles.subText
                                                         }
                                                     >
-                                                        The game ends
-                                                        in a draw.
+                                                        {tr("The game ends in a draw.")}
                                                     </Text>
                                                 </>
                                             )}
@@ -2492,10 +2546,13 @@ export default function GameScreen() {
                                                     styles.ratingText
                                                 }
                                             >
-                                                Your Elo:{" "}
-                                                {
-                                                    myRating
-                                                }   </Text>
+                                                {tr("Your Elo:")}{" "}
+                                                {ratingAfter ?? myRating}
+                                                {ratingAfter !== null &&
+                                                    ratingAfter !== myRating
+                                                    ? ` (${ratingAfter > myRating ? "+" : ""}${ratingAfter - myRating})`
+                                                    : ""}
+                                            </Text>
                                         </View>
 
                                         <Pressable
@@ -2518,7 +2575,7 @@ export default function GameScreen() {
                                                     params: {
                                                         name: myName,
                                                         avatar: myAvatar,
-                                                        rating: String(acc?.rating ?? myRating),
+                                                        rating: String(acc?.rating ?? ratingAfter ?? myRating),
                                                     },
                                                 } as any);
                                             }}
@@ -2528,7 +2585,7 @@ export default function GameScreen() {
                                                     styles.btnText
                                                 }
                                             >
-                                                New Game
+                                                {tr("New Game")}
                                             </Text>
                                         </Pressable>
 
@@ -2556,8 +2613,8 @@ export default function GameScreen() {
                                                     }
                                                 >
                                                     {rematchWaiting
-                                                        ? "Waiting..."
-                                                        : "Rematch"}
+                                                        ? tr("Waiting...")
+                                                        : tr("Rematch")}
                                                 </Text>
                                             </Pressable>
 
@@ -2577,7 +2634,7 @@ export default function GameScreen() {
                                                         );
                                                         router.push({
                                                             pathname: "/game/review",
-                                                            params: { gameId: lastGameId },
+                                                            params: { gameId: lastGameId, color: myColor ?? "" },
                                                         } as any);
                                                     }}
                                                 >
@@ -2586,7 +2643,7 @@ export default function GameScreen() {
                                                             styles.secondaryBtnText
                                                         }
                                                     >
-                                                        Analysis
+                                                        {tr("Analysis")}
                                                     </Text>
                                                 </Pressable>
                                             )}
@@ -2609,16 +2666,38 @@ export default function GameScreen() {
                                                         styles.secondaryBtnText
                                                     }
                                                 >
-                                                    Home
+                                                    {tr("Home")}
                                                 </Text>
                                             </Pressable>
                                         </View>
+
+                                        {/* Report the opponent of this game */}
+                                        <Pressable
+                                            onPress={() => setReportOpen(true)}
+                                            hitSlop={8}
+                                            style={({ pressed }) => [
+                                                styles.reportLink,
+                                                pressed && { opacity: 0.6 },
+                                            ]}
+                                        >
+                                            <Text style={styles.reportLinkText}>
+                                                ⚑ {tr("Report opponent")}
+                                            </Text>
+                                        </Pressable>
                                     </Animated.View>
                                 </View>
                             )}
                         </View>
                     </View>
                 )}
+
+                <ReportSheet
+                    visible={reportOpen}
+                    onClose={() => setReportOpen(false)}
+                    socket={socket}
+                    roomId={roomId}
+                    opponentName={opponentName}
+                />
             </SafeAreaView>
         </ImageBackground>
     );
@@ -3015,6 +3094,9 @@ const styles = StyleSheet.create({
         width: "100%",
         gap: 10,
     },
+
+    reportLink: { alignSelf: "center", marginTop: 14, paddingVertical: 4 },
+    reportLinkText: { color: "rgba(255,255,255,0.45)", fontSize: 12.5, fontWeight: "600" },
 
     secondaryBtn: {
         flex: 1,

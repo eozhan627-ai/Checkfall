@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     Pressable,
     StyleSheet,
@@ -7,24 +7,40 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getSocket } from "../../lib/socket";
-import WaitingChessBoard from "../components/WaitingChessBoard";
+import { claimGameStart } from "../../lib/challenges";
+import { ensureSocketConnected, getSocket } from "../../lib/socket";
+import WaitingChessBoard from "../../components/WaitingChessBoard";
+import { log } from "../../lib/log";
+import { describeTimeControl, getTimeControl } from "../../lib/timeControls";
+import { tr } from "../../lib/i18n";
 
 export default function WaitingScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
+
+    // Seconds spent searching - the server widens the rating range over time.
+    const [elapsed, setElapsed] = useState(0);
+    const gameStarted = useRef(false);
+
+    useEffect(() => {
+        const timer = setInterval(() => setElapsed((seconds) => seconds + 1), 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     // ================================
     // MATCHMAKING
     // ================================
     useEffect(() => {
         const socket = getSocket();
+        const releaseGameStart = claimGameStart();
 
         const handleGameStart = (data: any) => {
-            console.log(
+            log(
                 "🎮 MATCHMAKING: GAME START",
                 data
             );
+
+            gameStarted.current = true;
 
             router.replace({
                 pathname: "/game/online-game",
@@ -32,14 +48,15 @@ export default function WaitingScreen() {
             });
         };
 
-        const handleWaiting = () => {
-            console.log(
-                "⏳ MATCHMAKING: WAITING"
+        const handleWaiting = (data: any) => {
+            log(
+                "⏳ MATCHMAKING: WAITING",
+                data?.timeControl ?? ""
             );
         };
 
         const handleError = (data: any) => {
-            console.log(
+            log(
                 "❌ MATCHMAKING ERROR:",
                 data
             );
@@ -48,38 +65,42 @@ export default function WaitingScreen() {
         const startMatchmaking = () => {
             const rating = Number(params.rating);
 
-            console.log(
+            log(
                 "================================="
             );
-            console.log(
+            log(
                 "🔎 MATCHMAKING START"
             );
-            console.log(
+            log(
                 "SOCKET ID:",
                 socket.id
             );
-            console.log(
+            log(
                 "SOCKET CONNECTED:",
                 socket.connected
             );
-            console.log(
+            log(
                 "NAME:",
                 params.name
             );
-            console.log(
+            log(
                 "AVATAR:",
                 params.avatar
             );
-            console.log(
+            log(
                 "RATING:",
                 rating
             );
-            console.log(
+            log(
+                "TIME CONTROL:",
+                getTimeControl(String(params.timeControl ?? "")).id
+            );
+            log(
                 "================================="
             );
 
             if (!Number.isFinite(rating)) {
-                console.log(
+                log(
                     "❌ INVALID RATING:",
                     params.rating
                 );
@@ -91,9 +112,10 @@ export default function WaitingScreen() {
                 name: params.name,
                 avatar: params.avatar,
                 rating,
+                timeControl: getTimeControl(String(params.timeControl ?? "")).id,
             });
 
-            console.log(
+            log(
                 "📤 FIND_MATCH SENT"
             );
         };
@@ -122,13 +144,13 @@ export default function WaitingScreen() {
         // ================================
 
         if (socket.connected) {
-            console.log(
+            log(
                 "🟢 SOCKET ALREADY CONNECTED"
             );
 
             startMatchmaking();
         } else {
-            console.log(
+            log(
                 "🔌 SOCKET NOT CONNECTED → CONNECTING..."
             );
 
@@ -137,7 +159,7 @@ export default function WaitingScreen() {
                 startMatchmaking
             );
 
-            socket.connect();
+            ensureSocketConnected();
         }
 
         // ================================
@@ -145,6 +167,8 @@ export default function WaitingScreen() {
         // ================================
 
         return () => {
+            releaseGameStart();
+
             socket.off(
                 "game_start",
                 handleGameStart
@@ -164,21 +188,24 @@ export default function WaitingScreen() {
                 "connect",
                 startMatchmaking
             );
+
+            // Leaving this screen in any way (Cancel, the Android back
+            // button, a swipe) ends the search. Otherwise the server could
+            // still pair this player while nobody is looking.
+            if (!gameStarted.current) {
+                socket.emit("cancel_matchmaking");
+            }
         };
     }, []);
 
-    // Cancel search and navigate back.
-    // Matches the server event "cancel_matchmaking" (see server.js).
+    // Cancel search and navigate back. The effect above tells the server
+    // ("cancel_matchmaking") when this screen closes.
     const handleCancel = () => {
-        const socket = getSocket();
-
-        socket.emit("cancel_matchmaking");
-        socket.off("game_start");
-        socket.off("waiting");
-        socket.off("matchmaking_error");
-
         router.back();
     };
+
+    const statusText =
+        elapsed >= 10 ? tr("Widening the rating range...") : tr("Searching for an opponent...");
 
     return (
         <SafeAreaView style={styles.container}>
@@ -187,17 +214,25 @@ export default function WaitingScreen() {
 
                 {/* BRAND */}
                 <Text style={styles.brand}>
-                    POVCheck
+                    {tr("POVCheck")}
                 </Text>
 
                 {/* TITLE */}
                 <Text style={styles.title}>
-                    Finding an opponent
+                    {tr("Finding an opponent")}
                 </Text>
 
                 {/* SUBTITLE */}
                 <Text style={styles.subtitle}>
-                    We're finding a suitable opponent for you.   </Text>
+                    {tr("We're finding a suitable opponent for you.")}
+                </Text>
+
+                {/* TIME CONTROL */}
+                <View style={styles.timePill}>
+                    <Text style={styles.timePillText}>
+                        {getTimeControl(String(params.timeControl ?? "")).category} · {describeTimeControl(String(params.timeControl ?? ""))} {tr("· Rated")}
+                    </Text>
+                </View>
 
                 {/* CHESS BOARD */}
                 <WaitingChessBoard />
@@ -208,7 +243,7 @@ export default function WaitingScreen() {
                     <View style={styles.statusDot} />
 
                     <Text style={styles.statusText}>
-                        Searching for an opponent...
+                        {statusText}
                     </Text>
 
                 </View>
@@ -222,14 +257,13 @@ export default function WaitingScreen() {
                     ]}
                 >
                     <Text style={styles.cancelButtonText}>
-                        Cancel
+                        {tr("Cancel")}
                     </Text>
                 </Pressable>
 
                 {/* INFO */}
                 <Text style={styles.info}>
-                    The match will start automatically
-                    once an opponent has been found.
+                    {tr("The match will start automatically once an opponent has been found.")}
                 </Text>
 
             </View>
@@ -239,6 +273,18 @@ export default function WaitingScreen() {
 }
 
 const styles = StyleSheet.create({
+    timePill: {
+        alignSelf: "center",
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: 999,
+        backgroundColor: "rgba(91,141,184,0.16)",
+        borderWidth: 1,
+        borderColor: "rgba(91,141,184,0.45)",
+        marginTop: 14,
+        marginBottom: 18,
+    },
+    timePillText: { color: "#CFE0EF", fontSize: 13, fontWeight: "700" },
     container: {
         flex: 1,
         backgroundColor: "#0f172a",

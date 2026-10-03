@@ -1,8 +1,9 @@
 // Belohnungssystem für das Daily Puzzle: XP, Level und Tages-Streak.
 // Benötigt: npx expo install @react-native-async-storage/async-storage
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { REWARDS_KEY, schedulePushProgress } from "./progressSync";
 
-const KEY = "puzzle_rewards_v1";
+const KEY = REWARDS_KEY;
 
 export type Rewards = {
     xp: number;
@@ -36,6 +37,24 @@ export async function getRewards(): Promise<Rewards> {
     } catch {
         return EMPTY;
     }
+}
+
+// Adds XP from somewhere else in the app (e.g. daily tasks).
+export async function addXp(amount: number): Promise<Rewards> {
+    const current = await getRewards();
+
+    if (!Number.isFinite(amount) || amount <= 0) return current;
+
+    const next: Rewards = { ...current, xp: current.xp + Math.round(amount) };
+
+    try {
+        await AsyncStorage.setItem(KEY, JSON.stringify(next));
+        schedulePushProgress();
+    } catch {
+        /* the XP are then just not stored */
+    }
+
+    return next;
 }
 
 // Streak, der gerade wirklich läuft (gestern oder heute gelöst)
@@ -77,6 +96,7 @@ export async function awardDailyPuzzle(stars: number, rating: number): Promise<A
 
     try {
         await AsyncStorage.setItem(KEY, JSON.stringify(next));
+        schedulePushProgress();
     } catch {
         /* Belohnung wird dann nur nicht gespeichert */
     }

@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import React from "react";
+import { tr } from "../lib/i18n";
 import {
     Pressable,
     ScrollView,
@@ -64,6 +65,13 @@ export default function PrivacyScreen() {
                         When using online features, game data (moves,
                         results, session info) is transmitted to servers
                         to enable multiplayer functionality.
+                    </Text>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{tr("Reports, support and error reports")}</Text>
+                    <Text style={styles.text}>
+                        {tr("If you report a player, we store your report, the reason, your text and the moves of that game, linked to both accounts. If you write to support, we store your message, the e-mail address you enter, your app version and device type, and your account if you are signed in. If the app runs into an unexpected error, it sends a short technical report (error text, place in the code, screen, app version, device type, and your account if you are signed in). We use this only to handle reports, answer you and fix problems.")}
                     </Text>
                 </View>
 

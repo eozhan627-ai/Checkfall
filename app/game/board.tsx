@@ -6,9 +6,7 @@ import {
     Alert,
     Animated,
     BackHandler,
-    Dimensions,
     Easing,
-    ImageBackground,
     Modal,
     Pressable,
     ScrollView,
@@ -16,33 +14,18 @@ import {
     Text,
     View,
 } from "react-native";
+import ImageBackground from "../../components/ui/ImageBackground";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import Board from "./components/Board";
+import Board from "../../components/game/Board";
+import { BOARD_SIZE, pieces, pieceToKey } from "../../components/game/pieces";
+import { log } from "../../lib/log";
+import { tr } from "../../lib/i18n";
+import { useMoveSound } from "../../lib/sounds";
 
 // Gleiche Deckelung wie in bot-game.tsx / online-game.tsx
-const BOARD_SIZE = Math.min(Dimensions.get("window").width * 0.9, 520);
 
-const pieces: Record<string, any> = {
-    wp: require("../../assets/images/pawn_white.png"),
-    wr: require("../../assets/images/rook_white.png"),
-    wn: require("../../assets/images/knight_white.png"),
-    wb: require("../../assets/images/bishop_white.png"),
-    wq: require("../../assets/images/queen_white.png"),
-    wk: require("../../assets/images/king_white.png"),
 
-    bp: require("../../assets/images/pawn_black.png"),
-    br: require("../../assets/images/rook_black.png"),
-    bn: require("../../assets/images/knight_black.png"),
-    bb: require("../../assets/images/bishop_black.png"),
-    bq: require("../../assets/images/queen_black.png"),
-    bk: require("../../assets/images/king_black.png"),
-};
-
-const pieceToKey = (piece: any) => {
-    if (!piece) return null;
-    return `${piece.color}${piece.type}`;
-};
 
 type MoveData = {
     from: string;
@@ -65,11 +48,11 @@ type EndState = {
 };
 
 const END_TEXTS: Record<EndState["reason"], string> = {
-    checkmate: "Schachmatt.",
-    stalemate: "Patt – keine legalen Züge mehr.",
-    threefold: "Remis durch dreifache Stellungswiederholung.",
-    material: "Remis durch unzureichendes Material.",
-    rule: "Remis nach 50-Züge-Regel oder allgemeinem Remis.",
+    get checkmate() { return tr("Checkmate."); },
+    get stalemate() { return tr("Stalemate – no legal moves left."); },
+    get threefold() { return tr("Draw by threefold repetition."); },
+    get material() { return tr("Draw by insufficient material."); },
+    get rule() { return tr("Draw by the 50-move rule."); },
 };
 
 export default function LocalGame() {
@@ -100,6 +83,9 @@ export default function LocalGame() {
     // =========================================================
 
     const [moveHistory, setMoveHistory] = useState<string[]>([]);
+
+    // Sounds: every move that is added to the list.
+    useMoveSound(moveHistory);
     const moveStack = useRef<MoveData[]>([]);
     const [moveIndex, setMoveIndex] = useState(0);
 
@@ -132,7 +118,7 @@ export default function LocalGame() {
     // BACKGROUND
     // =========================================================
 
-    const backgroundImage = require("../../assets/images/onlinebackground.png");
+    const backgroundImage = require("../../assets/images/background.jpg");
 
     // =========================================================
     // BOARD / PERSPECTIVE
@@ -205,7 +191,7 @@ export default function LocalGame() {
 
             await AsyncStorage.setItem(key, JSON.stringify(history));
         } catch (error) {
-            console.log("Fehler beim Speichern des Spielverlaufs:", error);
+            log("Error saving game history:", error);
         }
     };
 
@@ -350,7 +336,7 @@ export default function LocalGame() {
 
             gameFinished.current = false;
         } catch (error) {
-            console.log("Fehler beim Laden des Spiels:", error);
+            log("Error loading game:", error);
         }
     }, []);
 
@@ -492,15 +478,15 @@ export default function LocalGame() {
             await saveGameToHistory("local", "aborted", timestamp);
 
             setInfoModal({
-                title: "Spiel gespeichert",
-                text: "Du kannst es unter „Gespeicherte Spiele“ fortsetzen.",
+                title: tr("Game saved"),
+                text: tr("You can continue it under \"Saved Games\"."),
             });
         } catch (error) {
-            console.log("SaveGame Error:", error);
+            log("SaveGame Error:", error);
 
             setInfoModal({
-                title: "Fehler",
-                text: "Das Spiel konnte nicht gespeichert werden.",
+                title: tr("Error"),
+                text: tr("The game could not be saved."),
             });
         }
     };
@@ -523,7 +509,7 @@ export default function LocalGame() {
                 newGame.move(moveStack.current[i]);
             }
         } catch (error) {
-            console.log("Undo Error:", error);
+            log("Undo Error:", error);
 
             return;
         }
@@ -570,7 +556,7 @@ export default function LocalGame() {
                 newGame.move(moveStack.current[i]);
             }
         } catch (error) {
-            console.log("Redo Error:", error);
+            log("Redo Error:", error);
 
             return;
         }
@@ -617,7 +603,7 @@ export default function LocalGame() {
                 ...(promotion ? { promotion } : {}),
             });
         } catch (error) {
-            console.log("Move Error:", error);
+            log("Move Error:", error);
 
             return;
         }
@@ -860,7 +846,7 @@ export default function LocalGame() {
                             <Text style={styles.backText}>‹</Text>
                         </Pressable>
 
-                        <Text style={styles.headerTitle}>LOCAL GAME</Text>
+                        <Text style={styles.headerTitle}>{tr("LOCAL GAME")}</Text>
 
                         {/* Symmetrie rechts */}
                         <View style={styles.headerSpacer} />
@@ -901,10 +887,10 @@ export default function LocalGame() {
                                     ]}
                                 />
                                 <Text style={styles.turnText}>
-                                    {currentColor === "w" ? "WEISS" : "SCHWARZ"} AM ZUG
+                                    {currentColor === "w" ? tr("WHITE") : tr("BLACK")} {tr("TO MOVE")}
                                 </Text>
                                 {isCheck && !isCheckmate && (
-                                    <Text style={styles.checkBadge}>SCHACH</Text>
+                                    <Text style={styles.checkBadge}>{tr("SCHACH")}</Text>
                                 )}
                             </View>
 
@@ -949,7 +935,7 @@ export default function LocalGame() {
                                     style={[styles.actionButton, !canUndo && styles.actionDisabled]}
                                 >
                                     <Text style={styles.actionIcon}>↶</Text>
-                                    <Text style={styles.actionText}>Undo</Text>
+                                    <Text style={styles.actionText}>{tr("Undo")}</Text>
                                 </Pressable>
 
                                 <Pressable
@@ -958,17 +944,17 @@ export default function LocalGame() {
                                     style={[styles.actionButton, !canRedo && styles.actionDisabled]}
                                 >
                                     <Text style={styles.actionIcon}>↷</Text>
-                                    <Text style={styles.actionText}>Redo</Text>
+                                    <Text style={styles.actionText}>{tr("Redo")}</Text>
                                 </Pressable>
 
                                 <Pressable onPress={saveGame} style={styles.actionButton}>
                                     <Text style={styles.actionIcon}>⬇</Text>
-                                    <Text style={styles.actionText}>Save</Text>
+                                    <Text style={styles.actionText}>{tr("Save")}</Text>
                                 </Pressable>
 
                                 <Pressable onPress={restartGame} style={styles.actionButton}>
                                     <Text style={styles.actionIcon}>⟳</Text>
-                                    <Text style={styles.actionText}>Restart</Text>
+                                    <Text style={styles.actionText}>{tr("Restart")}</Text>
                                 </Pressable>
                             </View>
                         </View>
@@ -988,16 +974,16 @@ export default function LocalGame() {
             >
                 <View style={styles.overlay}>
                     <View style={styles.card}>
-                        <Text style={styles.title}>Bauernumwandlung</Text>
-                        <Text style={styles.text}>Wähle eine Figur:</Text>
+                        <Text style={styles.title}>{tr("Pawn promotion")}</Text>
+                        <Text style={styles.text}>{tr("Choose a piece:")}</Text>
 
                         <View style={styles.promoRow}>
                             {(
                                 [
-                                    ["q", "Dame"],
-                                    ["r", "Turm"],
-                                    ["b", "Läufer"],
-                                    ["n", "Springer"],
+                                    ["q", "Queen"],
+                                    ["r", "Rook"],
+                                    ["b", "Bishop"],
+                                    ["n", "Knight"],
                                 ] as const
                             ).map(([piece, label]) => (
                                 <Pressable
@@ -1011,7 +997,7 @@ export default function LocalGame() {
                         </View>
 
                         <Pressable onPress={() => setPromotionMove(null)}>
-                            <Text style={styles.promoCancel}>Abbrechen</Text>
+                            <Text style={styles.promoCancel}>{tr("Cancel")}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -1029,19 +1015,19 @@ export default function LocalGame() {
             >
                 <View style={styles.overlay}>
                     <View style={styles.card}>
-                        <Text style={styles.title}>Spiel neu starten?</Text>
-                        <Text style={styles.text}>Dein aktueller Fortschritt geht verloren.</Text>
+                        <Text style={styles.title}>{tr("Restart game?")}</Text>
+                        <Text style={styles.text}>{tr("Your current progress will be lost.")}</Text>
 
                         <View style={styles.buttons}>
                             <Pressable
                                 style={styles.cancelButton}
                                 onPress={() => setShowRestartModal(false)}
                             >
-                                <Text style={styles.cancelButtonText}>Abbrechen</Text>
+                                <Text style={styles.cancelButtonText}>{tr("Cancel")}</Text>
                             </Pressable>
 
                             <Pressable style={styles.leaveButton} onPress={confirmRestart}>
-                                <Text style={styles.leaveButtonText}>Neustarten</Text>
+                                <Text style={styles.leaveButtonText}>{tr("Restart")}</Text>
                             </Pressable>
                         </View>
                     </View>
@@ -1064,7 +1050,7 @@ export default function LocalGame() {
                         <Text style={styles.text}>{infoModal?.text}</Text>
 
                         <Pressable style={styles.okBtn} onPress={() => setInfoModal(null)}>
-                            <Text style={styles.btnText}>OK</Text>
+                            <Text style={styles.btnText}>{tr("OK")}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -1096,17 +1082,17 @@ export default function LocalGame() {
                         </Pressable>
 
                         {endState.type === "draw" ? (
-                            <Text style={styles.drawTitle}>Remis</Text>
+                            <Text style={styles.drawTitle}>{tr("Draw")}</Text>
                         ) : (
                             <Text style={styles.winTitle}>
-                                {endState.type === "white" ? "Weiß gewinnt!" : "Schwarz gewinnt!"}
+                                {endState.type === "white" ? tr("White wins!") : tr("Black wins!")}
                             </Text>
                         )}
 
                         <Text style={styles.subText}>{END_TEXTS[endState.reason]}</Text>
 
                         <Pressable style={styles.endPrimaryBtn} onPress={resetGame}>
-                            <Text style={styles.btnText}>Neue Partie</Text>
+                            <Text style={styles.btnText}>{tr("New game")}</Text>
                         </Pressable>
 
                         <View style={styles.secondaryRow}>
@@ -1117,7 +1103,7 @@ export default function LocalGame() {
                                     undoMove();
                                 }}
                             >
-                                <Text style={styles.endSecondaryBtnText}>Zug zurück</Text>
+                                <Text style={styles.endSecondaryBtnText}>{tr("Undo move")}</Text>
                             </Pressable>
 
                             <Pressable
@@ -1127,7 +1113,7 @@ export default function LocalGame() {
                                     router.back();
                                 }}
                             >
-                                <Text style={styles.endSecondaryBtnText}>Home</Text>
+                                <Text style={styles.endSecondaryBtnText}>{tr("Home")}</Text>
                             </Pressable>
                         </View>
                     </Animated.View>

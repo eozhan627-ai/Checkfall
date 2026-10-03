@@ -1,11 +1,12 @@
 import { getSocket } from "./socket";
+import { log } from "./log";
 
 // =============================
 // Aktionen
 // =============================
 export const resignGame = (roomId: string, myName: string, myAvatar: string) => {
   const socket = getSocket();
-  console.log("➡️ resign sent", roomId);
+  log("➡️ resign sent", roomId);
   socket.emit("resign_game", { roomId });
 };
 

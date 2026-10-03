@@ -1,251 +1,76 @@
 import { Chess } from "chess.js";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator, Dimensions, Image, PanResponder, Pressable, ScrollView,
-    StyleSheet, Text, View,
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    PanResponder,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
-// npx expo install react-native-view-shot expo-sharing
 import * as Sharing from "expo-sharing";
 import { captureRef } from "react-native-view-shot";
+import AccuracyRing, { accuracyColor } from "../../components/review/AccuracyRing";
+import AnalysisProgress, {
+    AnalysisProgressState,
+    EMPTY_PROGRESS,
+} from "../../components/review/AnalysisProgress";
+import ClassificationBadge from "../../components/review/ClassificationBadge";
+import EvalGraph from "../../components/review/EvalGraph";
+import MoveTable from "../../components/review/MoveTable";
+import ReviewBoard, { EvalBar } from "../../components/review/ReviewBoard";
+import LimitGate from "../../components/LimitGate";
+import { T } from "../../components/ui/theme";
 import { getCurrentAccount } from "../../lib/account";
 import {
-    onAnalysisComplete, onAnalysisError,
+    CLASSIFICATION_META,
+    CLASSIFICATION_ORDER,
+    describeMove,
+    formatEval,
+    GameReview,
+    isCurrentReview,
+    moveLabel,
+    normalizeAnalysis,
+    Side,
+    summarize,
+    whiteShare,
+} from "../../lib/analysis";
+import { askCoach } from "../../lib/coach";
+import {
+    AnalysisError,
+    confirmAnalysisAd,
+    onAnalysisComplete,
+    onAnalysisError,
     onAnalysisProgress,
     requestGameAnalysis,
 } from "../../lib/games";
 import { getSocket } from "../../lib/socket";
 import { supabase } from "../../lib/supabase";
+import { getLanguage, tr } from "../../lib/i18n";
+import { reportTaskEvent } from "../../lib/dailyTasks";
 
-const BOARD_SIZE = Math.min(Dimensions.get("window").width - 80, 380);
-const SQUARE_SIZE = BOARD_SIZE / 8;
+const WINDOW_WIDTH = Dimensions.get("window").width;
+const EVAL_BAR_SPACE = 28; // bar + gap
+const BOARD_SIZE = Math.floor(Math.min(WINDOW_WIDTH - 32 - EVAL_BAR_SPACE, 420) / 8) * 8;
+const CONTENT_WIDTH = BOARD_SIZE + EVAL_BAR_SPACE;
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 
-const COLORS = {
-    bg: "#0D0F13",
-    surface: "#171A20",
-    surfaceRaised: "#1D2129",
-    border: "rgba(255,255,255,0.07)",
-    textPrimary: "#ECEDEE",
-    textSecondary: "#868C94",
-    textTertiary: "#565B63",
-    accent: "#7C9473",
-    accentSoft: "rgba(124,148,115,0.14)",
-    accentBorder: "rgba(124,148,115,0.45)",
-    // Brett – identisch zum Spielbrett
-    boardLight: "#e7d5b7",
-    boardDark: "#b58863",
-    lastTo: "#6bb6ff",
-    lastFrom: "#4da3ff",
-    selected: "#4da3ff",
-    check: "#ff4d4d",
-    evalTrack: "#ECEDEE",
-    evalFill: "#20242B",
-};
+const coachImage = require("../../assets/images/coach.png");
 
-const pieces: Record<string, any> = {
-    wp: require("../../assets/images/pawn_white.png"),
-    wr: require("../../assets/images/rook_white.png"),
-    wn: require("../../assets/images/knight_white.png"),
-    wb: require("../../assets/images/bishop_white.png"),
-    wq: require("../../assets/images/queen_white.png"),
-    wk: require("../../assets/images/king_white.png"),
-    bp: require("../../assets/images/pawn_black.png"),
-    br: require("../../assets/images/rook_black.png"),
-    bn: require("../../assets/images/knight_black.png"),
-    bb: require("../../assets/images/bishop_black.png"),
-    bq: require("../../assets/images/queen_black.png"),
-    bk: require("../../assets/images/king_black.png"),
-};
-
-const PIECE_SCALE: Record<string, number> = {
-    wp: 1.35, wn: 1.55, wb: 1.7, wr: 1.65, wq: 1.55, wk: 1.3,
-    bp: 1.3, bn: 1.2, bb: 1.3, br: 1.15, bq: 1.25, bk: 1.15,
-};
-const PIECE_SHIFT: Record<string, number> = {
-    wb: -1.1, wr: -2, wq: -2, wp: 1.2, bp: 2, bn: 2, br: 2, bq: 2, bb: 0.5,
-};
-const pieceTransform = (key: string) => [
-    { scale: PIECE_SCALE[key] ?? 1 },
-    { translateY: PIECE_SHIFT[key] ?? 0 },
+const COACH_QUESTIONS = [
+    "Why is this move good or bad?",
+    "What was the idea behind the best move?",
+    "What should my plan be here?",
 ];
 
-const pieceToKey = (piece: any) => (piece ? `${piece.color}${piece.type}` : null);
-
-// ───────────────────────── Zugbewertung ─────────────────────────
-// Nur die gängigen Kategorien. Die Bewertung wird hier aus den Engine-Werten
-// berechnet (Gewinnwahrscheinlichkeit), damit Statistik, Genauigkeit und
-// Kurzreport immer zusammenpassen.
-
-type MoveClassification = "brilliant" | "best" | "good" | "inaccuracy" | "mistake" | "blunder" | "missed_win";
-
-type AnalysisMove = { moveNumber: number; san: string; evalCp: number | null; bestMove: string; classification?: string };
-
-type Analysis = {
-    depth: number; tier: string; moves: AnalysisMove[];
-    accuracy?: { w: number | null; b: number | null };
-};
-
-const CLASSIFICATION_META: Record<MoveClassification, { label: string; icon: string; color: string }> = {
-    brilliant: { label: "Brillant", icon: "!!", color: "#3FB6DE" },
-    best: { label: "Bester Zug", icon: "★", color: "#7C9473" },
-    good: { label: "Gut", icon: "✓", color: "#9BB58F" },
-    inaccuracy: { label: "Ungenauigkeit", icon: "?!", color: "#D2B45A" },
-    mistake: { label: "Fehler", icon: "?", color: "#E0914D" },
-    blunder: { label: "Patzer", icon: "??", color: "#DD6259" },
-    missed_win: { label: "Gewinn verpasst", icon: "✗", color: "#B37FE0" },
-};
-const CLASS_ORDER: MoveClassification[] = ["brilliant", "best", "good", "inaccuracy", "mistake", "blunder", "missed_win"];
-const NEG_KEYS: MoveClassification[] = ["blunder", "mistake", "inaccuracy", "missed_win"];
-// "Gut" bekommt kein Badge auf dem Brett, damit es ruhig bleibt
-const BADGE_HIDDEN: MoveClassification[] = ["good"];
-
-const winPct = (cp: number) => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
-const moveAccuracy = (loss: number) => Math.max(0, Math.min(100, 103.1668 * Math.exp(-0.04354 * loss) - 3.1669));
-const round1 = (n: number) => Math.round(n * 10) / 10;
-const PIECE_VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-
-function evalSeries(moves: AnalysisMove[]): number[] {
-    const out: number[] = [];
-    let prev = 0;
-    for (const m of moves) {
-        prev = m.evalCp ?? prev;
-        out.push(prev);
-    }
-    return out;
-}
-
-function moverStats(evals: number[], i: number) {
-    const isWhite = i % 2 === 0;
-    const prevCp = i === 0 ? 0 : evals[i - 1];
-    const curCp = evals[i];
-    const before = isWhite ? winPct(prevCp) : 100 - winPct(prevCp);
-    const after = isWhite ? winPct(curCp) : 100 - winPct(curCp);
-    return { before, after, loss: Math.max(0, before - after) };
-}
-
-function computeAccuracy(moves: AnalysisMove[]): { w: number | null; b: number | null } {
-    const evals = evalSeries(moves);
-    const sum = { w: 0, b: 0 };
-    const cnt = { w: 0, b: 0 };
-    moves.forEach((_, i) => {
-        const side = i % 2 === 0 ? "w" : "b";
-        sum[side] += moveAccuracy(moverStats(evals, i).loss);
-        cnt[side] += 1;
-    });
-    return {
-        w: cnt.w ? round1(sum.w / cnt.w) : null,
-        b: cnt.b ? round1(sum.b / cnt.b) : null,
-    };
-}
-
-type Ply = { from: string; to: string; uci: string; san: string; sacrifice: boolean };
-
-function classifyMoves(moves: AnalysisMove[], plies: Ply[]): MoveClassification[] {
-    const evals = evalSeries(moves);
-    return moves.map((m, i) => {
-        const { before, after, loss } = moverStats(evals, i);
-        const ply = plies[i];
-        const isBest = !!ply && !!m.bestMove && m.bestMove.slice(0, 4) === ply.uci.slice(0, 4);
-
-        // Gewinn verpasst: klar gewonnen gewesen, danach nur noch Vorteil/Remis
-        if (before >= 80 && after <= 65 && loss >= 12 && loss < 30) return "missed_win";
-        if (loss > 20) return "blunder";
-        if (loss > 10) return "mistake";
-        if (loss > 5) return "inaccuracy";
-
-        // Brillant: echtes Figurenopfer + (nahezu) bester Zug + nicht ohnehin schon gewonnen/verloren
-        if (ply?.sacrifice && loss <= 2 && before < 85 && after >= 45) return "brilliant";
-
-        if (isBest || loss <= 0.5) return "best";
-        return "good";
-    });
-}
-
-function computeCounts(classes: MoveClassification[]) {
-    const counts: Record<"w" | "b", Partial<Record<MoveClassification, number>>> = { w: {}, b: {} };
-    classes.forEach((c, i) => {
-        const side = i % 2 === 0 ? "w" : "b";
-        counts[side][c] = (counts[side][c] || 0) + 1;
-    });
-    return counts;
-}
-
-// ───────────────────────── Eröffnung ─────────────────────────
-const OPENING_BOOK: Record<string, string> = {
-    "e4 e5": "Offenes Spiel",
-    "e4 e5 Nf3 Nc6 Bb5": "Spanische Partie (Ruy López)",
-    "e4 e5 Nf3 Nc6 Bc4": "Italienische Partie",
-    "e4 e5 Nf3 Nf6": "Petrow-Verteidigung",
-    "e4 c5": "Sizilianische Verteidigung",
-    "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6": "Sizilianisch, Najdorf-Variante",
-    "e4 e6": "Französische Verteidigung",
-    "e4 c6": "Caro-Kann-Verteidigung",
-    "d4 d5": "Geschlossenes Spiel",
-    "d4 d5 c4": "Damengambit",
-    "d4 Nf6 c4 g6": "Königsindische Verteidigung",
-    "d4 Nf6 c4 e6": "Nimzowitsch-Indisch",
-    "d4 f5": "Holländische Verteidigung",
-    "c4": "Englische Eröffnung",
-    "Nf3": "Réti-Eröffnung",
-};
-
-function detectOpening(sanHistory: string[]): string | null {
-    const limit = Math.min(10, sanHistory.length);
-    for (let len = limit; len >= 1; len -= 1) {
-        const key = sanHistory.slice(0, len).join(" ");
-        if (OPENING_BOOK[key]) return OPENING_BOOK[key];
-    }
-    return null;
-}
-
-// ───────────────────────── Kurzreport ─────────────────────────
-function buildReport(acc: { w: number | null; b: number | null }, counts: ReturnType<typeof computeCounts>): string[] {
-    const worst = (c: Partial<Record<MoveClassification, number>>) => {
-        let bestKey: MoveClassification | null = null;
-        let bestVal = 0;
-        for (const k of NEG_KEYS) {
-            const v = c[k] || 0;
-            if (v > bestVal) { bestVal = v; bestKey = k; }
-        }
-        return bestKey ? { key: bestKey, count: bestVal } : null;
-    };
-
-    const lines: string[] = [];
-    const wAcc = acc.w ?? 0;
-    const bAcc = acc.b ?? 0;
-    const fmt = (n: number) => n.toFixed(1);
-
-    if (wAcc >= bAcc + 5) lines.push(`Weiß spielte insgesamt präziser (${fmt(wAcc)}% gegenüber ${fmt(bAcc)}%).`);
-    else if (bAcc >= wAcc + 5) lines.push(`Schwarz spielte insgesamt präziser (${fmt(bAcc)}% gegenüber ${fmt(wAcc)}%).`);
-    else lines.push(`Beide Seiten spielten ähnlich genau (${fmt(wAcc)}% zu ${fmt(bAcc)}%).`);
-
-    const w = worst(counts.w);
-    const b = worst(counts.b);
-    if (w) lines.push(`Größte Schwachstelle für Weiß: ${CLASSIFICATION_META[w.key].label} (${w.count}×).`);
-    if (b) lines.push(`Größte Schwachstelle für Schwarz: ${CLASSIFICATION_META[b.key].label} (${b.count}×).`);
-
-    const brilliantTotal = (counts.w.brilliant || 0) + (counts.b.brilliant || 0);
-    if (brilliantTotal === 1) lines.push("Die Partie enthält einen brillanten Zug.");
-    else if (brilliantTotal > 1) lines.push(`Die Partie enthält ${brilliantTotal} brillante Züge.`);
-
-    return lines;
-}
-
-// ───────────────────────── Brett-Helfer ─────────────────────────
-function squareCenter(square: string, flipped: boolean) {
-    const file = square.charCodeAt(0) - 97;
-    const rank = parseInt(square[1], 10);
-    const col = flipped ? 7 - file : file;
-    const row = flipped ? rank - 1 : 8 - rank;
-    return { x: col * SQUARE_SIZE + SQUARE_SIZE / 2, y: row * SQUARE_SIZE + SQUARE_SIZE / 2 };
-}
-
-function parseUci(uci: string): { from: string; to: string; promotion?: string } | null {
-    const m = /^([a-h][1-8])([a-h][1-8])([qrbn])?/.exec(uci);
-    if (!m) return null;
-    return { from: m[1], to: m[2], promotion: m[3] };
-}
+// "limit": today's free analysis is used up (see LimitGate).
+// "guest": not signed in - games of guests are not stored on the server.
+type Status = "loading" | "guest" | "limit" | "analyzing" | "ready" | "error";
 
 function findCheckedKing(game: Chess): string | null {
     if (!game.inCheck()) return null;
@@ -260,58 +85,70 @@ function findCheckedKing(game: Chess): string | null {
     return null;
 }
 
-function formatEval(cp: number) {
-    const v = Math.abs(cp) / 100;
-    const s = v >= 10 ? v.toFixed(0) : v.toFixed(1);
-    return `${cp > 0 ? "+" : cp < 0 ? "−" : ""}${s}`;
+function parseUci(uci: string | null): { from: string; to: string } | null {
+    const m = uci ? /^([a-h][1-8])([a-h][1-8])/.exec(uci) : null;
+    return m ? { from: m[1], to: m[2] } : null;
 }
 
-// Prüft, ob der letzte Zug ein echtes Figurenopfer war (Basis für "Brillant")
-function isSacrifice(game: Chess, last: any): boolean {
-    try {
-        if (!last || last.piece === "p" || last.piece === "k") return false;
-        const movedValue = PIECE_VALUE[last.piece];
-        const capturedValue = last.captured ? PIECE_VALUE[last.captured] : 0;
-        const replies = game.moves({ verbose: true }).filter((m: any) => m.to === last.to && m.captured);
-        if (replies.length === 0) return false;
-        const cheapest = replies.reduce((a: any, b: any) => (PIECE_VALUE[a.piece] <= PIECE_VALUE[b.piece] ? a : b));
-        const probe = new Chess(game.fen());
-        probe.move(cheapest.san);
-        const recapture = probe.moves({ verbose: true }).some((m: any) => m.to === last.to && m.captured);
-        const net = movedValue - (recapture ? PIECE_VALUE[cheapest.piece] : 0) - capturedValue;
-        return net >= 2;
-    } catch {
-        return false;
-    }
-}
+const RESULT_TEXT: Record<string, string> = {
+    get win() { return tr("You won"); },
+    get loss() { return tr("You lost"); },
+    get draw() { return tr("Draw"); },
+    get aborted() { return tr("Aborted"); },
+};
 
-// ───────────────────────── Screen ─────────────────────────
-export default function GameReview() {
+export default function GameReviewScreen() {
     const params = useLocalSearchParams();
     const gameId = params.gameId as string;
+    const colorParam = params.color === "w" || params.color === "b" ? (params.color as Side) : null;
 
     const [pgn, setPgn] = useState<string | null>(null);
-    const [analysis, setAnalysis] = useState<Analysis | null>(null);
-    const [status, setStatus] = useState<"loading" | "not_vip" | "analyzing" | "ready" | "error">("loading");
-    const [progress, setProgress] = useState({ done: 0, total: 0 });
+    const [review, setReview] = useState<GameReview | null>(null);
+    const [status, setStatus] = useState<Status>("loading");
+
+    // Daily tasks: looking at a finished analysis counts as "reviewed a game".
+    const reviewCounted = useRef(false);
+    useEffect(() => {
+        if (status === "ready" && !reviewCounted.current) {
+            reviewCounted.current = true;
+            reportTaskEvent("game_reviewed");
+        }
+    }, [status]);
+    const [progress, setProgress] = useState<AnalysisProgressState>(EMPTY_PROGRESS);
+
+    // Daily limit: the window with "Upgrade" / "Watch an ad".
+    const [gateOpen, setGateOpen] = useState(false);
+    const [adsLeft, setAdsLeft] = useState<number | null>(null);
+    // The analysis request that was sent when the ad started.
+    const adRequest = useRef<Promise<unknown> | null>(null);
+
     const [currentIndex, setCurrentIndex] = useState(0);
     const [flipped, setFlipped] = useState(false);
     const [showBest, setShowBest] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
 
-    const [mode, setMode] = useState<"review" | "sandbox">("review");
-    const [sandboxFen, setSandboxFen] = useState<string | null>(null);
-    const [sandboxHistory, setSandboxHistory] = useState<string[]>([]);
-    const [sandboxLast, setSandboxLast] = useState<{ from: string; to: string } | null>(null);
+    const [sandbox, setSandbox] = useState<{ fen: string; history: string[]; last: { from: string; to: string } | null } | null>(null);
     const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
 
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [playSpeed, setPlaySpeed] = useState(1);
+    const [coachOpen, setCoachOpen] = useState(false);
+    const [coachQuestion, setCoachQuestion] = useState("");
+    const [coachBusy, setCoachBusy] = useState(false);
+    const [coachAnswer, setCoachAnswer] = useState<{ ply: number; text: string; remaining?: number } | null>(null);
+    const [coachError, setCoachError] = useState<string | null>(null);
 
-    const [recentGames, setRecentGames] = useState<{ id: string; date: string; accuracy: number }[]>([]);
+    const [trend, setTrend] = useState<{ id: string; accuracy: number }[]>([]);
 
     const shareRef = useRef<View>(null);
+    const scrollRef = useRef<ScrollView>(null);
+    const boardY = useRef(0);
+
+    // =============================
+    // LOAD + ANALYSE
+    // =============================
 
     useEffect(() => {
+        let cancelled = false;
+
         (async () => {
             const { data, error } = await supabase
                 .from("games")
@@ -319,622 +156,985 @@ export default function GameReview() {
                 .eq("id", gameId)
                 .single();
 
-            if (error || !data) { setStatus("error"); return; }
+            if (cancelled) return;
+            if (error || !data) {
+                setStatus("error");
+                return;
+            }
+
             setPgn(data.pgn);
 
-            if (data.analyzed && data.analysis) {
-                setAnalysis(data.analysis);
+            const stored = data.analyzed ? normalizeAnalysis(data.analysis) : null;
+
+            if (stored && isCurrentReview(stored)) {
+                setReview(stored);
                 setStatus("ready");
                 return;
             }
 
             const acc = await getCurrentAccount();
-            if (!acc || !acc.vipTier || acc.vipTier === "none") { setStatus("not_vip"); return; }
+            if (cancelled) return;
+
+            const isVip = !!acc?.vipTier && acc.vipTier !== "none";
+
+            // An analysis in the old format: VIP gets it redone automatically.
+            // Without VIP it is shown as it is - redoing it would use up
+            // today's free analysis without being asked.
+            if (stored && !isVip) {
+                setReview(stored);
+                setStatus("ready");
+                return;
+            }
+
+            if (!acc?.authId || acc.guest) {
+                setStatus("guest");
+                return;
+            }
 
             setStatus("analyzing");
+
             try {
-                const socket = getSocket();
-                await requestGameAnalysis(socket, gameId);
+                await requestGameAnalysis(getSocket(), gameId, colorParam);
             } catch (err: any) {
-                setStatus(err?.message === "NOT_VIP" ? "not_vip" : "error");
+                if (cancelled) return;
+
+                if (stored) {
+                    setReview(stored);
+                    setStatus("ready");
+                } else if (err?.message === "DAILY_LIMIT") {
+                    setAdsLeft((err as AnalysisError).quota?.adsLeft ?? null);
+                    setStatus("limit");
+                    setGateOpen(true);
+                } else {
+                    setStatus("error");
+                }
             }
         })();
-    }, [gameId]);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [gameId, colorParam]);
 
     useEffect(() => {
         const socket = getSocket();
+
         const offProgress = onAnalysisProgress(socket, (data) => {
             if (data.gameId !== gameId) return;
-            setProgress({ done: data.progress, total: data.total });
+
+            setProgress((prev) => {
+                const feed = data.last ? [data.last, ...prev.feed].slice(0, 8) : prev.feed;
+                const evals =
+                    data.last && data.last.ply >= 0
+                        ? { ...prev.evals, [data.last.ply]: { evalCp: data.last.evalCp, mate: !!data.last.mate } }
+                        : prev.evals;
+
+                return {
+                    done: data.progress ?? prev.done,
+                    total: data.total ?? prev.total,
+                    queued: !!data.queued,
+                    queuePosition: data.queuePosition ?? 0,
+                    active: data.active ?? [],
+                    feed,
+                    evals,
+                };
+            });
         });
+
         const offComplete = onAnalysisComplete(socket, (data) => {
             if (data.gameId !== gameId) return;
-            setAnalysis(data.analysis);
+
+            const next = normalizeAnalysis(data.analysis);
+            if (!next) {
+                setStatus("error");
+                return;
+            }
+
+            setReview(next);
             setStatus("ready");
         });
+
         const offError = onAnalysisError(socket, (data) => {
             if (data.gameId !== gameId) return;
-            setStatus("error");
+            setStatus((current) => (current === "ready" ? current : "error"));
         });
-        return () => { offProgress(); offComplete(); offError(); };
+
+        return () => {
+            offProgress();
+            offComplete();
+            offError();
+        };
     }, [gameId]);
 
-    // Stellungen, Zug-Infos (von/nach/UCI/Opfer) und Schach-Felder je Halbzug
-    const { positions, fens, plies, checks } = useMemo(() => {
-        const empty = { positions: [] as any[], fens: [] as string[], plies: [] as Ply[], checks: [] as (string | null)[] };
+    // =============================
+    // POSITIONS OF THE GAME
+    // =============================
+
+    const { boards, fens, plies, checks } = useMemo(() => {
+        const empty = {
+            boards: [] as any[][][],
+            fens: [] as string[],
+            plies: [] as { from: string; to: string }[],
+            checks: [] as (string | null)[],
+        };
         if (!pgn) return empty;
+
         try {
             const source = new Chess();
             source.loadPgn(pgn);
             const verbose = source.history({ verbose: true }) as any[];
 
             const replay = new Chess();
-            const boards = [replay.board()];
+            const boardsOut: any[][][] = [replay.board()];
             const fensOut = [replay.fen()];
             const checksOut: (string | null)[] = [null];
-            const pliesOut: Ply[] = [];
+            const pliesOut: { from: string; to: string }[] = [];
 
             for (const mv of verbose) {
-                const done: any = replay.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
-                boards.push(replay.board());
+                replay.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+                boardsOut.push(replay.board());
                 fensOut.push(replay.fen());
                 checksOut.push(findCheckedKing(replay));
-                pliesOut.push({
-                    from: mv.from,
-                    to: mv.to,
-                    uci: `${mv.from}${mv.to}${mv.promotion ?? ""}`,
-                    san: mv.san,
-                    sacrifice: isSacrifice(replay, done),
-                });
+                pliesOut.push({ from: mv.from, to: mv.to });
             }
-            return { positions: boards, fens: fensOut, plies: pliesOut, checks: checksOut };
+
+            return { boards: boardsOut, fens: fensOut, plies: pliesOut, checks: checksOut };
         } catch {
             return empty;
         }
     }, [pgn]);
 
-    const openingName = useMemo(() => {
-        if (plies.length === 0) return null;
-        return detectOpening(plies.map((p) => p.san));
-    }, [plies]);
-
-    const classes = useMemo(() => (analysis ? classifyMoves(analysis.moves, plies) : []), [analysis, plies]);
-    const counts = useMemo(() => computeCounts(classes), [classes]);
-    const accuracy = useMemo(() => (analysis ? computeAccuracy(analysis.moves) : { w: null, b: null }), [analysis]);
-    const evals = useMemo(() => (analysis ? evalSeries(analysis.moves) : []), [analysis]);
-    const reportLines = useMemo(() => (analysis ? buildReport(accuracy, counts) : []), [analysis, accuracy, counts]);
-
-    const turningPoints = useMemo(() => {
-        if (!analysis) return [] as { index: number; delta: number }[];
-        let prevEval = 0;
-        const deltas = evals.map((cur, i) => {
-            const delta = Math.abs(cur - prevEval);
-            prevEval = cur;
-            return { index: i, delta };
-        });
-        return deltas.filter((d) => d.delta >= 150).sort((a, b) => b.delta - a.delta).slice(0, 3).sort((a, b) => a.index - b.index);
-    }, [analysis, evals]);
-
-    const sandboxGameObj = useMemo(() => {
-        if (!sandboxFen) return null;
-        const g = new Chess();
-        try { g.load(sandboxFen); } catch { return null; }
-        return g;
-    }, [sandboxFen]);
-
-    // Bester Zug (SAN) zum aktuellen Halbzug – aus der Stellung VOR dem Zug
-    const bestInfo = useMemo(() => {
-        if (!analysis || currentIndex === 0) return null;
-        const mv = analysis.moves[currentIndex - 1];
-        const parsed = mv?.bestMove ? parseUci(mv.bestMove) : null;
-        if (!parsed || !fens[currentIndex - 1]) return null;
-        try {
-            const g = new Chess(fens[currentIndex - 1]);
-            const res = g.move({ from: parsed.from, to: parsed.to, promotion: parsed.promotion });
-            return res ? { ...parsed, san: res.san } : null;
-        } catch { return null; }
-    }, [analysis, currentIndex, fens]);
-
-    useEffect(() => { setShowBest(false); }, [currentIndex, mode]);
+    // The user's own side at the bottom.
+    useEffect(() => {
+        if (review?.playerColor === "b") setFlipped(true);
+    }, [review?.playerColor]);
 
     useEffect(() => {
-        if (!isPlaying || !analysis) return;
+        setShowBest(false);
+    }, [currentIndex]);
+
+    useEffect(() => {
+        if (!isPlaying || !review) return;
+
         const id = setInterval(() => {
             setCurrentIndex((i) => {
-                if (i >= analysis.moves.length) { setIsPlaying(false); return i; }
+                if (i >= review.moves.length) {
+                    setIsPlaying(false);
+                    return i;
+                }
                 return i + 1;
             });
-        }, 900 / playSpeed);
-        return () => clearInterval(id);
-    }, [isPlaying, playSpeed, analysis]);
+        }, 1100);
 
-    // Verlauf: ANNAHME Spalten "white_id" / "black_id" – ggf. ans Schema anpassen
+        return () => clearInterval(id);
+    }, [isPlaying, review]);
+
+    // =============================
+    // TREND OVER THE LAST GAMES
+    // =============================
+
     useEffect(() => {
         if (status !== "ready") return;
+        let cancelled = false;
+
         (async () => {
             try {
                 const acc = await getCurrentAccount();
-                if (!acc?.id) return;
+                if (!acc?.authId) return;
+
                 const { data } = await supabase
                     .from("games")
                     .select("id, created_at, analysis")
-                    .or(`white_id.eq.${acc.id},black_id.eq.${acc.id}`)
+                    .eq("user_id", acc.authId)
                     .eq("analyzed", true)
                     .order("created_at", { ascending: false })
                     .limit(8);
-                if (data) {
-                    const parsed = data
-                        .map((g: any) => {
-                            const acc2 = g.analysis?.moves ? computeAccuracy(g.analysis.moves) : null;
-                            return {
-                                id: g.id,
-                                date: g.created_at,
-                                accuracy: acc2 && acc2.w != null && acc2.b != null ? Math.round((acc2.w + acc2.b) / 2) : null,
-                            };
-                        })
-                        .filter((g: any) => g.accuracy !== null)
-                        .reverse();
-                    setRecentGames(parsed as any);
-                }
-            } catch { /* optional */ }
+
+                if (cancelled || !data) return;
+
+                const points = data
+                    .map((g: any) => {
+                        const r = normalizeAnalysis(g.analysis);
+                        if (!r) return null;
+
+                        const own = r.playerColor ? r.accuracy[r.playerColor] : null;
+                        const both =
+                            r.accuracy.w !== null && r.accuracy.b !== null ? (r.accuracy.w + r.accuracy.b) / 2 : null;
+                        const accuracy = own ?? both;
+
+                        return accuracy === null ? null : { id: g.id as string, accuracy };
+                    })
+                    .filter((p): p is { id: string; accuracy: number } => p !== null)
+                    .reverse();
+
+                setTrend(points);
+            } catch {
+                // The trend is optional.
+            }
         })();
+
+        return () => {
+            cancelled = true;
+        };
     }, [status]);
+
+    // =============================
+    // SANDBOX
+    // =============================
+
+    const sandboxGame = useMemo(() => {
+        if (!sandbox) return null;
+        try {
+            return new Chess(sandbox.fen);
+        } catch {
+            return null;
+        }
+    }, [sandbox]);
+
+    function enterSandbox() {
+        const fen = fens[currentIndex] ?? fens[0];
+        if (!fen) return;
+        setIsPlaying(false);
+        setSelectedSquare(null);
+        setSandbox({ fen, history: [], last: null });
+    }
+
+    function exitSandbox() {
+        setSandbox(null);
+        setSelectedSquare(null);
+    }
+
+    function handleSandboxPress(square: string) {
+        if (!sandbox || !sandboxGame) return;
+
+        const piece = sandboxGame.get(square as any);
+
+        if (!selectedSquare) {
+            if (piece && piece.color === sandboxGame.turn()) setSelectedSquare(square);
+            return;
+        }
+        if (selectedSquare === square) {
+            setSelectedSquare(null);
+            return;
+        }
+        if (piece && piece.color === sandboxGame.turn()) {
+            setSelectedSquare(square);
+            return;
+        }
+
+        try {
+            const move = sandboxGame.move({ from: selectedSquare, to: square, promotion: "q" } as any);
+            if (move) {
+                setSandbox({
+                    fen: sandboxGame.fen(),
+                    history: [...sandbox.history, sandbox.fen],
+                    last: { from: move.from, to: move.to },
+                });
+            }
+        } catch {
+            // illegal move - ignore
+        }
+        setSelectedSquare(null);
+    }
+
+    function undoSandbox() {
+        if (!sandbox || sandbox.history.length === 0) return;
+        setSelectedSquare(null);
+        setSandbox({
+            fen: sandbox.history[sandbox.history.length - 1],
+            history: sandbox.history.slice(0, -1),
+            last: null,
+        });
+    }
+
+    // =============================
+    // ACTIONS
+    // =============================
 
     const panResponder = useMemo(
         () =>
             PanResponder.create({
                 onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dx) > Math.abs(g.dy),
                 onPanResponderRelease: (_, g) => {
-                    if (!analysis) return;
-                    if (g.dx < -30) setCurrentIndex((i) => Math.min(analysis.moves.length, i + 1));
+                    if (!review) return;
+                    if (g.dx < -30) setCurrentIndex((i) => Math.min(review.moves.length, i + 1));
                     else if (g.dx > 30) setCurrentIndex((i) => Math.max(0, i - 1));
                 },
             }),
-        [analysis]
+        [review]
     );
-
-    function enterSandbox() {
-        const fen = fens[currentIndex] ?? fens[0];
-        if (!fen) return;
-        setSandboxFen(fen);
-        setSandboxHistory([]);
-        setSandboxLast(null);
-        setSelectedSquare(null);
-        setIsPlaying(false);
-        setMode("sandbox");
-    }
-
-    function exitSandbox() {
-        setMode("review");
-        setSandboxFen(null);
-        setSandboxHistory([]);
-        setSandboxLast(null);
-        setSelectedSquare(null);
-    }
-
-    function handleSandboxSquarePress(square: string) {
-        if (!sandboxGameObj) return;
-        const piece = sandboxGameObj.get(square as any);
-
-        if (!selectedSquare) {
-            if (piece && piece.color === sandboxGameObj.turn()) setSelectedSquare(square);
-            return;
-        }
-        if (selectedSquare === square) { setSelectedSquare(null); return; }
-        // anderes eigenes Stück antippen = Auswahl wechseln
-        if (piece && piece.color === sandboxGameObj.turn()) { setSelectedSquare(square); return; }
-
-        try {
-            const move = sandboxGameObj.move({ from: selectedSquare, to: square, promotion: "q" } as any);
-            if (move) {
-                setSandboxHistory((h) => [...h, sandboxFen as string]);
-                setSandboxLast({ from: move.from, to: move.to });
-                setSandboxFen(sandboxGameObj.fen());
-            }
-        } catch { /* ungültiger Zug */ }
-        setSelectedSquare(null);
-    }
-
-    function undoSandbox() {
-        setSandboxHistory((h) => {
-            if (h.length === 0) return h;
-            setSandboxFen(h[h.length - 1]);
-            setSandboxLast(null);
-            setSelectedSquare(null);
-            return h.slice(0, -1);
-        });
-    }
 
     async function handleShare() {
         try {
             const uri = await captureRef(shareRef, { format: "png", quality: 0.92 });
             if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri);
-        } catch { /* optional */ }
+        } catch {
+            // sharing is optional
+        }
     }
 
-    if (status === "loading" || status === "analyzing") {
-        return (
-            <View style={styles.center}>
-                <ActivityIndicator color={COLORS.accent} size="large" />
-                {status === "analyzing" && (
-                    <Text style={styles.loadingText}>Partie wird analysiert · {progress.done}/{progress.total || "?"}</Text>
-                )}
-            </View>
+    function goTo(index: number) {
+        setIsPlaying(false);
+        setCurrentIndex(index);
+    }
+
+    function jumpToKeyMoment(direction: 1 | -1) {
+        if (!review) return;
+
+        const targets = review.keyMoments.map((ply) => ply + 1);
+        const next =
+            direction === 1
+                ? targets.find((t) => t > currentIndex)
+                : [...targets].reverse().find((t) => t < currentIndex);
+
+        if (next !== undefined) goTo(next);
+    }
+
+    function startReview() {
+        const first = review?.keyMoments[0];
+        goTo(first !== undefined ? first + 1 : 1);
+        scrollRef.current?.scrollTo({ y: Math.max(0, boardY.current - 8), animated: true });
+    }
+
+    // ---- daily limit: unlock this analysis with an ad ----
+
+    // The ad starts: the server begins to analyse right away, so the result
+    // is ready (or nearly ready) when the ad is over.
+    function handleAdStart() {
+        setProgress(EMPTY_PROGRESS);
+
+        adRequest.current = requestGameAnalysis(getSocket(), gameId, colorParam, { adUnlock: true }).catch(
+            (err: AnalysisError) => {
+                if (err?.message === "AD_LIMIT_REACHED") setAdsLeft(0);
+                return null;
+            }
         );
     }
 
-    if (status === "not_vip") {
-        return (
-            <View style={styles.center}>
-                <View style={styles.vipBadge}><Text style={styles.vipBadgeText}>VIP</Text></View>
-                <Text style={styles.emptyTitle}>Nur für VIP-Mitglieder</Text>
-                <Text style={styles.emptyText}>Die Stockfish-Analyse steht exklusiv VIP-Konten zur Verfügung.</Text>
-                <Pressable onPress={() => router.push("/vip")} style={({ pressed }) => [styles.vipButton, pressed && styles.vipButtonPressed]}>
-                    <Text style={styles.vipButtonText}>VIP ansehen</Text>
+    // The ad was watched to the end: the server releases the analysis.
+    async function handleAdRewarded() {
+        setStatus("analyzing");
+
+        const socket = getSocket();
+
+        try {
+            await adRequest.current;
+
+            try {
+                await confirmAnalysisAd(socket, gameId);
+            } catch {
+                // The first request did not reach the server: send it again.
+                await requestGameAnalysis(socket, gameId, colorParam, { adUnlock: true });
+                await confirmAnalysisAd(socket, gameId);
+            }
+        } catch (err: any) {
+            if (err?.message === "AD_LIMIT_REACHED") {
+                setAdsLeft(0);
+                setStatus("limit");
+            } else {
+                setStatus((current) => (current === "ready" ? current : "error"));
+            }
+        }
+    }
+
+    async function handleAskCoach(question: string) {
+        const text = question.trim();
+        if (!text || coachBusy || currentIndex === 0) return;
+
+        setCoachBusy(true);
+        setCoachError(null);
+
+        try {
+            const res = await askCoach(getSocket(), { gameId, moveIndex: currentIndex, question: text });
+            setCoachAnswer({ ply: currentIndex - 1, text: res.answer, remaining: res.remaining });
+            setCoachQuestion("");
+        } catch (err: any) {
+            const code = err?.message;
+            setCoachError(
+                code === "LIMIT_REACHED"
+                    ? tr("You have used all coach questions for today.")
+                    : code === "NOT_VIP"
+                        ? tr("The coach is part of VIP.")
+                        : tr("The coach could not answer right now. Please try again.")
+            );
+        } finally {
+            setCoachBusy(false);
+        }
+    }
+
+    // =============================
+    // STATES BEFORE THE REVIEW IS READY
+    // =============================
+
+    const header = (
+        <View style={styles.header}>
+            <Pressable onPress={() => router.back()} style={styles.iconButton}>
+                <Text style={styles.backText}>‹</Text>
+            </Pressable>
+            <Text style={styles.headerTitle}>{tr("Game Review")}</Text>
+            {status === "ready" ? (
+                <Pressable onPress={handleShare} style={styles.iconButton}>
+                    <Text style={styles.shareText}>↗</Text>
                 </Pressable>
-            </View>
-        );
-    }
+            ) : (
+                <View style={{ width: 40 }} />
+            )}
+        </View>
+    );
 
-    if (status === "error" || !analysis || positions.length === 0) {
+    if (status === "loading") {
         return (
-            <View style={styles.center}>
-                <Text style={styles.emptyTitle}>Analyse nicht verfügbar</Text>
-                <Text style={styles.emptyText}>Die Partie konnte nicht geladen werden. Versuch es später erneut.</Text>
+            <View style={styles.screen}>
+                {header}
+                <View style={styles.center}>
+                    <ActivityIndicator color={T.accent} size="large" />
+                </View>
             </View>
         );
     }
 
-    // ── Abgeleitete Werte für das Rendern ──
-    const total = analysis.moves.length;
-    const isSandbox = mode === "sandbox" && !!sandboxGameObj;
-    const showingBest = mode === "review" && showBest && !!bestInfo && currentIndex > 0;
+    if (status === "analyzing") {
+        return (
+            <View style={styles.screen}>
+                {header}
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <AnalysisProgress progress={progress} boards={boards} plies={plies} boardSize={BOARD_SIZE} />
+                </ScrollView>
+            </View>
+        );
+    }
 
-    const board = isSandbox
-        ? sandboxGameObj!.board()
-        : positions[showingBest ? currentIndex - 1 : currentIndex] ?? positions[0];
+    if (status === "guest") {
+        return (
+            <View style={styles.screen}>
+                {header}
+                <View style={styles.center}>
+                    <Text style={styles.emptyTitle}>{tr("Sign in to analyse your games")}</Text>
+                    <Text style={styles.emptyText}>
+                        {tr("See every move rated from brilliant to blunder, your accuracy, the best lines and a coach that explains what happened.")}
+                    </Text>
+                </View>
+            </View>
+        );
+    }
 
-    const playedPly = currentIndex > 0 ? plies[currentIndex - 1] : null;
-    const currentMove = currentIndex > 0 ? analysis.moves[currentIndex - 1] : null;
-    const currentClass = currentIndex > 0 ? classes[currentIndex - 1] : null;
-    const currentMeta = currentClass ? CLASSIFICATION_META[currentClass] : null;
+    if (status === "limit") {
+        return (
+            <View style={styles.screen}>
+                {header}
+                <View style={styles.center}>
+                    <View style={styles.vipBadge}>
+                        <Text style={styles.vipBadgeText}>{tr("DAILY LIMIT")}</Text>
+                    </View>
+                    <Text style={styles.emptyTitle}>{tr("Today's free analysis is used up")}</Text>
+                    <Text style={styles.emptyText}>
+                        {tr("One game analysis a day is free. Upgrade to VIP for unlimited analyses - or watch a short ad to analyse this game.")}
+                    </Text>
+                    <Pressable onPress={() => setGateOpen(true)} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+                        <Text style={styles.primaryButtonText}>{tr("Unlock this analysis")}</Text>
+                    </Pressable>
+                </View>
 
-    const lastMove = isSandbox ? sandboxLast : showingBest ? null : playedPly ? { from: playedPly.from, to: playedPly.to } : null;
-    const checkSquare = isSandbox ? findCheckedKing(sandboxGameObj!) : checks[showingBest ? currentIndex - 1 : currentIndex] ?? null;
+                <LimitGate
+                    visible={gateOpen}
+                    kind="analysis"
+                    adAllowed={adsLeft === null || adsLeft > 0}
+                    onClose={() => setGateOpen(false)}
+                    onAdStart={handleAdStart}
+                    onRewarded={handleAdRewarded}
+                />
+            </View>
+        );
+    }
+
+    if (status === "error" || !review || boards.length === 0) {
+        return (
+            <View style={styles.screen}>
+                {header}
+                <View style={styles.center}>
+                    <Text style={styles.emptyTitle}>{tr("Analysis not available")}</Text>
+                    <Text style={styles.emptyText}>{tr("The game could not be analyzed. Please try again later.")}</Text>
+                </View>
+            </View>
+        );
+    }
+
+    // =============================
+    // REVIEW
+    // =============================
+
+    const total = review.moves.length;
+    const move = currentIndex > 0 ? review.moves[currentIndex - 1] : null;
+    const comment = move ? describeMove(move, review, getLanguage()) : null;
+    const meta = move ? CLASSIFICATION_META[move.classification] : null;
+
+    const bestArrow = move ? parseUci(move.bestMove) : null;
+    const canShowBest = !!move && !!bestArrow && !!move.bestSan && move.bestSan !== move.san;
+    const showingBest = showBest && canShowBest && !sandbox;
+
+    const board = sandbox && sandboxGame
+        ? sandboxGame.board()
+        : boards[showingBest ? currentIndex - 1 : currentIndex] ?? boards[0];
+
+    const lastMove = sandbox
+        ? sandbox.last
+        : showingBest
+            ? null
+            : currentIndex > 0
+                ? plies[currentIndex - 1]
+                : null;
+
+    const checkSquare = sandbox && sandboxGame
+        ? findCheckedKing(sandboxGame)
+        : checks[showingBest ? currentIndex - 1 : currentIndex] ?? null;
 
     const legalTargets = new Set<string>();
-    if (isSandbox && selectedSquare) {
-        (sandboxGameObj!.moves({ square: selectedSquare as any, verbose: true }) as any[]).forEach((m) => legalTargets.add(m.to));
+    if (sandbox && sandboxGame && selectedSquare) {
+        (sandboxGame.moves({ square: selectedSquare as any, verbose: true }) as any[]).forEach((m) =>
+            legalTargets.add(m.to)
+        );
     }
 
-    const evalCp = currentIndex > 0 ? evals[currentIndex - 1] ?? 0 : 0;
-    const whiteFraction = winPct(Math.max(-1000, Math.min(1000, evalCp))) / 100;
+    const players = review.players;
+    const sideName = (side: Side) =>
+        (side === "w" ? players?.white.name : players?.black.name) ?? (side === "w" ? tr("White") : tr("Black"));
+    const sideRating = (side: Side) => (side === "w" ? players?.white.rating : players?.black.rating) ?? null;
+    const isUser = (side: Side) => review.playerColor === side;
 
-    const whiteCounts = counts.w;
-    const blackCounts = counts.b;
-    const maxCount = Math.max(1, ...Object.values(whiteCounts).map(Number), ...Object.values(blackCounts).map(Number));
+    const hasPrevKey = review.keyMoments.some((ply) => ply + 1 < currentIndex);
+    const hasNextKey = review.keyMoments.some((ply) => ply + 1 > currentIndex);
 
-    const arrow = (() => {
-        if (!showingBest || !bestInfo) return null;
-        const from = squareCenter(bestInfo.from, flipped);
-        const to = squareCenter(bestInfo.to, flipped);
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        return {
-            length: Math.sqrt(dx * dx + dy * dy),
-            angle: Math.atan2(dy, dx),
-            mid: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 },
-        };
-    })();
+    const phaseSide: Side | null = review.playerColor;
+    const hasPhases = (["w", "b"] as Side[]).some((s) =>
+        Object.values(review.phases[s]).some((v) => v !== null)
+    );
 
-    const maxRecentAccuracy = Math.max(1, ...recentGames.map((g) => g.accuracy));
-    const showBestButton = !!currentClass && !["best", "brilliant"].includes(currentClass) && !!bestInfo;
+    const coachAnswerForMove = coachAnswer && move && coachAnswer.ply === move.ply ? coachAnswer : null;
+
+    const playerCard = (side: Side) => (
+        <View style={styles.playerCard}>
+            <View style={styles.playerNameRow}>
+                <View style={[styles.sideDot, { backgroundColor: side === "w" ? "#F1F3F5" : "#3A404A" }]} />
+                <Text style={styles.playerName} numberOfLines={1}>
+                    {sideName(side)}
+                </Text>
+                {isUser(side) && (
+                    <View style={styles.youTag}>
+                        <Text style={styles.youTagText}>{tr("YOU")}</Text>
+                    </View>
+                )}
+            </View>
+            <Text style={styles.playerRating}>
+                {sideRating(side) !== null
+                    ? tr("{0} Elo", sideRating(side))
+                    : players
+                        ? side === "w" ? tr("White") : tr("Black")
+                        : " "}
+            </Text>
+
+            <View style={{ marginTop: 10 }}>
+                <AccuracyRing value={review.accuracy[side]} size={92} />
+            </View>
+
+            {review.estimatedRating[side] !== null && (
+                <View style={styles.estimate}>
+                    <Text style={styles.estimateValue}>{review.estimatedRating[side]}</Text>
+                    <Text style={styles.estimateLabel}>{tr("played like")}</Text>
+                </View>
+            )}
+        </View>
+    );
 
     return (
         <View style={styles.screen}>
-            <View style={styles.header}>
-                <Pressable onPress={() => router.back()} style={styles.iconButton}><Text style={styles.backText}>‹</Text></Pressable>
-                <Text style={styles.headerTitle}>Partieanalyse</Text>
-                <Pressable onPress={handleShare} style={styles.iconButton}><Text style={styles.shareText}>↗</Text></Pressable>
-            </View>
+            {header}
 
-            <View style={styles.modeTabs}>
-                <Pressable onPress={exitSandbox} style={[styles.modeTab, mode === "review" && styles.modeTabActive]}>
-                    <Text style={[styles.modeTabText, mode === "review" && styles.modeTabTextActive]}>Analyse</Text>
-                </Pressable>
-                <Pressable onPress={enterSandbox} style={[styles.modeTab, mode === "sandbox" && styles.modeTabActive]}>
-                    <Text style={[styles.modeTabText, mode === "sandbox" && styles.modeTabTextActive]}>Sandbox</Text>
-                </Pressable>
-            </View>
-
-            <ScrollView contentContainerStyle={{ alignItems: "center", paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-                <View ref={shareRef} collapsable={false} style={{ alignItems: "center", backgroundColor: COLORS.bg, paddingBottom: 4 }}>
-                    <View style={styles.engineRow}>
-                        <Text style={styles.engineText}>{analysis.tier} · Tiefe {analysis.depth}</Text>
-                        {openingName && mode === "review" && <Text style={styles.openingText}>{openingName}</Text>}
-                    </View>
-
-                    <View style={styles.accuracyRow}>
-                        <View style={styles.accuracyCard}>
-                            <View style={[styles.accuracyDot, { backgroundColor: "#ECEDEE" }]} />
-                            <Text style={styles.accuracyLabel}>Weiß</Text>
-                            <Text style={styles.accuracyValue}>{accuracy.w != null ? accuracy.w.toFixed(1) : "–"}%</Text>
-                        </View>
-                        <View style={styles.accuracyDivider} />
-                        <View style={styles.accuracyCard}>
-                            <View style={[styles.accuracyDot, { backgroundColor: "#4B5058" }]} />
-                            <Text style={styles.accuracyLabel}>Schwarz</Text>
-                            <Text style={styles.accuracyValue}>{accuracy.b != null ? accuracy.b.toFixed(1) : "–"}%</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.boardRow}>
-                        {mode === "review" && (
-                            <View style={styles.evalWrap}>
-                                <View style={[styles.evalBarVertical, { justifyContent: flipped ? "flex-end" : "flex-start" }]}>
-                                    <View style={[styles.evalBarBlack, { height: `${(1 - whiteFraction) * 100}%` }]} />
-                                    <View style={styles.evalBarMidline} />
+            <ScrollView
+                ref={scrollRef}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
+                {/* ───────────── Summary ───────────── */}
+                <View ref={shareRef} collapsable={false} style={{ backgroundColor: T.bg, alignItems: "center" }}>
+                    <View style={[styles.card, { width: CONTENT_WIDTH }]}>
+                        <View style={styles.summaryTop}>
+                            {review.opening.name ? (
+                                <Text style={styles.opening} numberOfLines={1}>
+                                    {review.opening.name}
+                                </Text>
+                            ) : (
+                                <Text style={styles.opening}>{tr("Game summary")}</Text>
+                            )}
+                            {review.result && review.playerColor && RESULT_TEXT[review.result] ? (
+                                <View
+                                    style={[
+                                        styles.resultTag,
+                                        review.result === "win" && { backgroundColor: T.greenSoft },
+                                        review.result === "loss" && { backgroundColor: T.redSoft },
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.resultTagText,
+                                            review.result === "win" && { color: T.green },
+                                            review.result === "loss" && { color: T.red },
+                                        ]}
+                                    >
+                                        {RESULT_TEXT[review.result]}
+                                    </Text>
                                 </View>
-                            </View>
+                            ) : null}
+                        </View>
+
+                        <View style={styles.playersRow}>
+                            {playerCard("w")}
+                            <View style={styles.playersDivider} />
+                            {playerCard("b")}
+                        </View>
+
+                        <Text style={styles.summaryText}>{summarize(review, getLanguage())}</Text>
+
+                        <Pressable onPress={startReview} style={({ pressed }) => [styles.primaryButton, { alignSelf: "stretch", marginTop: 14 }, pressed && styles.pressed]}>
+                            <Text style={styles.primaryButtonText}>
+                                {review.keyMoments.length > 0 ? tr("Review the key moments") : tr("Go through the game")}
+                            </Text>
+                        </Pressable>
+                    </View>
+
+                    {/* ───────────── Move quality ───────────── */}
+                    <View style={[styles.card, { width: CONTENT_WIDTH }]}>
+                        <View style={styles.qualityHeader}>
+                            <Text style={[styles.qualitySide, { textAlign: "left" }]} numberOfLines={1}>
+                                {sideName("w")}
+                            </Text>
+                            <Text style={styles.cardTitle}>{tr("Move quality")}</Text>
+                            <Text style={[styles.qualitySide, { textAlign: "right" }]} numberOfLines={1}>
+                                {sideName("b")}
+                            </Text>
+                        </View>
+
+                        {CLASSIFICATION_ORDER.map((key) => {
+                            const w = review.counts.w[key] || 0;
+                            const b = review.counts.b[key] || 0;
+                            const info = CLASSIFICATION_META[key];
+                            const dim = w === 0 && b === 0;
+
+                            return (
+                                <View key={key} style={[styles.qualityRow, dim && { opacity: 0.38 }]}>
+                                    <Text style={[styles.qualityCount, { textAlign: "left", color: w > 0 ? info.color : T.textFaint }]}>
+                                        {w}
+                                    </Text>
+                                    <View style={styles.qualityLabelWrap}>
+                                        <ClassificationBadge classification={key} size={22} />
+                                        <Text style={styles.qualityLabel}>{tr(info.label)}</Text>
+                                    </View>
+                                    <Text style={[styles.qualityCount, { textAlign: "right", color: b > 0 ? info.color : T.textFaint }]}>
+                                        {b}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                </View>
+
+                {/* ───────────── Board ───────────── */}
+                <View
+                    style={{ width: CONTENT_WIDTH, marginTop: 18 }}
+                    onLayout={(e) => {
+                        boardY.current = e.nativeEvent.layout.y;
+                    }}
+                >
+                    <View style={styles.boardRow}>
+                        {!sandbox && (
+                            <EvalBar share={whiteShare(move)} height={BOARD_SIZE} flipped={flipped} label={formatEval(move)} />
                         )}
+                        <View style={styles.boardFrame} {...(!sandbox ? panResponder.panHandlers : {})}>
+                            <ReviewBoard
+                                board={board}
+                                size={sandbox ? BOARD_SIZE + EVAL_BAR_SPACE : BOARD_SIZE}
+                                flipped={flipped}
+                                lastMove={lastMove}
+                                classification={sandbox || showingBest ? null : move?.classification ?? null}
+                                checkSquare={checkSquare}
+                                arrow={showingBest ? bestArrow : null}
+                                selectedSquare={sandbox ? selectedSquare : null}
+                                legalTargets={legalTargets}
+                                onSquarePress={sandbox ? handleSandboxPress : undefined}
+                            />
+                        </View>
+                    </View>
 
-                        <View style={styles.boardFrame} {...(mode === "review" ? panResponder.panHandlers : {})}>
-                            <View style={{ width: BOARD_SIZE, height: BOARD_SIZE }}>
-                                <View style={styles.board}>
-                                    {Array.from({ length: 8 }).map((_, r) =>
-                                        Array.from({ length: 8 }).map((__, c) => {
-                                            const br = flipped ? 7 - r : r;
-                                            const bc = flipped ? 7 - c : c;
-                                            const piece = board[br][bc];
-                                            const key = pieceToKey(piece);
-                                            const square = `${FILES[bc]}${8 - br}`;
-                                            const isDark = (br + bc) % 2 === 1;
+                    {sandbox ? (
+                        <View style={[styles.card, { marginTop: 12 }]}>
+                            <Text style={styles.cardTitle}>{tr("Try your own moves")}</Text>
+                            <Text style={styles.sandboxHint}>
+                                {tr("Move the pieces freely from this position. Nothing here changes the review.")}
+                            </Text>
+                            <View style={styles.sandboxRow}>
+                                <Pressable onPress={undoSandbox} style={[styles.secondaryButton, sandbox.history.length === 0 && { opacity: 0.4 }]}>
+                                    <Text style={styles.secondaryButtonText}>{tr("Undo")}</Text>
+                                </Pressable>
+                                <Pressable onPress={enterSandbox} style={styles.secondaryButton}>
+                                    <Text style={styles.secondaryButtonText}>{tr("Reset")}</Text>
+                                </Pressable>
+                                <Pressable onPress={() => setFlipped((f) => !f)} style={styles.secondaryButton}>
+                                    <Text style={styles.secondaryButtonText}>{tr("Flip")}</Text>
+                                </Pressable>
+                            </View>
+                            <Pressable onPress={exitSandbox} style={({ pressed }) => [styles.primaryButton, { alignSelf: "stretch", marginTop: 12 }, pressed && styles.pressed]}>
+                                <Text style={styles.primaryButtonText}>{tr("Back to the review")}</Text>
+                            </Pressable>
+                        </View>
+                    ) : (
+                        <>
+                            {/* Coach */}
+                            <View style={[styles.coachCard, meta && { borderColor: `${meta.color}66` }]}>
+                                <Image source={coachImage} style={styles.coachAvatar} resizeMode="contain" />
 
-                                            const isCheckSq = checkSquare === square;
-                                            const isLastTo = lastMove?.to === square;
-                                            const isLastFrom = lastMove?.from === square;
-                                            const isSelected = isSandbox && selectedSquare === square;
-                                            const isLegal = legalTargets.has(square);
+                                <View style={{ flex: 1 }}>
+                                    {move && comment && meta ? (
+                                        <>
+                                            <View style={styles.coachHeadline}>
+                                                <ClassificationBadge classification={move.classification} size={22} />
+                                                <Text style={[styles.coachTitle, { color: meta.color }]}>{comment.headline}</Text>
+                                            </View>
+                                            <Text style={styles.coachMeta}>
+                                                {moveLabel(move)} · {formatEval(move)}
+                                            </Text>
+                                            <Text style={styles.coachText}>{comment.text}</Text>
 
-                                            const bg = isCheckSq ? COLORS.check
-                                                : isLastTo ? COLORS.lastTo
-                                                : isLastFrom ? COLORS.lastFrom
-                                                : isSelected ? COLORS.selected
-                                                : isDark ? COLORS.boardDark : COLORS.boardLight;
-
-                                            const showBadge = !!currentClass && !showingBest && !isSandbox && isLastTo && !BADGE_HIDDEN.includes(currentClass);
-                                            const labelColor = isDark ? "#e5e7eb" : "#334155";
-
-                                            return (
-                                                <Pressable
-                                                    key={square}
-                                                    disabled={!isSandbox}
-                                                    onPress={() => handleSandboxSquarePress(square)}
-                                                    style={[styles.square, { backgroundColor: bg }]}
-                                                >
-                                                    {key && (
-                                                        <Image source={pieces[key]} style={[styles.piece, { transform: pieceTransform(key) }]} resizeMode="contain" />
-                                                    )}
-                                                    {isLegal && <View style={key ? styles.dotCapture : styles.dot} />}
-
-                                                    {c === 0 && <Text style={[styles.coordLabel, { top: 2, left: 2, color: labelColor }]}>{8 - br}</Text>}
-                                                    {r === 7 && <Text style={[styles.coordLabel, { bottom: 2, right: 3, color: labelColor }]}>{FILES[bc]}</Text>}
-
-                                                    {showBadge && currentMeta && (
-                                                        <View style={[styles.badge, { backgroundColor: currentMeta.color }]}>
-                                                            <Text style={styles.badgeText}>{currentMeta.icon}</Text>
-                                                        </View>
-                                                    )}
-                                                </Pressable>
-                                            );
-                                        })
+                                            {move.bestLine.length > 1 && canShowBest && (
+                                                <Text style={styles.coachLine} numberOfLines={2}>
+                                                    <Text style={styles.coachLineLabel}>{tr("Best line")}  </Text>
+                                                    {move.bestLine.join("  ")}
+                                                </Text>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Text style={styles.coachTitle}>{tr("Starting position")}</Text>
+                                            <Text style={styles.coachText}>
+                                                {tr("Step through the game with the arrows, swipe over the board or tap a point in the graph.")}
+                                            </Text>
+                                        </>
                                     )}
                                 </View>
-
-                                {arrow && (
-                                    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-                                        <View
-                                            style={{
-                                                position: "absolute",
-                                                left: arrow.mid.x - arrow.length / 2,
-                                                top: arrow.mid.y - 7,
-                                                width: arrow.length,
-                                                height: 14,
-                                                justifyContent: "center",
-                                                transform: [{ rotate: `${arrow.angle}rad` }],
-                                                opacity: 0.9,
-                                            }}
-                                        >
-                                            <View style={{ position: "absolute", left: 0, width: Math.max(0, arrow.length - 12), height: 6, backgroundColor: COLORS.accent, borderRadius: 3 }} />
-                                            <View style={styles.arrowHead} />
-                                        </View>
-                                    </View>
-                                )}
                             </View>
-                        </View>
-                    </View>
 
-                    {mode === "review" && (
-                        <View style={styles.classificationBanner}>
-                            {currentMove && currentMeta ? (
-                                <>
-                                    <View style={[styles.classificationStripe, { backgroundColor: currentMeta.color }]} />
-                                    <View style={[styles.classificationIconWrap, { backgroundColor: `${currentMeta.color}22` }]}>
-                                        <Text style={[styles.classificationIcon, { color: currentMeta.color }]}>{currentMeta.icon}</Text>
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.classificationSan}>{currentIndex % 2 === 1 ? `${Math.ceil(currentIndex / 2)}.` : `${Math.ceil(currentIndex / 2)}...`} {currentMove.san}</Text>
-                                        <Text style={[styles.classificationLabel, { color: currentMeta.color }]}>{currentMeta.label}</Text>
-                                    </View>
-                                    <Text style={styles.evalText}>{formatEval(evalCp)}</Text>
-                                </>
-                            ) : (
-                                <>
-                                    <View style={[styles.classificationStripe, { backgroundColor: COLORS.textTertiary }]} />
-                                    <Text style={styles.classificationLabelIdle}>Ausgangsstellung</Text>
-                                </>
+                            {move && (
+                                <View style={styles.actionsRow}>
+                                    {canShowBest && (
+                                        <Pressable
+                                            onPress={() => setShowBest((s) => !s)}
+                                            style={[styles.chipButton, showBest && styles.chipButtonActive]}
+                                        >
+                                            <Text style={[styles.chipButtonText, showBest && styles.chipButtonTextActive]}>
+                                                {showBest ? tr("Show played move") : tr("Show best: {0}", move.bestSan)}
+                                            </Text>
+                                        </Pressable>
+                                    )}
+                                    <Pressable
+                                        onPress={() => setCoachOpen((o) => !o)}
+                                        style={[styles.chipButton, coachOpen && styles.chipButtonActive]}
+                                    >
+                                        <Text style={[styles.chipButtonText, coachOpen && styles.chipButtonTextActive]}>{tr("Ask the coach")}</Text>
+                                    </Pressable>
+                                </View>
                             )}
-                        </View>
+
+                            {move && coachOpen && (
+                                <View style={[styles.card, { marginTop: 10 }]}>
+                                    {coachAnswerForMove ? (
+                                        <>
+                                            <Text style={styles.coachAnswer}>{coachAnswerForMove.text}</Text>
+                                            {typeof coachAnswerForMove.remaining === "number" && (
+                                                <Text style={styles.coachRemaining}>
+                                                    {coachAnswerForMove.remaining} {tr("questions left today")}
+                                                </Text>
+                                            )}
+                                        </>
+                                    ) : null}
+
+                                    {COACH_QUESTIONS.map((q) => (
+                                        <Pressable key={q} onPress={() => handleAskCoach(q)} disabled={coachBusy} style={styles.questionChip}>
+                                            <Text style={styles.questionChipText}>{q}</Text>
+                                        </Pressable>
+                                    ))}
+
+                                    <View style={styles.coachInputRow}>
+                                        <TextInput
+                                            value={coachQuestion}
+                                            onChangeText={setCoachQuestion}
+                                            placeholder={tr("Your own question about this move…")}
+                                            placeholderTextColor={T.textFaint}
+                                            style={styles.coachInput}
+                                            maxLength={300}
+                                            editable={!coachBusy}
+                                            onSubmitEditing={() => handleAskCoach(coachQuestion)}
+                                        />
+                                        <Pressable
+                                            onPress={() => handleAskCoach(coachQuestion)}
+                                            disabled={coachBusy || !coachQuestion.trim()}
+                                            style={[styles.sendButton, (coachBusy || !coachQuestion.trim()) && { opacity: 0.5 }]}
+                                        >
+                                            {coachBusy ? (
+                                                <ActivityIndicator color={T.onAccent} size="small" />
+                                            ) : (
+                                                <Text style={styles.sendButtonText}>{tr("Ask")}</Text>
+                                            )}
+                                        </Pressable>
+                                    </View>
+
+                                    {coachError && <Text style={styles.coachErrorText}>{coachError}</Text>}
+                                </View>
+                            )}
+
+                            {/* Controls */}
+                            <View style={styles.controls}>
+                                <Pressable onPress={() => goTo(0)} style={styles.controlButton}>
+                                    <Text style={styles.controlText}>⏮</Text>
+                                </Pressable>
+                                <Pressable onPress={() => goTo(Math.max(0, currentIndex - 1))} style={styles.controlButton}>
+                                    <Text style={styles.controlTextLarge}>‹</Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={() => {
+                                        if (currentIndex >= total) setCurrentIndex(0);
+                                        setIsPlaying((p) => !p);
+                                    }}
+                                    style={styles.playButton}
+                                >
+                                    <Text style={styles.playText}>{isPlaying ? "❚❚" : "▶"}</Text>
+                                </Pressable>
+                                <Pressable onPress={() => goTo(Math.min(total, currentIndex + 1))} style={styles.controlButton}>
+                                    <Text style={styles.controlTextLarge}>›</Text>
+                                </Pressable>
+                                <Pressable onPress={() => goTo(total)} style={styles.controlButton}>
+                                    <Text style={styles.controlText}>⏭</Text>
+                                </Pressable>
+                            </View>
+
+                            <View style={styles.keyRow}>
+                                <Pressable
+                                    onPress={() => jumpToKeyMoment(-1)}
+                                    disabled={!hasPrevKey}
+                                    style={[styles.keyButton, !hasPrevKey && { opacity: 0.35 }]}
+                                >
+                                    <Text style={styles.keyButtonText}>{tr("‹ Previous key moment")}</Text>
+                                </Pressable>
+                                <Pressable
+                                    onPress={() => jumpToKeyMoment(1)}
+                                    disabled={!hasNextKey}
+                                    style={[styles.keyButton, styles.keyButtonPrimary, !hasNextKey && { opacity: 0.35 }]}
+                                >
+                                    <Text style={[styles.keyButtonText, { color: T.text }]}>{tr("Next key moment ›")}</Text>
+                                </Pressable>
+                            </View>
+
+                            <View style={styles.toolsRow}>
+                                <Pressable onPress={() => setFlipped((f) => !f)}>
+                                    <Text style={styles.toolText}>{tr("Flip board")}</Text>
+                                </Pressable>
+                                <Text style={styles.toolIndex}>
+                                    {tr("Move")} {currentIndex} / {total}
+                                </Text>
+                                <Pressable onPress={enterSandbox}>
+                                    <Text style={styles.toolText}>{tr("Try moves")}</Text>
+                                </Pressable>
+                            </View>
+                        </>
                     )}
                 </View>
 
-                {mode === "review" && showBestButton && bestInfo && (
-                    <Pressable onPress={() => setShowBest((s) => !s)} style={[styles.bestButton, showBest && styles.bestButtonActive]}>
-                        <Text style={[styles.bestButtonText, showBest && { color: "#12151B" }]}>
-                            {showBest ? "Zurück zum gespielten Zug" : `Besser wäre ${bestInfo.san} gewesen – zeigen`}
-                        </Text>
-                    </Pressable>
-                )}
-
-                {mode === "sandbox" ? (
-                    <View style={styles.sandboxControls}>
-                        <Text style={styles.sandboxHint}>Sandbox · eigene Züge ohne Engine-Bewertung</Text>
-                        <View style={styles.sandboxButtonsRow}>
-                            <Pressable onPress={undoSandbox} style={[styles.navButton, sandboxHistory.length === 0 && { opacity: 0.4 }]}>
-                                <Text style={styles.navButtonText}>Zug zurück</Text>
-                            </Pressable>
-                            <Pressable onPress={() => { setSandboxFen(fens[currentIndex] ?? fens[0]); setSandboxHistory([]); setSandboxLast(null); setSelectedSquare(null); }} style={styles.navButton}>
-                                <Text style={styles.navButtonText}>Zurücksetzen</Text>
-                            </Pressable>
-                            <Pressable onPress={() => setFlipped((f) => !f)} style={styles.navButton}>
-                                <Text style={styles.navButtonText}>⇅</Text>
-                            </Pressable>
-                        </View>
-                        <Pressable onPress={exitSandbox} style={[styles.navButton, { backgroundColor: COLORS.accent, borderColor: COLORS.accent }]}>
-                            <Text style={[styles.navButtonText, { color: "#12151B" }]}>Zurück zur Analyse</Text>
-                        </Pressable>
-                    </View>
-                ) : (
+                {!sandbox && (
                     <>
-                        {/* Bewertungsverlauf: antippen springt zum Zug */}
-                        <View style={styles.graphPanel}>
-                            <View style={styles.graphHeader}>
-                                <Text style={styles.reportTitle}>Bewertungsverlauf</Text>
-                                <Pressable onPress={() => setFlipped((f) => !f)}><Text style={styles.flipText}>Brett drehen ⇅</Text></Pressable>
-                            </View>
-                            <View style={styles.graphBars}>
-                                {evals.map((cp, i) => {
-                                    const wp = winPct(Math.max(-1000, Math.min(1000, cp)));
-                                    const cls = classes[i];
-                                    const hot = cls === "blunder" || cls === "mistake" || cls === "missed_win";
-                                    return (
-                                        <Pressable key={i} onPress={() => { setIsPlaying(false); setCurrentIndex(i + 1); }} style={[styles.graphCol, currentIndex === i + 1 && styles.graphColActive]}>
-                                            <View style={{ height: `${100 - wp}%`, backgroundColor: COLORS.evalFill }} />
-                                            {hot && <View style={[styles.graphMark, { backgroundColor: CLASSIFICATION_META[cls].color }]} />}
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-                        </View>
-
-                        {turningPoints.length > 0 && (
-                            <ScrollView horizontal style={styles.turningList} contentContainerStyle={{ paddingHorizontal: 12 }} showsHorizontalScrollIndicator={false}>
-                                <Text style={styles.turningLabel}>Wendepunkte</Text>
-                                {turningPoints.map((tp) => {
-                                    const m = analysis.moves[tp.index];
-                                    return (
-                                        <Pressable key={tp.index} onPress={() => setCurrentIndex(tp.index + 1)} style={styles.turningChip}>
-                                            <Text style={styles.turningChipText}>{m.moveNumber}. {m.san}</Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </ScrollView>
-                        )}
-
-                        <ScrollView horizontal style={styles.moveList} contentContainerStyle={{ paddingHorizontal: 12 }} showsHorizontalScrollIndicator={false}>
-                            <Pressable onPress={() => setCurrentIndex(0)} style={[styles.moveChip, currentIndex === 0 && styles.moveChipActive]}>
-                                <Text style={[styles.moveChipText, currentIndex === 0 && styles.moveChipTextActive]}>Start</Text>
-                            </Pressable>
-                            {analysis.moves.map((m, i) => {
-                                const meta = CLASSIFICATION_META[classes[i]];
-                                const isActive = currentIndex === i + 1;
-                                return (
-                                    <Pressable
-                                        key={i}
-                                        onPress={() => setCurrentIndex(i + 1)}
-                                        style={[styles.moveChip, isActive && { backgroundColor: meta.color, borderColor: meta.color }]}
-                                    >
-                                        <Text style={[styles.moveChipText, { color: isActive ? "#12151B" : meta.color }]}>{m.moveNumber}. {m.san}</Text>
-                                    </Pressable>
-                                );
-                            })}
-                        </ScrollView>
-
-                        <View style={styles.navRow}>
-                            <Pressable onPress={() => { setIsPlaying(false); setCurrentIndex((i) => Math.max(0, i - 1)); }} style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]}>
-                                <Text style={styles.navButtonText}>‹  Zurück</Text>
-                            </Pressable>
-                            <Pressable onPress={() => { if (currentIndex >= total) setCurrentIndex(0); setIsPlaying((p) => !p); }} style={({ pressed }) => [styles.playButton, pressed && styles.navButtonPressed]}>
-                                <Text style={styles.playButtonText}>{isPlaying ? "❚❚" : "▶"}</Text>
-                            </Pressable>
-                            <Pressable onPress={() => { setIsPlaying(false); setCurrentIndex((i) => Math.min(total, i + 1)); }} style={({ pressed }) => [styles.navButton, pressed && styles.navButtonPressed]}>
-                                <Text style={styles.navButtonText}>Weiter  ›</Text>
-                            </Pressable>
-                        </View>
-
-                        <View style={styles.speedRow}>
-                            {[0.5, 1, 2].map((s) => (
-                                <Pressable key={s} onPress={() => setPlaySpeed(s)} style={[styles.speedChip, playSpeed === s && styles.speedChipActive]}>
-                                    <Text style={[styles.speedChipText, playSpeed === s && styles.speedChipTextActive]}>{s}×</Text>
-                                </Pressable>
-                            ))}
-                            <Text style={styles.navIndex}>{currentIndex} / {total}</Text>
-                        </View>
-
-                        {reportLines.length > 0 && (
-                            <View style={styles.reportPanel}>
-                                <Text style={styles.reportTitle}>Kurzreport</Text>
-                                {reportLines.map((line, i) => (
-                                    <Text key={i} style={styles.reportLine}>{line}</Text>
+                        {/* ───────────── Graph ───────────── */}
+                        <View style={[styles.card, { width: CONTENT_WIDTH }]}>
+                            <Text style={[styles.cardTitle, { marginBottom: 10 }]}>{tr("Evaluation")}</Text>
+                            <EvalGraph moves={review.moves} currentIndex={currentIndex} onSelect={goTo} width={CONTENT_WIDTH - 34} />
+                            <View style={styles.legendRow}>
+                                {(["brilliant", "great", "mistake", "miss", "blunder"] as const).map((key) => (
+                                    <View key={key} style={styles.legendItem}>
+                                        <View style={[styles.legendDot, { backgroundColor: CLASSIFICATION_META[key].color }]} />
+                                        <Text style={styles.legendText}>{tr(CLASSIFICATION_META[key].label)}</Text>
+                                    </View>
                                 ))}
                             </View>
-                        )}
-
-                        <View style={styles.statsPanel}>
-                            <View style={styles.statsHeaderRow}>
-                                <Text style={styles.statsTitle}>Zugstatistik</Text>
-                                <View style={styles.statsHeaderLegend}>
-                                    <Text style={styles.statsHeaderLegendText}>Weiß</Text>
-                                    <Text style={styles.statsHeaderLegendText}>Schwarz</Text>
-                                </View>
-                            </View>
-
-                            {CLASS_ORDER.map((key) => {
-                                const meta = CLASSIFICATION_META[key];
-                                const w = whiteCounts[key] || 0;
-                                const b = blackCounts[key] || 0;
-                                if (w === 0 && b === 0) return null;
-                                return (
-                                    <View key={key} style={styles.statsRow}>
-                                        <View style={[styles.statsIconWrap, { backgroundColor: `${meta.color}1F` }]}>
-                                            <Text style={[styles.statsIcon, { color: meta.color }]}>{meta.icon}</Text>
-                                        </View>
-                                        <View style={styles.statsLabelWrap}>
-                                            <Text style={styles.statsLabel}>{meta.label}</Text>
-                                            <View style={styles.statsBarTrack}>
-                                                <View style={[styles.statsBarFill, { width: `${(w / maxCount) * 50}%`, backgroundColor: meta.color }]} />
-                                                <View style={[styles.statsBarFill, { width: `${(b / maxCount) * 50}%`, backgroundColor: meta.color, opacity: 0.4, left: "50%" }]} />
-                                            </View>
-                                        </View>
-                                        <Text style={styles.statsCount}>{w} · {b}</Text>
-                                    </View>
-                                );
-                            })}
                         </View>
 
-                        {recentGames.length > 1 && (
-                            <View style={styles.trendPanel}>
-                                <Text style={styles.reportTitle}>Dein Verlauf</Text>
-                                <Text style={styles.trendSubtitle}>Ø-Genauigkeit der letzten {recentGames.length} analysierten Partien</Text>
+                        {/* ───────────── Phases ───────────── */}
+                        {hasPhases && (
+                            <View style={[styles.card, { width: CONTENT_WIDTH }]}>
+                                <Text style={[styles.cardTitle, { marginBottom: 12 }]}>
+                                    {phaseSide ? tr("Your accuracy by phase") : tr("Accuracy by phase")}
+                                </Text>
+                                <View style={styles.phaseRow}>
+                                    {(["opening", "middlegame", "endgame"] as const).map((phase) => {
+                                        const sides: Side[] = phaseSide ? [phaseSide] : ["w", "b"];
+
+                                        return (
+                                            <View key={phase} style={styles.phaseCell}>
+                                                <Text style={styles.phaseName}>
+                                                    {phase === "opening" ? tr("Opening") : phase === "middlegame" ? tr("Middlegame") : tr("Endgame")}
+                                                </Text>
+                                                {sides.map((s) => {
+                                                    const value = review.phases[s][phase];
+                                                    return (
+                                                        <View key={s} style={styles.phaseValueRow}>
+                                                            {!phaseSide && (
+                                                                <View style={[styles.sideDot, { backgroundColor: s === "w" ? "#F1F3F5" : "#3A404A" }]} />
+                                                            )}
+                                                            <Text style={[styles.phaseValue, { color: accuracyColor(value) }]}>
+                                                                {value === null ? "–" : value.toFixed(0)}
+                                                            </Text>
+                                                        </View>
+                                                    );
+                                                })}
+                                            </View>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        )}
+
+                        {/* ───────────── Moves ───────────── */}
+                        <View style={[styles.card, { width: CONTENT_WIDTH }]}>
+                            <Text style={[styles.cardTitle, { marginBottom: 8 }]}>{tr("Moves")}</Text>
+                            <MoveTable moves={review.moves} currentIndex={currentIndex} onSelect={goTo} />
+                        </View>
+
+                        {/* ───────────── Trend ───────────── */}
+                        {trend.length > 1 && (
+                            <View style={[styles.card, { width: CONTENT_WIDTH }]}>
+                                <Text style={styles.cardTitle}>{tr("Your trend")}</Text>
+                                <Text style={styles.trendSubtitle}>{tr("Accuracy in your last")} {trend.length} {tr("analyzed games")}</Text>
                                 <View style={styles.trendBars}>
-                                    {recentGames.map((g) => (
-                                        <View key={g.id} style={styles.trendBarWrap}>
-                                            <View style={[styles.trendBar, { height: `${(g.accuracy / maxRecentAccuracy) * 100}%` }]} />
+                                    {trend.map((point) => (
+                                        <View key={point.id} style={styles.trendBarWrap}>
+                                            <Text style={styles.trendValue}>{Math.round(point.accuracy)}</Text>
+                                            <View
+                                                style={[
+                                                    styles.trendBar,
+                                                    {
+                                                        height: `${Math.max(6, point.accuracy - 30) * (100 / 70)}%`,
+                                                        backgroundColor: point.id === gameId ? T.accent : "rgba(91,141,184,0.4)",
+                                                    },
+                                                ]}
+                                            />
                                         </View>
                                     ))}
                                 </View>
                             </View>
                         )}
+
+                        <Text style={styles.footnote}>
+                            {review.tier && review.tier !== "none"
+                                ? tr("{0}{1} analysis", review.tier.charAt(0).toUpperCase(), review.tier.slice(1))
+                                : tr("Analysis")}
+                            {review.depth ? tr(" · average depth {0}", review.depth) : ""}
+                            {" · "}{tr("“Played like” is an estimate from this single game.")}
+                        </Text>
                     </>
                 )}
             </ScrollView>
@@ -943,127 +1143,118 @@ export default function GameReview() {
 }
 
 const styles = StyleSheet.create({
-    screen: { flex: 1, backgroundColor: COLORS.bg, paddingTop: 50 },
-    center: { flex: 1, backgroundColor: COLORS.bg, justifyContent: "center", alignItems: "center", paddingHorizontal: 36, gap: 10 },
-    loadingText: { color: COLORS.textSecondary, fontSize: 14, marginTop: 14, letterSpacing: 0.2 },
-    emptyTitle: { color: COLORS.textPrimary, fontSize: 19, fontWeight: "600" },
-    emptyText: { color: COLORS.textSecondary, fontSize: 14, textAlign: "center", lineHeight: 20, maxWidth: 280 },
-    vipBadge: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 8, backgroundColor: COLORS.accentSoft, borderWidth: 1, borderColor: COLORS.accentBorder, marginBottom: 4 },
-    vipBadgeText: { color: COLORS.accent, fontSize: 12, fontWeight: "700", letterSpacing: 0.5 },
-    vipButton: { backgroundColor: COLORS.accent, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 12, marginTop: 10 },
-    vipButtonPressed: { opacity: 0.85 },
-    vipButtonText: { color: "#12151B", fontWeight: "700", fontSize: 14 },
+    screen: { flex: 1, backgroundColor: T.bg, paddingTop: 50 },
+    scrollContent: { alignItems: "center", paddingBottom: 48 },
+    center: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 34, gap: 10 },
+    pressed: { opacity: 0.85 },
 
-    header: { width: "100%", paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-    iconButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.surface, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: COLORS.border },
-    backText: { color: COLORS.textPrimary, fontSize: 26, lineHeight: 26, fontWeight: "300" },
-    shareText: { color: COLORS.accent, fontSize: 18, fontWeight: "600" },
-    headerTitle: { color: COLORS.textPrimary, fontSize: 16, fontWeight: "600", letterSpacing: 0.2 },
+    header: { paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+    iconButton: { width: 40, height: 40, borderRadius: 13, backgroundColor: T.cardSolid, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: T.border },
+    backText: { color: T.text, fontSize: 26, lineHeight: 28, fontWeight: "300" },
+    shareText: { color: T.accent, fontSize: 18, fontWeight: "700" },
+    headerTitle: { color: T.text, fontSize: 16, fontWeight: "700", letterSpacing: 0.2 },
 
-    modeTabs: { flexDirection: "row", alignSelf: "center", backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, padding: 4, marginBottom: 16, gap: 4 },
-    modeTab: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 9 },
-    modeTabActive: { backgroundColor: COLORS.accent },
-    modeTabText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "600" },
-    modeTabTextActive: { color: "#12151B" },
+    emptyTitle: { color: T.text, fontSize: 19, fontWeight: "700", textAlign: "center" },
+    emptyText: { color: T.textDim, fontSize: 14, textAlign: "center", lineHeight: 20, maxWidth: 300 },
+    vipBadge: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 8, backgroundColor: T.goldSoft, borderWidth: 1, borderColor: T.goldBorder, marginBottom: 4 },
+    vipBadgeText: { color: T.gold, fontSize: 12, fontWeight: "800", letterSpacing: 0.8 },
 
-    engineRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
-    engineText: { color: COLORS.textTertiary, fontSize: 11.5, letterSpacing: 0.2 },
-    openingText: { color: COLORS.accent, fontSize: 11.5, fontWeight: "600" },
+    primaryButton: { backgroundColor: T.accent, paddingHorizontal: 22, paddingVertical: 13, borderRadius: 13, alignItems: "center", marginTop: 8 },
+    primaryButtonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 14.5 },
+    secondaryButton: { flex: 1, paddingVertical: 11, borderRadius: 11, backgroundColor: T.raised, borderWidth: 1, borderColor: T.border, alignItems: "center" },
+    secondaryButtonText: { color: T.text, fontWeight: "700", fontSize: 13.5 },
 
-    accuracyRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 20, overflow: "hidden", width: BOARD_SIZE + 24 },
-    accuracyCard: { flex: 1, alignItems: "center", paddingVertical: 14, gap: 3 },
-    accuracyDivider: { width: 1, alignSelf: "stretch", backgroundColor: COLORS.border },
-    accuracyDot: { width: 6, height: 6, borderRadius: 3, marginBottom: 2 },
-    accuracyLabel: { color: COLORS.textSecondary, fontSize: 12 },
-    accuracyValue: { color: COLORS.textPrimary, fontSize: 22, fontWeight: "700" },
+    card: { backgroundColor: T.card, borderRadius: 18, borderWidth: 1, borderColor: T.border, padding: 16, marginTop: 14 },
+    cardTitle: { color: T.text, fontSize: 15, fontWeight: "700" },
 
-    boardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-    evalWrap: { alignItems: "center" },
-    evalBarVertical: { width: 12, height: BOARD_SIZE, borderRadius: 6, backgroundColor: COLORS.evalTrack, overflow: "hidden" },
-    evalBarBlack: { width: "100%", backgroundColor: COLORS.evalFill },
-    evalBarMidline: { position: "absolute", top: "50%", width: "100%", height: 1, backgroundColor: "rgba(0,0,0,0.15)" },
-    boardFrame: { padding: 8, borderRadius: 14, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-    board: { width: BOARD_SIZE, height: BOARD_SIZE, flexDirection: "row", flexWrap: "wrap", borderRadius: 8, overflow: "hidden" },
-    square: { width: SQUARE_SIZE, height: SQUARE_SIZE, justifyContent: "center", alignItems: "center" },
-    piece: { width: SQUARE_SIZE * 0.9, height: SQUARE_SIZE * 0.9 },
-    coordLabel: { position: "absolute", fontSize: 9, fontWeight: "700" },
-    dot: { position: "absolute", width: SQUARE_SIZE * 0.3, height: SQUARE_SIZE * 0.3, borderRadius: SQUARE_SIZE * 0.15, backgroundColor: "rgba(0,0,0,0.25)" },
-    dotCapture: { position: "absolute", width: SQUARE_SIZE * 0.9, height: SQUARE_SIZE * 0.9, borderRadius: SQUARE_SIZE * 0.45, borderWidth: 3, borderColor: "rgba(0,0,0,0.25)" },
-    badge: { position: "absolute", top: -1, right: -1, minWidth: 18, height: 18, paddingHorizontal: 3, borderRadius: 9, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.25)" },
-    badgeText: { color: "#12151B", fontSize: 9, fontWeight: "900" },
-    arrowHead: { position: "absolute", right: 0, width: 0, height: 0, borderTopWidth: 8, borderBottomWidth: 8, borderLeftWidth: 14, borderTopColor: "transparent", borderBottomColor: "transparent", borderLeftColor: COLORS.accent },
+    summaryTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 },
+    opening: { color: T.textDim, fontSize: 13, fontWeight: "600", flex: 1 },
+    resultTag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: "rgba(237,240,243,0.08)" },
+    resultTagText: { color: T.textDim, fontSize: 12, fontWeight: "800" },
+    playersRow: { flexDirection: "row", alignItems: "stretch" },
+    playersDivider: { width: 1, backgroundColor: T.border, marginHorizontal: 8 },
+    playerCard: { flex: 1, alignItems: "center" },
+    playerNameRow: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "100%" },
+    sideDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1, borderColor: "rgba(237,240,243,0.35)" },
+    playerName: { color: T.text, fontSize: 15, fontWeight: "700", flexShrink: 1 },
+    youTag: { paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 5, backgroundColor: T.accentSoft },
+    youTagText: { color: T.accent, fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+    playerRating: { color: T.textFaint, fontSize: 12, marginTop: 2 },
+    estimate: { alignItems: "center", marginTop: 10 },
+    estimateValue: { color: T.text, fontSize: 17, fontWeight: "800", fontVariant: ["tabular-nums"] },
+    estimateLabel: { color: T.textFaint, fontSize: 10.5, fontWeight: "600", marginTop: 1 },
+    summaryText: { color: T.textDim, fontSize: 13.5, lineHeight: 19, textAlign: "center", marginTop: 16 },
 
-    classificationBanner: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 18, paddingVertical: 12, paddingRight: 16, borderRadius: 14, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, width: BOARD_SIZE + 24, overflow: "hidden" },
-    classificationStripe: { width: 4, alignSelf: "stretch" },
-    classificationIconWrap: { minWidth: 34, height: 34, paddingHorizontal: 4, borderRadius: 10, justifyContent: "center", alignItems: "center" },
-    classificationIcon: { fontSize: 15, fontWeight: "800" },
-    classificationSan: { color: COLORS.textPrimary, fontSize: 15, fontWeight: "600" },
-    classificationLabel: { fontSize: 12.5, fontWeight: "600", marginTop: 1 },
-    classificationLabelIdle: { color: COLORS.textSecondary, fontSize: 13.5, marginLeft: 4 },
-    evalText: { color: COLORS.textSecondary, fontSize: 13, fontWeight: "700", fontVariant: ["tabular-nums"] },
+    qualityHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+    qualitySide: { flex: 1, color: T.textFaint, fontSize: 11.5, fontWeight: "700" },
+    qualityRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6.5, borderTopWidth: 1, borderTopColor: T.border },
+    qualityCount: { width: 44, fontSize: 16, fontWeight: "800", fontVariant: ["tabular-nums"] },
+    qualityLabelWrap: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
+    qualityLabel: { color: T.text, fontSize: 14, fontWeight: "600", width: 104 },
 
-    bestButton: { marginTop: 12, width: BOARD_SIZE + 24, paddingVertical: 11, borderRadius: 12, borderWidth: 1, borderColor: COLORS.accentBorder, backgroundColor: COLORS.accentSoft, alignItems: "center" },
-    bestButtonActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
-    bestButtonText: { color: COLORS.accent, fontSize: 13, fontWeight: "600" },
+    boardRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    boardFrame: { borderRadius: 8, overflow: "hidden" },
 
-    sandboxControls: { width: BOARD_SIZE + 24, marginTop: 18, alignItems: "center", gap: 12 },
-    sandboxHint: { color: COLORS.textSecondary, fontSize: 12.5, textAlign: "center" },
-    sandboxButtonsRow: { flexDirection: "row", gap: 10 },
+    coachCard: { flexDirection: "row", gap: 12, marginTop: 12, padding: 14, borderRadius: 18, backgroundColor: T.card, borderWidth: 1, borderColor: T.border, minHeight: 104 },
+    coachAvatar: { width: 56, height: 56 },
+    coachHeadline: { flexDirection: "row", alignItems: "center", gap: 8 },
+    coachTitle: { color: T.text, fontSize: 16, fontWeight: "800", flexShrink: 1 },
+    coachMeta: { color: T.textFaint, fontSize: 12, fontWeight: "600", marginTop: 3, fontVariant: ["tabular-nums"] },
+    coachText: { color: T.textDim, fontSize: 13.5, lineHeight: 19.5, marginTop: 6 },
+    coachLine: { color: T.text, fontSize: 12.5, lineHeight: 18, marginTop: 8, fontWeight: "600" },
+    coachLineLabel: { color: T.textFaint, fontWeight: "700" },
 
-    graphPanel: { width: BOARD_SIZE + 24, marginTop: 16, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, padding: 14 },
-    graphHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-    flipText: { color: COLORS.accent, fontSize: 12, fontWeight: "600" },
-    graphBars: { flexDirection: "row", height: 56, borderRadius: 6, overflow: "hidden", backgroundColor: COLORS.evalTrack },
-    graphCol: { flex: 1, height: "100%" },
-    graphColActive: { backgroundColor: COLORS.accent },
-    graphMark: { position: "absolute", bottom: 0, left: 0, right: 0, height: 3 },
+    actionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+    chipButton: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 11, borderWidth: 1, borderColor: T.accentBorder, backgroundColor: T.accentSoft },
+    chipButtonActive: { backgroundColor: T.accent, borderColor: T.accent },
+    chipButtonText: { color: "#9CC3E6", fontSize: 13, fontWeight: "700" },
+    chipButtonTextActive: { color: "#FFFFFF" },
 
-    turningList: { marginTop: 14, maxHeight: 40, width: BOARD_SIZE + 24 },
-    turningLabel: { color: COLORS.textTertiary, fontSize: 12, alignSelf: "center", marginRight: 8 },
-    turningChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: COLORS.accentSoft, borderWidth: 1, borderColor: COLORS.accentBorder, marginRight: 7, justifyContent: "center" },
-    turningChipText: { color: COLORS.accent, fontSize: 12, fontWeight: "600" },
+    coachAnswer: { color: T.text, fontSize: 14, lineHeight: 20.5, marginBottom: 6 },
+    coachRemaining: { color: T.textFaint, fontSize: 11.5, marginBottom: 10 },
+    questionChip: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 11, backgroundColor: T.raised, borderWidth: 1, borderColor: T.border, marginTop: 6 },
+    questionChipText: { color: T.text, fontSize: 13.5, fontWeight: "600" },
+    coachInputRow: { flexDirection: "row", gap: 8, marginTop: 10, alignItems: "center" },
+    coachInput: { flex: 1, backgroundColor: T.raised, borderRadius: 11, borderWidth: 1, borderColor: T.border, paddingHorizontal: 12, paddingVertical: 10, color: T.text, fontSize: 13.5 },
+    sendButton: { backgroundColor: T.accent, borderRadius: 11, paddingHorizontal: 16, height: 40, alignItems: "center", justifyContent: "center" },
+    sendButtonText: { color: "#FFFFFF", fontWeight: "800", fontSize: 13.5 },
+    coachErrorText: { color: "#F0A19E", fontSize: 12.5, marginTop: 8 },
 
-    moveList: { marginTop: 14, maxHeight: 44, width: BOARD_SIZE + 24 },
-    moveChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginRight: 7 },
-    moveChipActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
-    moveChipText: { color: COLORS.textSecondary, fontSize: 12.5, fontWeight: "600" },
-    moveChipTextActive: { color: "#12151B" },
+    controls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 14 },
+    controlButton: { width: 52, height: 46, borderRadius: 13, backgroundColor: T.cardSolid, borderWidth: 1, borderColor: T.border, alignItems: "center", justifyContent: "center" },
+    controlText: { color: T.text, fontSize: 15 },
+    controlTextLarge: { color: T.text, fontSize: 26, lineHeight: 28, fontWeight: "300" },
+    playButton: { width: 56, height: 50, borderRadius: 15, backgroundColor: T.accent, alignItems: "center", justifyContent: "center" },
+    playText: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
 
-    navRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, marginTop: 18 },
-    navButton: { paddingHorizontal: 18, paddingVertical: 11, borderRadius: 11, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-    navButtonPressed: { backgroundColor: COLORS.surfaceRaised },
-    navButtonText: { color: COLORS.textPrimary, fontWeight: "600", fontSize: 13.5 },
-    playButton: { width: 46, height: 46, borderRadius: 23, backgroundColor: COLORS.accent, justifyContent: "center", alignItems: "center" },
-    playButtonText: { color: "#12151B", fontSize: 15, fontWeight: "700" },
-    navIndex: { color: COLORS.textTertiary, fontSize: 12.5, fontVariant: ["tabular-nums"], minWidth: 44, textAlign: "center" },
+    keyRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+    keyButton: { flex: 1, paddingVertical: 11, borderRadius: 12, backgroundColor: T.cardSolid, borderWidth: 1, borderColor: T.border, alignItems: "center" },
+    keyButtonPrimary: { backgroundColor: T.accentSoft, borderColor: T.accentBorder },
+    keyButtonText: { color: T.textDim, fontSize: 12.5, fontWeight: "700" },
 
-    speedRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 },
-    speedChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-    speedChipActive: { backgroundColor: COLORS.accentSoft, borderColor: COLORS.accentBorder },
-    speedChipText: { color: COLORS.textSecondary, fontSize: 11.5, fontWeight: "600" },
-    speedChipTextActive: { color: COLORS.accent },
+    toolsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingHorizontal: 4 },
+    toolText: { color: "#9CC3E6", fontSize: 12.5, fontWeight: "700" },
+    toolIndex: { color: T.textFaint, fontSize: 12, fontVariant: ["tabular-nums"] },
 
-    reportPanel: { width: BOARD_SIZE + 24, marginTop: 24, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, padding: 16, gap: 6 },
-    reportTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "600", marginBottom: 2 },
-    reportLine: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 19 },
+    sandboxHint: { color: T.textDim, fontSize: 13, lineHeight: 18.5, marginTop: 5, marginBottom: 12 },
+    sandboxRow: { flexDirection: "row", gap: 8 },
 
-    statsPanel: { width: BOARD_SIZE + 24, marginTop: 16, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, padding: 16 },
-    statsHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-    statsTitle: { color: COLORS.textPrimary, fontSize: 14, fontWeight: "600" },
-    statsHeaderLegend: { flexDirection: "row", gap: 14 },
-    statsHeaderLegendText: { color: COLORS.textTertiary, fontSize: 11, width: 28, textAlign: "right" },
-    statsRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
-    statsIconWrap: { minWidth: 28, height: 28, paddingHorizontal: 3, borderRadius: 8, justifyContent: "center", alignItems: "center", marginRight: 10 },
-    statsIcon: { fontSize: 12, fontWeight: "800" },
-    statsLabelWrap: { flex: 1, gap: 4 },
-    statsLabel: { color: COLORS.textPrimary, fontSize: 12.5, fontWeight: "500" },
-    statsBarTrack: { flexDirection: "row", height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.05)", overflow: "hidden", position: "relative" },
-    statsBarFill: { position: "absolute", top: 0, height: 4, borderRadius: 2 },
-    statsCount: { color: COLORS.textSecondary, fontSize: 12, fontVariant: ["tabular-nums"], marginLeft: 10, minWidth: 40, textAlign: "right" },
+    legendRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10 },
+    legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+    legendDot: { width: 8, height: 8, borderRadius: 4 },
+    legendText: { color: T.textFaint, fontSize: 11, fontWeight: "600" },
 
-    trendPanel: { width: BOARD_SIZE + 24, marginTop: 16, backgroundColor: COLORS.surface, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, padding: 16 },
-    trendSubtitle: { color: COLORS.textTertiary, fontSize: 11.5, marginBottom: 12 },
-    trendBars: { flexDirection: "row", alignItems: "flex-end", height: 60, gap: 6 },
-    trendBarWrap: { flex: 1, height: "100%", justifyContent: "flex-end" },
-    trendBar: { backgroundColor: COLORS.accent, borderRadius: 3, minHeight: 4 },
+    phaseRow: { flexDirection: "row", gap: 8 },
+    phaseCell: { flex: 1, backgroundColor: T.raised, borderRadius: 12, paddingVertical: 11, alignItems: "center", borderWidth: 1, borderColor: T.border },
+    phaseName: { color: T.textFaint, fontSize: 11, fontWeight: "700", marginBottom: 5 },
+    phaseValueRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+    phaseValue: { fontSize: 20, fontWeight: "800", fontVariant: ["tabular-nums"] },
+
+    trendSubtitle: { color: T.textFaint, fontSize: 12, marginTop: 3, marginBottom: 12 },
+    trendBars: { flexDirection: "row", alignItems: "flex-end", height: 84, gap: 7 },
+    trendBarWrap: { flex: 1, height: "100%", justifyContent: "flex-end", alignItems: "center" },
+    trendValue: { color: T.textFaint, fontSize: 10, fontWeight: "700", marginBottom: 3 },
+    trendBar: { width: "100%", borderRadius: 5, minHeight: 5 },
+
+    footnote: { color: T.textFaint, fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 18, width: CONTENT_WIDTH, paddingHorizontal: 10 },
 });

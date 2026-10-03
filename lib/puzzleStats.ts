@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { log } from "./log";
+import { SOLVED_PUZZLES_KEY, schedulePushProgress } from "./progressSync";
 
-const KEY = "solved_puzzles";
+const KEY = SOLVED_PUZZLES_KEY;
 
 export async function getSolvedPuzzleIds(): Promise<string[]> {
     try {
@@ -23,8 +25,9 @@ export async function markPuzzleSolved(id: string): Promise<number> {
     ids.push(id);
     try {
         await AsyncStorage.setItem(KEY, JSON.stringify(ids));
+        schedulePushProgress();
     } catch (error) {
-        console.log("PUZZLE STATS ERROR:", error);
+        log("PUZZLE STATS ERROR:", error);
     }
     return ids.length;
 }

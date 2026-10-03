@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, BackHandler, ImageBackground, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, BackHandler, Pressable, ScrollView, Text, View } from 'react-native';
+import ImageBackground from '../components/ui/ImageBackground';
+import { tr } from "../lib/i18n";
 
 type SavedGame = {
     key: string;
@@ -15,7 +17,7 @@ type SavedGame = {
 export default function SavedGames() {
     const [games, setGames] = useState<SavedGame[]>([]);
     const router = useRouter();
-    const backgroundImage = require("../assets/images/background.png"); // Hintergrundbild
+    const backgroundImage = require("../assets/images/background.jpg"); // Hintergrundbild
     const loadGames = async () => {
         const keys = await AsyncStorage.getAllKeys();
         const savedKeys = keys.filter(k => k.startsWith('@saved_game_'));
@@ -77,7 +79,7 @@ export default function SavedGames() {
                         marginTop: 15,
                     }}
                 >
-                    Saved games
+                    {tr("Saved games")}
                 </Text>
                 {games.length === 0 ? (
                     <Text
@@ -88,7 +90,7 @@ export default function SavedGames() {
                             fontSize: 14,
                         }}
                     >
-                        No saved games yet.
+                        {tr("No saved games yet.")}
                     </Text>
                 ) : (
                     games.map(game => (
@@ -135,8 +137,8 @@ export default function SavedGames() {
                                     }}
                                 >
                                     {game.mode === "bot"
-                                        ? "🤖 bot-game"
-                                        : "👥 Local-game"}
+                                        ? tr("🤖 bot-game")
+                                        : tr("👥 Local-game")}
                                 </Text>
 
                                 <Text
@@ -154,15 +156,15 @@ export default function SavedGames() {
                             <Pressable
                                 onPress={() =>
                                     Alert.alert(
-                                        "Delete Game?",
-                                        "This action cannot be undone.",
+                                        tr("Delete Game?"),
+                                        tr("This action cannot be undone."),
                                         [
                                             {
-                                                text: "Cancel",
+                                                text: tr("Cancel"),
                                                 style: "cancel",
                                             },
                                             {
-                                                text: "Delete",
+                                                text: tr("Delete"),
                                                 style: "destructive",
                                                 onPress: () => deleteGame(game.key),
                                             },

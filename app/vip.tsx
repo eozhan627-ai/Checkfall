@@ -1,17 +1,26 @@
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     Alert,
-    ImageBackground,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
+import ImageBackground from "../components/ui/ImageBackground";
 import VipBadge from "../components/VipBadge";
 import { AccountType, getCurrentAccount, VipTier } from "../lib/account";
-import { supabase } from "../lib/supabase";
+import { syncVip } from "../lib/api";
+import {
+    buyPlan,
+    getStorePlans,
+    openSubscriptionSettings,
+    purchasesAvailable,
+    restorePurchases,
+    StorePlan,
+} from "../lib/purchases";
+import { tr } from "../lib/i18n";
 
 type PlanId = "silver" | "gold" | "diamond";
 
@@ -19,52 +28,48 @@ const PLANS: {
     id: PlanId;
     name: string;
     monthly: string;
-    yearly?: string;
-    lifetime?: string;
     features: string[];
     accent: string;
 }[] = [
     {
         id: "silver",
         name: "Silver",
-        monthly: "5,99 €/Monat",
+        monthly: "€5.99/month",
         features: [
-            "Basic-KI Analyse (unbegrenzt)",
-            "3 Lektionen pro Tag",
-            "Unbegrenzte Puzzles",
-            "Keine Werbung",
+            "Unlimited game analysis",
+            "Unlimited puzzles",
+            "3 lessons per day",
+            "Opening trainer",
+            "No ads",
         ],
         accent: "#C0C5CE",
     },
     {
         id: "gold",
         name: "Gold",
-        monthly: "8,99 €/Monat",
-        yearly: "97,99 €/Jahr",
+        monthly: "€8.99/month",
         features: [
-            "Basic-KI Analyse (unbegrenzt)",
-            "Unbegrenzte Lektionen",
-            "Unbegrenzte Puzzles",
-            "Exklusive Skins",
-            "Clans gründen* (auch nach den ersten 100)",
-            "Keine Werbung",
+            "Deeper game analysis",
+            "Unlimited puzzles and lessons",
+            "Opening trainer",
+            "Coach: more questions per day",
+            "Create clans* (even after the first 100)",
+            "No ads",
         ],
         accent: "#D4AF37",
     },
     {
         id: "diamond",
         name: "Diamond",
-        monthly: "12,99 €/Monat",
-        yearly: "129,99 €/Jahr",
-        lifetime: "309,99 € (einmalig, lebenslang)",
+        monthly: "€12.99/month",
         features: [
-            "Volle Stockfish-Tiefe + KI-Auswertung",
-            "Langzeitstatistiken & Fortschritt",
-            "Unbegrenzte Lektionen & Puzzles",
-            "Exklusive Skins & Emotes",
-            "Clans gründen* (auch nach den ersten 100)",
-            "Diamond-Profilrahmen & Badge",
-            "Keine Werbung",
+            "Full Stockfish depth + AI evaluation",
+            "Unlimited puzzles and lessons",
+            "Opening trainer",
+            "Coach: most questions per day",
+            "Create clans* (even after the first 100)",
+            "Diamond profile frame & badge",
+            "No ads",
         ],
         accent: "#A8E0EC",
     },
@@ -73,9 +78,8 @@ const PLANS: {
 export default function VipScreen() {
     const [account, setAccount] = useState<AccountType | null>(null);
     const [loading, setLoading] = useState(true);
-    const [busyTier, setBusyTier] = useState<PlanId | null>(null);
 
-    const backgroundImage = require("../assets/images/loginbackground.png");
+    const backgroundImage = require("../assets/images/loginbackground.jpg");
 
     const loadAccount = useCallback(async () => {
         const acc = await getCurrentAccount();
@@ -92,40 +96,74 @@ export default function VipScreen() {
     const currentTier: VipTier = account?.vipTier ?? "none";
     const isGuest = !!account?.guest;
 
-    const handleUpgradePress = (planName: string) => {
-        Alert.alert(
-            "Bald verfügbar",
-            `${planName} kann aktuell noch nicht gekauft werden. VIP befindet sich in der Testphase.`
-        );
+    // Plans as the store offers them (real prices, free trial). Empty while
+    // loading or when purchases are not available in this build.
+    const [storePlans, setStorePlans] = useState<StorePlan[]>([]);
+    const [busy, setBusy] = useState<string | null>(null);
+
+    const authId = account && !account.guest ? account.authId ?? null : null;
+
+    useEffect(() => {
+        let alive = true;
+
+        if (authId && purchasesAvailable()) {
+            getStorePlans(authId).then((plans) => alive && setStorePlans(plans));
+        }
+
+        return () => {
+            alive = false;
+        };
+    }, [authId]);
+
+    // The server checks the subscription with the store and sets the plan.
+    const refreshPlan = async () => {
+        try {
+            await syncVip();
+        } catch {
+            // The store notifies the server as well - the plan arrives a
+            // little later then.
+        }
+        await loadAccount();
     };
 
-    const handleDevSetTier = async (tier: PlanId) => {
-        if (!account || isGuest) return;
-
-        setBusyTier(tier);
-
-        try {
-            const nextTier = currentTier === tier ? "none" : tier;
-
-            const { data, error } = await supabase.rpc(
-                "dev_set_own_vip_tier",
-                { new_tier: nextTier }
-            );
-
-            if (error) {
-                console.log("DEV VIP TIER ERROR:", error);
-                Alert.alert("Fehler", "VIP-Stufe konnte nicht geändert werden.");
-                return;
-            }
-
-            setAccount((prev) =>
-                prev ? { ...prev, vipTier: data as VipTier } : prev
-            );
-        } catch (error) {
-            console.log("DEV VIP TIER ERROR:", error);
-        } finally {
-            setBusyTier(null);
+    const handleUpgradePress = async (planId: PlanId, planName: string) => {
+        if (!authId) {
+            Alert.alert(tr("Account required"), tr("Guest accounts cannot use VIP. Sign in with a real account."));
+            return;
         }
+
+        const storePlan = storePlans.find((plan) => plan.id === planId);
+
+        if (!storePlan) {
+            Alert.alert(
+                tr("Coming soon"),
+                tr("{0} cannot be purchased yet. VIP is still in its test phase.", planName)
+            );
+            return;
+        }
+
+        setBusy(planId);
+        const result = await buyPlan(authId, storePlan);
+
+        if (result === "purchased") {
+            await refreshPlan();
+            Alert.alert(tr("Welcome to VIP"), tr("Your {0} plan is active now.", planName));
+        } else if (result === "failed") {
+            Alert.alert(tr("Purchase not completed"), tr("The purchase could not be completed. You have not been charged."));
+        }
+
+        setBusy(null);
+    };
+
+    const handleRestore = async () => {
+        if (!authId) return;
+
+        setBusy("restore");
+        const found = await restorePurchases(authId);
+        await refreshPlan();
+        setBusy(null);
+
+        if (!found) Alert.alert(tr("Restore purchases"), tr("No purchases could be restored."));
     };
 
     if (loading) {
@@ -136,7 +174,7 @@ export default function VipScreen() {
                 resizeMode="cover"
             >
                 <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Wird geladen...</Text>
+                    <Text style={styles.loadingText}>{tr("Loading...")}</Text>
                 </View>
             </ImageBackground>
         );
@@ -165,16 +203,16 @@ export default function VipScreen() {
                 </View>
 
                 <View style={styles.hero}>
-                    <Text style={styles.eyebrow}>POV CHECK VIP</Text>
+                    <Text style={styles.eyebrow}>{tr("POVCHECK VIP")}</Text>
                     <Text style={styles.heroTitle}>
-                        Unlock the premium side of POV Check.
+                        {tr("Unlock the premium side of POVCheck.")}
                     </Text>
 
                     {currentTier !== "none" && (
                         <View style={styles.currentBadgeRow}>
                             <VipBadge tier={currentTier} />
                             <Text style={styles.currentBadgeText}>
-                                Dein aktueller Plan
+                                {tr("Your current plan")}
                             </Text>
                         </View>
                     )}
@@ -182,6 +220,11 @@ export default function VipScreen() {
 
                 {PLANS.map((plan) => {
                     const isCurrent = currentTier === plan.id;
+                    const storePlan = storePlans.find((entry) => entry.id === plan.id);
+                    const trialDays = storePlan?.trialDays ?? 0;
+
+                    // The store's price in the buyer's currency, when known.
+                    const priceText = storePlan?.price ? tr("{0}/month", storePlan.price) : plan.monthly;
 
                     return (
                         <View
@@ -206,17 +249,15 @@ export default function VipScreen() {
                                 </Text>
 
                                 <Text style={styles.planPrice}>
-                                    {plan.monthly}
+                                    {priceText}
                                 </Text>
                             </View>
 
-                            {(plan.yearly || plan.lifetime) && (
-                                <Text style={styles.planSubPrice}>
-                                    {[plan.yearly, plan.lifetime]
-                                        .filter(Boolean)
-                                        .join("  ·  ")}
-                                </Text>
-                            )}
+                            <Text style={styles.planSubPrice}>
+                                {trialDays > 0
+                                    ? tr("{0} days free, then monthly", trialDays)
+                                    : tr("Monthly subscription")}
+                            </Text>
 
                             <View style={styles.featureList}>
                                 {plan.features.map((feature) => (
@@ -244,15 +285,15 @@ export default function VipScreen() {
                                         </View>
 
                                         <Text style={styles.featureText}>
-                                            {feature}
+                                            {tr(feature)}
                                         </Text>
                                     </View>
                                 ))}
                             </View>
 
                             <Pressable
-                                onPress={() => handleUpgradePress(plan.name)}
-                                disabled={isCurrent}
+                                onPress={() => handleUpgradePress(plan.id, plan.name)}
+                                disabled={isCurrent || busy !== null}
                                 style={({ pressed }) => [
                                     styles.upgradeButton,
                                     {
@@ -269,41 +310,60 @@ export default function VipScreen() {
                                         { color: plan.accent },
                                     ]}
                                 >
-                                    {isCurrent ? "Aktueller Plan" : "Upgrade"}
+                                    {isCurrent
+                                        ? tr("Current plan")
+                                        : busy === plan.id
+                                            ? tr("One moment…")
+                                            : trialDays > 0
+                                                ? tr("Start {0} days free", trialDays)
+                                                : tr("Subscribe")}
                                 </Text>
                             </Pressable>
 
-                            {__DEV__ && !isGuest && (
-                                <Pressable
-                                    onPress={() => handleDevSetTier(plan.id)}
-                                    disabled={busyTier === plan.id}
-                                    style={({ pressed }) => [
-                                        styles.devButton,
-                                        pressed && styles.pressed,
-                                    ]}
-                                >
-                                    <Text style={styles.devButtonText}>
-                                        {busyTier === plan.id
-                                            ? "..."
-                                            : isCurrent
-                                            ? `Dev: ${plan.name} deaktivieren`
-                                            : `Dev: ${plan.name} aktivieren`}
-                                    </Text>
-                                </Pressable>
+                            {/* What the buyer agrees to - directly at the button. */}
+                            {!isCurrent && storePlan && (
+                                <Text style={styles.legal}>
+                                    {trialDays > 0
+                                        ? tr("Free for {0} days, then {1} per month. Renews automatically every month until you cancel. Cancel any time in Google Play - at least 24 hours before the trial or the current month ends, otherwise the next month is charged.", trialDays, storePlan.price)
+                                        : tr("{0} per month. Renews automatically every month until you cancel. Cancel any time in Google Play - at least 24 hours before the current month ends, otherwise the next month is charged.", storePlan.price)}
+                                </Text>
                             )}
                         </View>
                     );
                 })}
 
                 <Text style={styles.footnote}>
-                    * Clans gründen: Solange weniger als 100 Clans existieren,
-                    kann jeder gründen. Danach nur noch Gold/Diamond.
+                    {tr("* Creating clans: as long as fewer than 100 clans exist, anyone can create one. After that only Gold/Diamond.")}
                 </Text>
+
+                {authId && purchasesAvailable() && (
+                    <View style={styles.manageBox}>
+                        <Text style={styles.manageText}>
+                            {tr("Subscriptions are billed through your Google Play account and renew automatically every month. You can cancel at any time in Google Play; VIP then stays active until the end of the paid period.")}
+                        </Text>
+
+                        <View style={styles.manageLinks}>
+                            <Pressable onPress={openSubscriptionSettings} hitSlop={8}>
+                                <Text style={styles.manageLink}>{tr("Manage or cancel subscription")}</Text>
+                            </Pressable>
+                            <Pressable onPress={handleRestore} disabled={busy !== null} hitSlop={8}>
+                                <Text style={styles.manageLink}>
+                                    {busy === "restore" ? tr("One moment…") : tr("Restore purchases")}
+                                </Text>
+                            </Pressable>
+                            <Pressable onPress={() => router.push("/terms")} hitSlop={8}>
+                                <Text style={styles.manageLink}>{tr("Terms of Use")}</Text>
+                            </Pressable>
+                            <Pressable onPress={() => router.push("/privacypolicy")} hitSlop={8}>
+                                <Text style={styles.manageLink}>{tr("Privacy Policy")}</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                )}
 
                 {isGuest && (
                     <Text style={styles.guestHint}>
-                        Gäste-Accounts können VIP nicht nutzen. Melde dich mit
-                        einem echten Account an.
+                        {tr("Guest accounts cannot use VIP. Sign in with a real account.")}
                     </Text>
                 )}
 
@@ -387,6 +447,18 @@ const styles = StyleSheet.create({
         fontSize: 12.5,
         marginBottom: 14,
     },
+    legal: { color: "rgba(237,240,243,0.5)", fontSize: 11.5, lineHeight: 16, marginTop: 10 },
+    manageBox: {
+        borderRadius: 16,
+        backgroundColor: "rgba(27,32,39,0.8)",
+        borderWidth: 1,
+        borderColor: "rgba(237,240,243,0.08)",
+        padding: 16,
+        marginBottom: 18,
+    },
+    manageText: { color: "rgba(237,240,243,0.6)", fontSize: 12.5, lineHeight: 18 },
+    manageLinks: { flexDirection: "row", flexWrap: "wrap", columnGap: 18, rowGap: 10, marginTop: 12 },
+    manageLink: { color: "#7FB3DC", fontSize: 13, fontWeight: "600" },
     featureList: { marginBottom: 16 },
     featureRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
     checkCircle: {
@@ -409,21 +481,6 @@ const styles = StyleSheet.create({
     },
     upgradeButtonDisabled: { opacity: 0.5 },
     upgradeText: { fontSize: 14.5, fontWeight: "700" },
-    devButton: {
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: "rgba(237,240,243,0.05)",
-        borderWidth: 1,
-        borderColor: "rgba(237,240,243,0.1)",
-        alignItems: "center",
-        justifyContent: "center",
-        marginTop: 10,
-    },
-    devButtonText: {
-        color: "rgba(237,240,243,0.6)",
-        fontSize: 12.5,
-        fontWeight: "600",
-    },
     footnote: {
         color: "rgba(237,240,243,0.4)",
     

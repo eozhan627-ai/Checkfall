@@ -7,6 +7,7 @@ import {
     Text,
     View,
 } from "react-native";
+import { tr } from "../lib/i18n";
 
 export default function TermsScreen() {
     const router = useRouter();
@@ -66,11 +67,53 @@ export default function TermsScreen() {
                 </View>
 
                 <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{tr("Computer opponents")}</Text>
+                    <Text style={styles.text}>
+                        {tr("If no suitable human opponent is found in time, you may be paired with a computer opponent that plays at about your rating. It is not marked as such during the game. These games count for your rating and statistics like any other game.")}
+                    </Text>
+                </View>
+
+                <View style={styles.card}>
                     <Text style={styles.cardTitle}>Penalties</Text>
                     <Text style={styles.text}>
                         Violations may result in temporary suspension,
                         permanent ban, or removal of rankings and game
                         history.
+                    </Text>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{tr("VIP subscription")}</Text>
+                    <Text style={styles.text}>
+                        {tr("POVCheck VIP is a paid subscription with the plans Silver, Gold and Diamond. The price of each plan is shown in the app before you buy. Payment is handled by the store you use (Google Play or the App Store) and charged to your store account.")}
+                    </Text>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{tr("Free trial")}</Text>
+                    <Text style={styles.text}>
+                        {tr("If a free trial is offered, it is shown before you buy, together with its length. You can cancel during the trial without being charged. If you do not cancel at least 24 hours before the trial ends, the subscription starts automatically and the first month is charged.")}
+                    </Text>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{tr("Automatic renewal")}</Text>
+                    <Text style={styles.text}>
+                        {tr("A VIP subscription runs for one month and renews automatically for another month at the price shown, again and again, until you cancel. The payment for the next month is charged within 24 hours before the current month ends.")}
+                    </Text>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{tr("Cancellation")}</Text>
+                    <Text style={styles.text}>
+                        {tr("You can cancel at any time in your store account (Google Play: Payments and subscriptions > Subscriptions). Cancel at least 24 hours before the current period ends. After cancelling, VIP stays active until the end of the period already paid for; payments already made are not refunded for the remaining time, except where the law or the store's refund rules require it. Deleting the app does not cancel the subscription.")}
+                    </Text>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{tr("Changes and your rights")}</Text>
+                    <Text style={styles.text}>
+                        {tr("If the price of a plan changes, you are informed in advance through the store and can cancel before the new price applies. Your statutory rights as a consumer, including any right of withdrawal, are not affected by these Terms.")}
                     </Text>
                 </View>
 
